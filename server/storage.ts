@@ -6,6 +6,8 @@ import {
   loans, Loan, InsertLoan,
   processes, Process, InsertProcess
 } from "@shared/schema";
+import { eq } from "drizzle-orm";
+import { db } from "./db";
 
 // Interface for storage operations
 export interface IStorage {
