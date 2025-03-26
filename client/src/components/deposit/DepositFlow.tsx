@@ -549,33 +549,35 @@ export default function DepositFlow({ warehouses, userLocation }: DepositFlowPro
               
               <div className="grid gap-4">
                 <div>
-                  <FormLabel>Preferred Date</FormLabel>
+                  <label className="text-sm font-medium">Preferred Date</label>
                   <Input
                     type="date"
                     value={pickupDate}
                     onChange={(e) => setPickupDate(e.target.value)}
                     min={new Date().toISOString().split('T')[0]}
+                    className="mt-1.5"
                   />
                 </div>
                 
                 {!useWarehouseDelivery && (
                   <>
                     <div>
-                      <FormLabel>Preferred Time</FormLabel>
+                      <label className="text-sm font-medium">Preferred Time</label>
                       <Input
                         type="time"
                         value={pickupTime}
                         onChange={(e) => setPickupTime(e.target.value)}
+                        className="mt-1.5"
                       />
                     </div>
                     
                     <div>
-                      <FormLabel>Pickup Address</FormLabel>
+                      <label className="text-sm font-medium">Pickup Address</label>
                       <Textarea
                         placeholder="Enter the complete address for pickup"
                         value={pickupAddress}
                         onChange={(e) => setPickupAddress(e.target.value)}
-                        className="resize-none"
+                        className="resize-none mt-1.5"
                       />
                     </div>
                   </>
