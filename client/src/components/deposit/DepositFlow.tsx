@@ -148,8 +148,8 @@ export default function DepositFlow({ warehouses, userLocation }: DepositFlowPro
       setCurrentStep(DepositStep.CommodityDetails);
     } else if (currentStep === DepositStep.ReviewSubmit) {
       setCurrentStep(DepositStep.SchedulePickup);
-    } else if (currentStep === DepositStep.Confirmation && processId) {
-      setCurrentStep(DepositStep.TrackDeposit);
+    } else if (currentStep === DepositStep.TrackDeposit) {
+      setCurrentStep(DepositStep.Confirmation);
     }
   };
   
@@ -760,13 +760,49 @@ export default function DepositFlow({ warehouses, userLocation }: DepositFlowPro
             <CardFooter className="flex flex-col space-y-2">
               <Button 
                 className="w-full" 
-                onClick={() => setLocation("/receipts")}
+                onClick={() => processId ? setCurrentStep(DepositStep.TrackDeposit) : null}
               >
-                Go to Warehouse Receipts
+                Track This Deposit
               </Button>
               <Button 
                 variant="outline" 
                 className="w-full" 
+                onClick={() => setCurrentStep(DepositStep.CommodityDetails)}
+              >
+                Start New Deposit
+              </Button>
+            </CardFooter>
+          </Card>
+        )}
+        
+        {currentStep === DepositStep.TrackDeposit && processId && (
+          <Card className="w-full">
+            <CardHeader>
+              <div className="flex items-center">
+                <Button variant="ghost" size="icon" onClick={handlePreviousStep} className="mr-2">
+                  <ArrowLeft className="h-4 w-4" />
+                </Button>
+                <div>
+                  <CardTitle>Track Deposit</CardTitle>
+                  <CardDescription>
+                    Follow the progress of your commodity deposit in real-time
+                  </CardDescription>
+                </div>
+              </div>
+            </CardHeader>
+            
+            <CardContent>
+              <DepositProgress processId={processId} />
+            </CardContent>
+            
+            <CardFooter className="flex justify-end space-x-2">
+              <Button 
+                variant="outline" 
+                onClick={() => setLocation("/receipts")}
+              >
+                View All Receipts
+              </Button>
+              <Button 
                 onClick={() => setCurrentStep(DepositStep.CommodityDetails)}
               >
                 Start New Deposit
