@@ -515,4 +515,247 @@ export class MemStorage implements IStorage {
   }
 }
 
-export const storage = new MemStorage();
+export class DatabaseStorage implements IStorage {
+  // User operations
+  async getUser(id: number): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.id, id));
+    return user || undefined;
+  }
+
+  async getUserByUsername(username: string): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.username, username));
+    return user || undefined;
+  }
+
+  async getUserByEmail(email: string): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.email, email));
+    return user || undefined;
+  }
+
+  async createUser(insertUser: InsertUser): Promise<User> {
+    const [user] = await db.insert(users).values(insertUser).returning();
+    return user;
+  }
+
+  async listUsers(): Promise<User[]> {
+    return await db.select().from(users);
+  }
+
+  async updateUser(id: number, userData: Partial<InsertUser>): Promise<User | undefined> {
+    const [updatedUser] = await db
+      .update(users)
+      .set(userData)
+      .where(eq(users.id, id))
+      .returning();
+    return updatedUser || undefined;
+  }
+  
+  // Warehouse operations
+  async getWarehouse(id: number): Promise<Warehouse | undefined> {
+    const [warehouse] = await db.select().from(warehouses).where(eq(warehouses.id, id));
+    return warehouse || undefined;
+  }
+
+  async createWarehouse(insertWarehouse: InsertWarehouse): Promise<Warehouse> {
+    const [warehouse] = await db.insert(warehouses).values(insertWarehouse).returning();
+    return warehouse;
+  }
+
+  async listWarehouses(): Promise<Warehouse[]> {
+    return await db.select().from(warehouses);
+  }
+
+  async listWarehousesByLocation(latitude: number, longitude: number, radius: number): Promise<Warehouse[]> {
+    // For now, get all warehouses and filter in-memory
+    // In a real app, you'd use a spatial query or PostGIS
+    const allWarehouses = await this.listWarehouses();
+    return allWarehouses.filter(warehouse => {
+      const distance = calculateDistance(
+        latitude,
+        longitude,
+        parseFloat(warehouse.latitude),
+        parseFloat(warehouse.longitude)
+      );
+      return distance <= radius;
+    });
+
+    function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
+      const R = 6371; // Radius of the earth in km
+      const dLat = deg2rad(lat2 - lat1);
+      const dLon = deg2rad(lon2 - lon1);
+      const a =
+        Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+        Math.cos(deg2rad(lat1)) * Math.cos(deg2rad(lat2)) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+      const distance = R * c; // Distance in km
+      return distance;
+    }
+
+    function deg2rad(deg: number): number {
+      return deg * (Math.PI / 180);
+    }
+  }
+
+  async updateWarehouse(id: number, warehouseData: Partial<InsertWarehouse>): Promise<Warehouse | undefined> {
+    const [updatedWarehouse] = await db
+      .update(warehouses)
+      .set(warehouseData)
+      .where(eq(warehouses.id, id))
+      .returning();
+    return updatedWarehouse || undefined;
+  }
+  
+  // Commodity operations
+  async getCommodity(id: number): Promise<Commodity | undefined> {
+    const [commodity] = await db.select().from(commodities).where(eq(commodities.id, id));
+    return commodity || undefined;
+  }
+
+  async createCommodity(insertCommodity: InsertCommodity): Promise<Commodity> {
+    const now = new Date();
+    const commodityWithDates = {
+      ...insertCommodity,
+      depositDate: now,
+      lastUpdated: now
+    };
+    const [commodity] = await db.insert(commodities).values(commodityWithDates).returning();
+    return commodity;
+  }
+
+  async listCommodities(): Promise<Commodity[]> {
+    return await db.select().from(commodities);
+  }
+
+  async listCommoditiesByOwner(ownerId: number): Promise<Commodity[]> {
+    return await db.select().from(commodities).where(eq(commodities.ownerId, ownerId));
+  }
+
+  async updateCommodity(id: number, commodityData: Partial<InsertCommodity>): Promise<Commodity | undefined> {
+    const dataToUpdate = { ...commodityData, lastUpdated: new Date() };
+    const [updatedCommodity] = await db
+      .update(commodities)
+      .set(dataToUpdate)
+      .where(eq(commodities.id, id))
+      .returning();
+    return updatedCommodity || undefined;
+  }
+  
+  // Warehouse Receipt operations
+  async getWarehouseReceipt(id: number): Promise<WarehouseReceipt | undefined> {
+    const [receipt] = await db.select().from(warehouseReceipts).where(eq(warehouseReceipts.id, id));
+    return receipt || undefined;
+  }
+
+  async getWarehouseReceiptByNumber(receiptNumber: string): Promise<WarehouseReceipt | undefined> {
+    const [receipt] = await db.select().from(warehouseReceipts).where(eq(warehouseReceipts.receiptNumber, receiptNumber));
+    return receipt || undefined;
+  }
+
+  async createWarehouseReceipt(insertReceipt: InsertWarehouseReceipt): Promise<WarehouseReceipt> {
+    const now = new Date();
+    const receiptWithDate = {
+      ...insertReceipt,
+      issuedDate: now
+    };
+    const [receipt] = await db.insert(warehouseReceipts).values(receiptWithDate).returning();
+    return receipt;
+  }
+
+  async listWarehouseReceipts(): Promise<WarehouseReceipt[]> {
+    return await db.select().from(warehouseReceipts);
+  }
+
+  async listWarehouseReceiptsByOwner(ownerId: number): Promise<WarehouseReceipt[]> {
+    return await db.select().from(warehouseReceipts).where(eq(warehouseReceipts.ownerId, ownerId));
+  }
+
+  async updateWarehouseReceipt(id: number, receiptData: Partial<InsertWarehouseReceipt>): Promise<WarehouseReceipt | undefined> {
+    const [updatedReceipt] = await db
+      .update(warehouseReceipts)
+      .set(receiptData)
+      .where(eq(warehouseReceipts.id, id))
+      .returning();
+    return updatedReceipt || undefined;
+  }
+  
+  // Loan operations
+  async getLoan(id: number): Promise<Loan | undefined> {
+    const [loan] = await db.select().from(loans).where(eq(loans.id, id));
+    return loan || undefined;
+  }
+
+  async createLoan(insertLoan: InsertLoan): Promise<Loan> {
+    const now = new Date();
+    const loanWithDate = {
+      ...insertLoan,
+      startDate: now
+    };
+    const [loan] = await db.insert(loans).values(loanWithDate).returning();
+    return loan;
+  }
+
+  async listLoans(): Promise<Loan[]> {
+    return await db.select().from(loans);
+  }
+
+  async listLoansByUser(userId: number): Promise<Loan[]> {
+    return await db.select().from(loans).where(eq(loans.userId, userId));
+  }
+
+  async updateLoan(id: number, loanData: Partial<InsertLoan>): Promise<Loan | undefined> {
+    const [updatedLoan] = await db
+      .update(loans)
+      .set(loanData)
+      .where(eq(loans.id, id))
+      .returning();
+    return updatedLoan || undefined;
+  }
+  
+  // Process operations
+  async getProcess(id: number): Promise<Process | undefined> {
+    const [process] = await db.select().from(processes).where(eq(processes.id, id));
+    return process || undefined;
+  }
+
+  async createProcess(insertProcess: InsertProcess): Promise<Process> {
+    const now = new Date();
+    const processWithDates = {
+      ...insertProcess,
+      startTime: now,
+      completedTime: null
+    };
+    const [process] = await db.insert(processes).values(processWithDates).returning();
+    return process;
+  }
+
+  async listProcesses(): Promise<Process[]> {
+    return await db.select().from(processes);
+  }
+
+  async listProcessesByUser(userId: number): Promise<Process[]> {
+    return await db.select().from(processes).where(eq(processes.userId, userId));
+  }
+
+  async listProcessesByCommodity(commodityId: number): Promise<Process[]> {
+    return await db.select().from(processes).where(eq(processes.commodityId, commodityId));
+  }
+
+  async updateProcess(id: number, processData: Partial<InsertProcess>): Promise<Process | undefined> {
+    let dataToUpdate = processData;
+    
+    // If updating status to completed, add completed time
+    if (processData.status === 'completed') {
+      dataToUpdate = { ...processData, completedTime: new Date() };
+    }
+    
+    const [updatedProcess] = await db
+      .update(processes)
+      .set(dataToUpdate)
+      .where(eq(processes.id, id))
+      .returning();
+    return updatedProcess || undefined;
+  }
+}
+
+// Use the database storage implementation
+export const storage = new DatabaseStorage();
