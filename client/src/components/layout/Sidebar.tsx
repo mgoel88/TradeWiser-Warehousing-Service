@@ -65,6 +65,19 @@ export default function Sidebar() {
             </Link>
           </li>
           <li className="mb-1">
+            <Link href="/deposit" className={cn(
+              "flex items-center p-2 rounded-md",
+              location === "/deposit" 
+                ? "bg-primary-50 text-primary-600 font-medium" 
+                : "text-gray-700 hover:bg-gray-100"
+            )}>
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
+              </svg>
+              Deposit Commodity
+            </Link>
+          </li>
+          <li className="mb-1">
             <Link href="/loans" className={cn(
               "flex items-center p-2 rounded-md",
               location === "/loans" 

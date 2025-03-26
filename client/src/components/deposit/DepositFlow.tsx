@@ -68,7 +68,7 @@ export default function DepositFlow({ warehouses, userLocation }: DepositFlowPro
     defaultValues: {
       name: "",
       type: "",
-      quantity: "",
+      quantity: "0",
       measurementUnit: "MT",
       qualityParameters: {},
       gradeAssigned: "",
@@ -158,7 +158,7 @@ export default function DepositFlow({ warehouses, userLocation }: DepositFlowPro
         ownerId: user?.id,
         status: "processing", // Initial status
         channelType: "green", // Default channel
-        valuation: parseFloat(data.quantity) * 2100, // Sample valuation calculation
+        valuation: (parseFloat(data.quantity) * 2100).toString(), // Sample valuation calculation
         // Add pickup/delivery details
         depositDetails: {
           pickupDate,
@@ -169,10 +169,12 @@ export default function DepositFlow({ warehouses, userLocation }: DepositFlowPro
       };
       
       // Call API to create a new commodity
-      const commodity = await apiRequest("/api/commodities", {
-        method: "POST",
-        body: JSON.stringify(formattedData),
-      });
+      const response = await apiRequest(
+        "POST",
+        "/api/commodities",
+        formattedData
+      );
+      const commodity = await response.json();
 
       if (commodity) {
         // Create a process for this deposit
@@ -192,10 +194,11 @@ export default function DepositFlow({ warehouses, userLocation }: DepositFlowPro
           estimatedCompletionTime: new Date(new Date().setHours(new Date().getHours() + 48)) // 48 hours estimate
         };
         
-        await apiRequest("/api/processes", {
-          method: "POST",
-          body: JSON.stringify(processData),
-        });
+        await apiRequest(
+          "POST",
+          "/api/processes",
+          processData
+        );
         
         setCurrentStep(DepositStep.Confirmation);
         toast({
@@ -293,11 +296,13 @@ export default function DepositFlow({ warehouses, userLocation }: DepositFlowPro
                               </div>
                               <p className="text-sm text-muted-foreground">{formatAddress(warehouse)}</p>
                               <div className="flex flex-wrap gap-1 mt-2">
-                                {warehouse.specializations.crops.map((crop: string, i: number) => (
-                                  <span key={i} className="bg-primary/10 text-primary text-xs px-2 py-0.5 rounded">
-                                    {crop}
-                                  </span>
-                                ))}
+                                {Array.isArray((warehouse.specializations as any)?.crops) ? 
+                                  (warehouse.specializations as any).crops.map((crop: string, i: number) => (
+                                    <span key={i} className="bg-primary/10 text-primary text-xs px-2 py-0.5 rounded">
+                                      {crop}
+                                    </span>
+                                  ))
+                                : <span className="text-xs text-muted-foreground">No specializations</span>}
                               </div>
                             </div>
                             <div className="text-right">
