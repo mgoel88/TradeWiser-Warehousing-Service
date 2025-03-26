@@ -15,9 +15,13 @@ import { Textarea } from "@/components/ui/textarea";
 import { Steps, Step } from "@/components/ui/steps";
 import { Warehouse } from "@shared/schema";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Check, Truck, Package, FileText, ArrowLeft, MapPin, Search, Calendar, Activity } from "lucide-react";
+import { 
+  Check, Truck, Package, FileText, ArrowLeft, MapPin, Search, 
+  Calendar, Activity, Globe, Navigation, Locate, Map 
+} from "lucide-react";
 import { calculateDistance } from "@/lib/utils";
 import DepositProgress from "./DepositProgress";
+import LocationPicker from "./LocationPicker";
 
 // Create schema for the deposit form
 const depositCommoditySchema = z.object({
@@ -71,7 +75,7 @@ export default function DepositFlow({ warehouses, userLocation }: DepositFlowPro
     defaultValues: {
       name: "",
       type: "",
-      quantity: "0",
+      quantity: "0" as any, // Type assertion to resolve string type in a numeric field
       measurementUnit: "MT",
       qualityParameters: {},
       gradeAssigned: "",
@@ -118,11 +122,15 @@ export default function DepositFlow({ warehouses, userLocation }: DepositFlowPro
   };
   
   // Handle moving to next step
-  const handleNextStep = () => {
+  const handleNextStep = async () => {
     if (currentStep === DepositStep.CommodityDetails) {
-      const result = form.trigger(['name', 'type', 'quantity', 'measurementUnit']);
-      if (result) {
-        setCurrentStep(DepositStep.SelectWarehouse);
+      try {
+        const result = await form.trigger(['name', 'type', 'quantity', 'measurementUnit']);
+        if (result === true) { // Explicit true check
+          setCurrentStep(DepositStep.SelectWarehouse);
+        }
+      } catch (error) {
+        console.error("Validation error:", error);
       }
     } else if (currentStep === DepositStep.SchedulePickup) {
       if (
@@ -584,12 +592,13 @@ export default function DepositFlow({ warehouses, userLocation }: DepositFlowPro
                     </div>
                     
                     <div>
-                      <label className="text-sm font-medium">Pickup Address</label>
-                      <Textarea
-                        placeholder="Enter the complete address for pickup"
-                        value={pickupAddress}
-                        onChange={(e) => setPickupAddress(e.target.value)}
-                        className="resize-none mt-1.5"
+                      <label className="text-sm font-medium mb-1.5 block">Pickup Location</label>
+                      <LocationPicker 
+                        onLocationSelect={(address, coordinates) => {
+                          setPickupAddress(address);
+                          console.log("Selected coordinates:", coordinates); // For future use with logistics
+                        }}
+                        initialAddress={pickupAddress}
                       />
                     </div>
                   </>
