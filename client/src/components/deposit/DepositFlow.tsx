@@ -27,7 +27,14 @@ import LocationPicker from "./LocationPicker";
 const depositCommoditySchema = z.object({
   name: z.string().min(2, "Commodity name must be at least 2 characters"),
   type: z.string().min(2, "Type is required"),
-  quantity: z.string().transform((val) => parseFloat(val)).refine(val => !isNaN(val) && val > 0, "Quantity must be a positive number"),
+  quantity: z.union([
+    z.string().transform((val) => {
+      const num = parseFloat(val);
+      if (isNaN(num)) throw new Error("Invalid number");
+      return num;
+    }),
+    z.number().positive("Quantity must be a positive number")
+  ]),
   measurementUnit: z.string().min(1, "Unit is required"),
   qualityParameters: z.record(z.string()).optional(),
   gradeAssigned: z.string().optional(),
@@ -164,6 +171,20 @@ export default function DepositFlow({ warehouses, userLocation }: DepositFlowPro
   // Handle form submission
   const onSubmit = async (data: DepositCommodityFormValues) => {
     try {
+      // Convert quantity to number for API compatibility
+      const quantityAsNumber = typeof data.quantity === 'string' 
+        ? parseFloat(data.quantity) 
+        : (data.quantity as unknown as number);
+        
+      if (isNaN(quantityAsNumber)) {
+        toast({
+          title: "Invalid quantity",
+          description: "Please enter a valid number for quantity",
+          variant: "destructive",
+        });
+        return;
+      }
+      
       // Include quality parameters from the state
       const formattedData = {
         ...data,
@@ -171,8 +192,8 @@ export default function DepositFlow({ warehouses, userLocation }: DepositFlowPro
         ownerId: user?.id,
         status: "processing", // Initial status
         channelType: "green", // Default channel
-        quantity: data.quantity.toString(), // Keep as string for API compatibility
-        valuation: parseFloat(data.quantity.toString()) * 2100, // Sample valuation calculation
+        quantity: quantityAsNumber, // Convert to number for API
+        valuation: quantityAsNumber * 2100, // Sample valuation calculation
         // Add pickup/delivery details
         depositDetails: {
           pickupDate,
