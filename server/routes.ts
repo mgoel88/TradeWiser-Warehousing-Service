@@ -790,6 +790,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const process = await storage.createProcess(validData);
       
+      // If this is a deposit process, simulate automatic updates for demo purposes
+      if (process.processType === 'deposit' && process.status === 'pending') {
+        // We will simulate a simple process update broadcast to demonstrate the websocket functionality
+        setTimeout(() => {
+          console.log(`Setting up demo process simulation for process ${process.id}`);
+          
+          // Simply send a notification about the process being created and ready for tracking
+          const broadcastUpdate = (global as any).broadcastProcessUpdate;
+          if (typeof broadcastUpdate === 'function') {
+            broadcastUpdate(process.userId, process.id, {
+              process: process,
+              update: {
+                message: 'Process tracking initialized',
+                status: 'pending',
+                progress: 5
+              }
+            });
+          }
+        }, 2000);
+      }
+      
       res.status(201).json(process);
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -826,6 +847,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       const updatedProcess = await storage.updateProcess(id, req.body);
+      
+      // Broadcast update to WebSocket clients
+      const broadcastUpdate = (global as any).broadcastProcessUpdate;
+      if (typeof broadcastUpdate === 'function') {
+        broadcastUpdate(process.userId, id, {
+          process: updatedProcess,
+          update: req.body
+        });
+      }
+      
       res.status(200).json(updatedProcess);
     } catch (error) {
       res.status(500).json({ message: "Server error" });
@@ -836,6 +867,95 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api", apiRouter);
 
   const httpServer = createServer(app);
+  
+  // Initialize WebSocket server on a distinct path to avoid conflicts with Vite HMR
+  const wss = new WebSocketServer({ 
+    server: httpServer, 
+    path: '/ws'
+  });
+  
+  // Map to store active connections by user ID and process ID
+  const connections = new Map<string, WebSocket[]>();
+  
+  wss.on('connection', (ws: WebSocket) => {
+    console.log('WebSocket client connected');
+    let userId: string | null = null;
+    let processId: string | null = null;
+    
+    ws.on('message', (message: string) => {
+      try {
+        const data = JSON.parse(message);
+        // User subscribes to updates for a specific process
+        if (data.type === 'subscribe' && data.userId && data.processId) {
+          userId = data.userId.toString();
+          processId = data.processId.toString();
+          
+          // Store connection keyed by userId:processId
+          const key = `${userId}:${processId}`;
+          if (!connections.has(key)) {
+            connections.set(key, []);
+          }
+          connections.get(key)?.push(ws);
+          
+          // Send confirmation
+          ws.send(JSON.stringify({
+            type: 'subscribed',
+            processId,
+            userId,
+            timestamp: new Date().toISOString()
+          }));
+          
+          console.log(`User ${userId} subscribed to process ${processId}`);
+        }
+      } catch (err) {
+        console.error('Error processing WebSocket message:', err);
+      }
+    });
+    
+    ws.on('close', () => {
+      if (userId && processId) {
+        const key = `${userId}:${processId}`;
+        const clients = connections.get(key) || [];
+        const index = clients.indexOf(ws);
+        if (index !== -1) {
+          clients.splice(index, 1);
+          if (clients.length === 0) {
+            connections.delete(key);
+          } else {
+            connections.set(key, clients);
+          }
+        }
+        console.log(`User ${userId} unsubscribed from process ${processId}`);
+      }
+      console.log('WebSocket client disconnected');
+    });
+  });
+  
+  // Helper function to broadcast updates to WebSocket clients
+  function broadcastProcessUpdate(userId: number, processId: number, data: any) {
+    const key = `${userId}:${processId}`;
+    const clients = connections.get(key) || [];
+    
+    if (clients.length > 0) {
+      const message = JSON.stringify({
+        type: 'process_update',
+        processId,
+        ...data,
+        timestamp: new Date().toISOString()
+      });
+      
+      clients.forEach(client => {
+        if (client.readyState === WebSocket.OPEN) {
+          client.send(message);
+        }
+      });
+      
+      console.log(`Sent update to ${clients.length} clients for process ${processId}`);
+    }
+  }
+  
+  // Make broadcastProcessUpdate available on the global scope
+  (global as any).broadcastProcessUpdate = broadcastProcessUpdate;
 
   return httpServer;
 }

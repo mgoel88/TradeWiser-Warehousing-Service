@@ -51,13 +51,15 @@ export default function DepositProgress({ processId }: DepositProgressProps) {
           console.log('WebSocket connection established');
           setIsLive(true);
           
-          // Subscribe to updates for this specific process
-          const subscribeMsg = JSON.stringify({
+          // Get the user ID from session (you would normally get this from your auth context)
+          const userId = localStorage.getItem('userId');
+          
+          // Subscribe to updates for this process
+          socket.send(JSON.stringify({
             type: 'subscribe',
-            entity: 'process',
-            id: processId
-          });
-          socket.send(subscribeMsg);
+            userId: userId || 1, // Fallback to ID 1 for demo
+            processId
+          }));
           
           toast({
             title: 'Live updates activated',
@@ -65,14 +67,16 @@ export default function DepositProgress({ processId }: DepositProgressProps) {
           });
         };
         
-        socket.onmessage = (event) => {
+        socket.onmessage = (event: MessageEvent) => {
           try {
-            const data = JSON.parse(event.data);
+            const data = JSON.parse(event.data as string);
             console.log('WebSocket message received:', data);
             
-            if (data.type === 'update' && data.entity === 'process' && data.id === processId) {
+            if (data.type === 'process_update' && data.processId === processId) {
               // Update the cached data with the new process information
-              queryClient.setQueryData(['/api/processes', processId], data.data);
+              if (data.process) {
+                queryClient.setQueryData(['/api/processes', processId], data.process);
+              }
               setLastUpdate(new Date());
             }
           } catch (error) {
@@ -87,7 +91,7 @@ export default function DepositProgress({ processId }: DepositProgressProps) {
           setTimeout(connectWebSocket, 5000);
         };
         
-        socket.onerror = (error) => {
+        socket.onerror = (error: Event) => {
           console.error('WebSocket error:', error);
           setIsLive(false);
         };
