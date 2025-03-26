@@ -249,10 +249,17 @@ export default function DepositFlow({ warehouses, userLocation }: DepositFlowPro
         {currentStep === DepositStep.SelectWarehouse && (
           <Card className="w-full">
             <CardHeader>
-              <CardTitle>Select a Warehouse</CardTitle>
-              <CardDescription>
-                Choose a warehouse closest to you or based on your requirements
-              </CardDescription>
+              <div className="flex items-center">
+                <Button variant="ghost" size="icon" onClick={handlePreviousStep} className="mr-2">
+                  <ArrowLeft className="h-4 w-4" />
+                </Button>
+                <div>
+                  <CardTitle>Select a Warehouse</CardTitle>
+                  <CardDescription>
+                    Choose a warehouse closest to you or based on your requirements
+                  </CardDescription>
+                </div>
+              </div>
               
               <div className="relative mt-4">
                 <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
@@ -746,7 +753,7 @@ export default function DepositFlow({ warehouses, userLocation }: DepositFlowPro
               <Button 
                 variant="outline" 
                 className="w-full" 
-                onClick={() => setCurrentStep(DepositStep.SelectWarehouse)}
+                onClick={() => setCurrentStep(DepositStep.CommodityDetails)}
               >
                 Start New Deposit
               </Button>
