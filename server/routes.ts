@@ -255,6 +255,341 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // GREEN CHANNEL: Withdraw commodity (partial or complete)
+  apiRouter.post("/commodities/:id/withdraw", async (req: Request, res: Response) => {
+    try {
+      // Check if user is authenticated
+      if (!req.session || !req.session.userId) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+      
+      const id = parseInt(req.params.id);
+      
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid commodity ID" });
+      }
+      
+      const { quantity } = req.body;
+      
+      if (!quantity || isNaN(parseFloat(quantity)) || parseFloat(quantity) <= 0) {
+        return res.status(400).json({ message: "Valid quantity is required" });
+      }
+      
+      // Validate withdrawal amount
+      const commodity = await storage.getCommodity(id);
+      
+      if (!commodity) {
+        return res.status(404).json({ message: "Commodity not found" });
+      }
+      
+      // Check if user owns the commodity
+      if (commodity.ownerId !== req.session.userId) {
+        return res.status(403).json({ message: "Not authorized to withdraw this commodity" });
+      }
+      
+      // Check commodity status
+      if (commodity.status !== 'active') {
+        return res.status(400).json({ message: `Cannot withdraw commodity with status '${commodity.status}'` });
+      }
+      
+      // Check if commodity is in green channel
+      if (commodity.channelType !== 'green') {
+        return res.status(400).json({ message: "Only green channel commodities can be withdrawn directly" });
+      }
+      
+      // Check if quantity is valid
+      const requestedQuantity = parseFloat(quantity);
+      const availableQuantity = parseFloat(commodity.quantity.toString());
+      
+      if (requestedQuantity > availableQuantity) {
+        return res.status(400).json({ message: "Requested quantity exceeds available quantity" });
+      }
+      
+      // Process withdrawal
+      if (requestedQuantity === availableQuantity) {
+        // Complete withdrawal
+        const updatedCommodity = await storage.updateCommodity(id, {
+          status: "withdrawn",
+          quantity: "0"
+        });
+        
+        // Create a withdrawal process
+        await storage.createProcess({
+          commodityId: id,
+          warehouseId: commodity.warehouseId,
+          userId: req.session.userId,
+          processType: "withdrawal",
+          status: "completed",
+          currentStage: "completed",
+          stageProgress: {
+            withdrawal_initiated: "completed",
+            warehouse_verification: "completed",
+            physical_release: "completed"
+          },
+          estimatedCompletionTime: new Date()
+        });
+        
+        res.status(200).json({ 
+          message: "Commodity fully withdrawn", 
+          commodity: updatedCommodity 
+        });
+      } else {
+        // Partial withdrawal
+        const remainingQuantity = (availableQuantity - requestedQuantity).toString();
+        
+        const updatedCommodity = await storage.updateCommodity(id, {
+          quantity: remainingQuantity
+        });
+        
+        // Create a withdrawal process
+        await storage.createProcess({
+          commodityId: id,
+          warehouseId: commodity.warehouseId,
+          userId: req.session.userId,
+          processType: "partial_withdrawal",
+          status: "completed",
+          currentStage: "completed",
+          stageProgress: {
+            withdrawal_initiated: "completed",
+            warehouse_verification: "completed",
+            physical_release: "completed"
+          },
+          estimatedCompletionTime: new Date()
+        });
+        
+        res.status(200).json({ 
+          message: `${quantity} ${commodity.measurementUnit} withdrawn successfully`, 
+          commodity: updatedCommodity,
+          withdrawnQuantity: quantity
+        });
+      }
+    } catch (error) {
+      console.error("Withdrawal error:", error);
+      res.status(500).json({ message: "Server error during withdrawal" });
+    }
+  });
+
+  // GREEN CHANNEL: Transfer commodity ownership
+  apiRouter.post("/commodities/:id/transfer-ownership", async (req: Request, res: Response) => {
+    try {
+      // Check if user is authenticated
+      if (!req.session || !req.session.userId) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+      
+      const id = parseInt(req.params.id);
+      
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid commodity ID" });
+      }
+      
+      const { newOwnerId } = req.body;
+      
+      if (!newOwnerId || isNaN(parseInt(newOwnerId))) {
+        return res.status(400).json({ message: "Valid new owner ID is required" });
+      }
+      
+      // Get the commodity
+      const commodity = await storage.getCommodity(id);
+      
+      if (!commodity) {
+        return res.status(404).json({ message: "Commodity not found" });
+      }
+      
+      // Check if user owns the commodity
+      if (commodity.ownerId !== req.session.userId) {
+        return res.status(403).json({ message: "Not authorized to transfer this commodity" });
+      }
+      
+      // Check commodity status
+      if (commodity.status !== 'active') {
+        return res.status(400).json({ message: `Cannot transfer commodity with status '${commodity.status}'` });
+      }
+      
+      // Check if commodity is in green channel
+      if (commodity.channelType !== 'green') {
+        return res.status(400).json({ message: "Only green channel commodities can be transferred directly" });
+      }
+      
+      // Check if new owner exists
+      const newOwner = await storage.getUser(parseInt(newOwnerId));
+      
+      if (!newOwner) {
+        return res.status(404).json({ message: "New owner not found" });
+      }
+      
+      // Process transfer
+      const updatedCommodity = await storage.updateCommodity(id, {
+        ownerId: parseInt(newOwnerId)
+      });
+      
+      // Create a transfer process
+      await storage.createProcess({
+        commodityId: id,
+        warehouseId: commodity.warehouseId,
+        userId: req.session.userId,
+        processType: "ownership_transfer",
+        status: "completed",
+        currentStage: "completed",
+        stageProgress: {
+          transfer_initiated: "completed",
+          ownership_verification: "completed",
+          records_updated: "completed"
+        },
+        estimatedCompletionTime: new Date()
+      });
+      
+      // Also update related warehouse receipts
+      const receipts = await storage.listWarehouseReceiptsByCommodity(id);
+      for (const receipt of receipts) {
+        await storage.updateWarehouseReceipt(receipt.id, {
+          ownerId: parseInt(newOwnerId)
+        });
+      }
+      
+      res.status(200).json({ 
+        message: "Commodity ownership transferred successfully", 
+        commodity: updatedCommodity,
+        newOwner: {
+          id: newOwner.id,
+          fullName: newOwner.fullName,
+          username: newOwner.username
+        }
+      });
+    } catch (error) {
+      console.error("Transfer error:", error);
+      res.status(500).json({ message: "Server error during ownership transfer" });
+    }
+  });
+
+  // GREEN CHANNEL: Transfer commodity to another warehouse
+  apiRouter.post("/commodities/:id/transfer-warehouse", async (req: Request, res: Response) => {
+    try {
+      // Check if user is authenticated
+      if (!req.session || !req.session.userId) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+      
+      const id = parseInt(req.params.id);
+      
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid commodity ID" });
+      }
+      
+      const { newWarehouseId } = req.body;
+      
+      if (!newWarehouseId || isNaN(parseInt(newWarehouseId))) {
+        return res.status(400).json({ message: "Valid new warehouse ID is required" });
+      }
+      
+      // Get the commodity
+      const commodity = await storage.getCommodity(id);
+      
+      if (!commodity) {
+        return res.status(404).json({ message: "Commodity not found" });
+      }
+      
+      // Check if user owns the commodity
+      if (commodity.ownerId !== req.session.userId) {
+        return res.status(403).json({ message: "Not authorized to transfer this commodity" });
+      }
+      
+      // Check commodity status
+      if (commodity.status !== 'active') {
+        return res.status(400).json({ message: `Cannot transfer commodity with status '${commodity.status}'` });
+      }
+      
+      // Check if commodity is in green channel
+      if (commodity.channelType !== 'green') {
+        return res.status(400).json({ message: "Only green channel commodities can be transferred directly" });
+      }
+      
+      // Check if new warehouse exists
+      const newWarehouse = await storage.getWarehouse(parseInt(newWarehouseId));
+      
+      if (!newWarehouse) {
+        return res.status(404).json({ message: "New warehouse not found" });
+      }
+      
+      // Check if new warehouse has enough space
+      const commodityQuantity = parseFloat(commodity.quantity.toString());
+      const warehouseAvailableSpace = parseFloat(newWarehouse.availableSpace.toString());
+      
+      if (commodityQuantity > warehouseAvailableSpace) {
+        return res.status(400).json({ 
+          message: "Not enough space in target warehouse", 
+          required: commodityQuantity,
+          available: warehouseAvailableSpace
+        });
+      }
+      
+      // Update space in old warehouse (increase available space)
+      const oldWarehouse = await storage.getWarehouse(parseInt(commodity.warehouseId?.toString() || "0"));
+      if (oldWarehouse) {
+        const updatedAvailableSpace = (parseFloat(oldWarehouse.availableSpace.toString()) + commodityQuantity).toString();
+        await storage.updateWarehouse(oldWarehouse.id, {
+          availableSpace: updatedAvailableSpace
+        });
+      }
+      
+      // Update space in new warehouse (decrease available space)
+      const updatedNewWarehouseSpace = (warehouseAvailableSpace - commodityQuantity).toString();
+      await storage.updateWarehouse(newWarehouse.id, {
+        availableSpace: updatedNewWarehouseSpace
+      });
+      
+      // Process warehouse transfer
+      const updatedCommodity = await storage.updateCommodity(id, {
+        warehouseId: parseInt(newWarehouseId),
+        status: "transferred"
+      });
+      
+      // Create a warehouse transfer process
+      await storage.createProcess({
+        commodityId: id,
+        warehouseId: parseInt(newWarehouseId),
+        userId: req.session.userId,
+        processType: "warehouse_transfer",
+        status: "in_progress",
+        currentStage: "transit",
+        stageProgress: {
+          transfer_initiated: "completed",
+          pickup_from_source: "completed",
+          in_transit: "in_progress",
+          delivery_to_destination: "pending",
+          quality_verification: "pending",
+          records_updated: "pending"
+        },
+        estimatedCompletionTime: new Date(new Date().getTime() + 24 * 60 * 60 * 1000) // 24 hours from now
+      });
+      
+      // Also update related warehouse receipts
+      const receipts = await storage.listWarehouseReceiptsByCommodity(id);
+      for (const receipt of receipts) {
+        await storage.updateWarehouseReceipt(receipt.id, {
+          warehouseId: parseInt(newWarehouseId),
+          status: "transferred"
+        });
+      }
+      
+      res.status(200).json({ 
+        message: "Commodity transfer to new warehouse initiated", 
+        commodity: updatedCommodity,
+        sourceWarehouse: {
+          id: oldWarehouse?.id,
+          name: oldWarehouse?.name
+        },
+        destinationWarehouse: {
+          id: newWarehouse.id,
+          name: newWarehouse.name
+        }
+      });
+    } catch (error) {
+      console.error("Warehouse transfer error:", error);
+      res.status(500).json({ message: "Server error during warehouse transfer" });
+    }
+  });
+
   // Warehouse Receipt routes
   apiRouter.get("/receipts", async (req: Request, res: Response) => {
     try {

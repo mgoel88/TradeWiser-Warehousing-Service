@@ -39,6 +39,7 @@ export interface IStorage {
   createWarehouseReceipt(receipt: InsertWarehouseReceipt): Promise<WarehouseReceipt>;
   listWarehouseReceipts(): Promise<WarehouseReceipt[]>;
   listWarehouseReceiptsByOwner(ownerId: number): Promise<WarehouseReceipt[]>;
+  listWarehouseReceiptsByCommodity(commodityId: number): Promise<WarehouseReceipt[]>;
   updateWarehouseReceipt(id: number, receipt: Partial<InsertWarehouseReceipt>): Promise<WarehouseReceipt | undefined>;
   
   // Loan operations
@@ -427,6 +428,12 @@ export class MemStorage implements IStorage {
     );
   }
   
+  async listWarehouseReceiptsByCommodity(commodityId: number): Promise<WarehouseReceipt[]> {
+    return Array.from(this.warehouseReceipts.values()).filter(
+      receipt => receipt.commodityId === commodityId
+    );
+  }
+  
   async updateWarehouseReceipt(id: number, receiptData: Partial<InsertWarehouseReceipt>): Promise<WarehouseReceipt | undefined> {
     const receipt = await this.getWarehouseReceipt(id);
     if (!receipt) return undefined;
@@ -669,6 +676,10 @@ export class DatabaseStorage implements IStorage {
 
   async listWarehouseReceiptsByOwner(ownerId: number): Promise<WarehouseReceipt[]> {
     return await db.select().from(warehouseReceipts).where(eq(warehouseReceipts.ownerId, ownerId));
+  }
+  
+  async listWarehouseReceiptsByCommodity(commodityId: number): Promise<WarehouseReceipt[]> {
+    return await db.select().from(warehouseReceipts).where(eq(warehouseReceipts.commodityId, commodityId));
   }
 
   async updateWarehouseReceipt(id: number, receiptData: Partial<InsertWarehouseReceipt>): Promise<WarehouseReceipt | undefined> {
