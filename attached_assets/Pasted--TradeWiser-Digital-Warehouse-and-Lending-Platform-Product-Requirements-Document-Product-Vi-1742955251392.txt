@@ -1,0 +1,165 @@
+# TradeWiser Digital Warehouse and Lending Platform - Product Requirements Document
+
+## Product Vision
+A comprehensive digital platform for agricultural commodity management, offering end-to-end services including warehousing, collateral management, quality assessment, and digital lending.
+
+## User Channels and Workflow
+
+### Channel Classifications
+1. **Green Channel** (TradeWiser Warehouse Ecosystem)
+   - Full-service warehouse management
+   - Direct deposit, storage, and management of agricultural commodities
+   - Comprehensive tracking and value-added services
+
+2. **Orange Channel** (Third-Party Receipt Integration)
+   - Aggregation of existing warehouse receipts
+   - Parsing and standardizing external warehouse documents
+   - Unified view of commodity holdings
+
+3. **Red Channel** (Self-Certification)
+   - User-initiated quality and quantity self-reporting
+   - Minimal infrastructure involvement
+   - Primarily for peer-to-peer transactions
+
+## User Journey and Functional Requirements
+
+### 1. User Onboarding and Registration
+- Digital KYC process
+- Multi-tier user profiles:
+  - Farmers
+  - Traders
+  - Food processors
+  - Intermediaries
+- Comprehensive profile creation with:
+  - Personal details
+  - Business information
+  - Historical transaction data
+  - Credit history
+
+### 2. Warehouse Discovery and Commodity Deposit (Green Channel)
+#### Warehouse Mapping and Selection
+- Geolocation-based warehouse discovery
+- Intelligent warehouse assignment algorithm considering:
+  - Proximity
+  - Commodity type
+  - Warehouse capacity
+  - Historical performance
+- Real-time warehouse availability tracking
+- User-configurable filters for warehouse selection
+
+#### Pickup Management
+- Uber-like pickup scheduling
+- Multiple date and time slot selection
+- Real-time tracking of pickup status
+- Detailed SOP communication
+- IoT-enabled tracking and verification
+
+### 3. Warehouse Processing Workflow
+#### Inward Processing
+- Digital weighbridge integration
+- Automated weight verification
+- Digital documentation of inward process
+- Photographic and video evidence capture
+
+#### Commodity Processing
+- Precleaning services
+- Optional processing steps
+- Flexible user controls to skip/modify processing
+
+#### Quality Assessment
+- Multi-parameter quality evaluation:
+  - Moisture content (digital moisture meter)
+  - Composition analysis
+  - Foreign matter detection
+  - AI-powered visual quality assessment
+  - Color and physical property analysis
+
+#### Valuation
+- Real-time pricing engine integration
+- Transparent valuation methodology
+- Market-linked pricing
+- Instant valuation report generation
+
+### 4. Electronic Warehouse Receipt (eWR) Generation
+- Blockchain-based ledger for receipt creation
+- Unique identification for each commodity unit
+- Standard sack-based receipt generation
+- Traceability and immutability
+- Demat-like digital storage vault
+
+### 5. Warehouse Receipt Management
+#### Receipt Operations
+- Partial and full withdrawal capabilities
+- Inter-warehouse transfer
+- Ownership transfer mechanisms
+- Digital signing and verification protocols
+
+#### Lien Management
+- Comprehensive lien tracking system
+- Withdrawal checkpoint verification
+- Partial withdrawal rules:
+  - Check for active liens
+  - Proportional withdrawal based on lien status
+  - Real-time lien value recalculation
+
+### 6. Digital Lending Mechanism
+#### Loan Application Process
+- Automated credit assessment
+- Real-time collateral valuation
+- Overdraft and credit-like facilities
+- Flexible borrowing options
+- Transparent interest rate determination
+
+#### Loan Lifecycle Management
+- Maximum loan tenure: 180 days
+- Interest calculation on drawdown amount
+- Automated repayment tracking
+- Default management protocol
+- Collateral enforcement mechanism
+
+### 7. Risk Management
+#### Comprehensive Risk Assessment
+- Transaction history analysis
+- Credit score generation
+- Real-time collateral valuation
+- Automated underwriting
+- Insurance integration
+
+### 8. Security and Compliance
+- Multi-layer security protocols
+- Blockchain-based data integrity
+- Regulatory compliance checks
+- Data privacy mechanisms
+
+## Technical Architecture
+- Microservices-based architecture
+- Blockchain backend (Hedera Hashgraph)
+- Mobile and web application support
+- IoT and AI integration
+- Real-time data synchronization
+- Scalable cloud infrastructure
+
+## Monetization Strategy
+- Transaction-based fees
+- Interest rate spread
+- Collateral management charges
+- Value-added service pricing
+
+## Reporting and Analytics
+- Comprehensive dashboard
+- Predictive analytics
+- Performance tracking
+- Regulatory reporting tools
+
+## Future Roadmap
+- DeFi protocol integration
+- Secondary market for eWRs
+- Advanced risk hedging mechanisms
+- International commodity trading support
+
+## Performance Metrics
+- Turnaround Time (TAT) reduction
+- User acquisition rate
+- Loan disbursement efficiency
+- Customer satisfaction index
+- Risk mitigation effectiveness
