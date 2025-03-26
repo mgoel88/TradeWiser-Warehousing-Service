@@ -1,14 +1,25 @@
 import React from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Commodity, User, Warehouse } from '@shared/schema';
+import { Commodity, Warehouse } from '@shared/schema';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { formatCurrency, formatDate, getChannelClass, getStatusClass } from '@/lib/utils';
 import CommodityActions from './CommodityActions';
 import { apiRequest } from '@/lib/queryClient';
-import { ArrowPathIcon, CalendarIcon, CubeIcon, ScaleIcon, TableCellsIcon, TagIcon, TruckIcon, UserIcon, UsersIcon } from 'lucide-react';
-import { Grain, Seedling, Tractor } from 'lucide-react';
+import { 
+  RefreshCw, 
+  Calendar, 
+  Package, 
+  Scale, 
+  Table, 
+  Tag, 
+  Truck, 
+  UserIcon,
+  Wheat,
+  Leaf,
+  Cog
+} from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 
 interface CommodityDetailProps {
@@ -92,13 +103,13 @@ export default function CommodityDetail({ commodityId }: CommodityDetailProps) {
   const CommodityIcon = () => {
     switch(commodity.type.toLowerCase()) {
       case 'grain':
-        return <Grain />;
+        return <Wheat />;
       case 'produce':
       case 'vegetable':
       case 'fruit':
-        return <Seedling />;
+        return <Leaf />;
       default:
-        return <CubeIcon />;
+        return <Package />;
     }
   };
 
@@ -133,7 +144,7 @@ export default function CommodityDetail({ commodityId }: CommodityDetailProps) {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-4">
               <div className="flex items-center">
-                <ScaleIcon className="h-5 w-5 mr-2 text-muted-foreground" />
+                <Scale className="h-5 w-5 mr-2 text-muted-foreground" />
                 <div>
                   <p className="text-sm font-medium">Quantity</p>
                   <p className="text-lg">{commodity.quantity} {commodity.measurementUnit}</p>
@@ -141,7 +152,7 @@ export default function CommodityDetail({ commodityId }: CommodityDetailProps) {
               </div>
               
               <div className="flex items-center">
-                <TagIcon className="h-5 w-5 mr-2 text-muted-foreground" />
+                <Tag className="h-5 w-5 mr-2 text-muted-foreground" />
                 <div>
                   <p className="text-sm font-medium">Valuation</p>
                   <p className="text-lg">{formatCurrency(commodity.valuation)}</p>
@@ -149,7 +160,7 @@ export default function CommodityDetail({ commodityId }: CommodityDetailProps) {
               </div>
               
               <div className="flex items-center">
-                <TableCellsIcon className="h-5 w-5 mr-2 text-muted-foreground" />
+                <Table className="h-5 w-5 mr-2 text-muted-foreground" />
                 <div>
                   <p className="text-sm font-medium">Grade</p>
                   <p className="text-lg">{commodity.gradeAssigned || 'Not Assigned'}</p>
@@ -157,7 +168,7 @@ export default function CommodityDetail({ commodityId }: CommodityDetailProps) {
               </div>
               
               <div className="flex items-center">
-                <CalendarIcon className="h-5 w-5 mr-2 text-muted-foreground" />
+                <Calendar className="h-5 w-5 mr-2 text-muted-foreground" />
                 <div>
                   <p className="text-sm font-medium">Deposit Date</p>
                   <p className="text-base">{formatDate(commodity.depositDate)}</p>
@@ -167,7 +178,7 @@ export default function CommodityDetail({ commodityId }: CommodityDetailProps) {
             
             <div className="space-y-4">
               <div className="flex items-center">
-                <TruckIcon className="h-5 w-5 mr-2 text-muted-foreground" />
+                <Truck className="h-5 w-5 mr-2 text-muted-foreground" />
                 <div>
                   <p className="text-sm font-medium">Stored At</p>
                   <p className="text-lg">{getWarehouseName(commodity.warehouseId)}</p>
@@ -183,7 +194,7 @@ export default function CommodityDetail({ commodityId }: CommodityDetailProps) {
               </div>
               
               <div className="flex items-center">
-                <ArrowPathIcon className="h-5 w-5 mr-2 text-muted-foreground" />
+                <RefreshCw className="h-5 w-5 mr-2 text-muted-foreground" />
                 <div>
                   <p className="text-sm font-medium">Last Updated</p>
                   <p className="text-base">{formatDate(commodity.lastUpdated)}</p>
