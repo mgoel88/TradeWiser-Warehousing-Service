@@ -210,12 +210,15 @@ export default function DepositFlow({ warehouses, userLocation }: DepositFlowPro
         return;
       }
       
-      // Convert quantity to number for API compatibility
-      const quantityAsNumber = typeof data.quantity === 'string' 
-        ? parseFloat(data.quantity) 
-        : data.quantity;
+      // Parse quantity as a number for validation but keep as string for API
+      let quantityValue: number;
+      if (typeof data.quantity === 'string') {
+        quantityValue = parseFloat(data.quantity);
+      } else {
+        quantityValue = data.quantity;
+      }
         
-      if (isNaN(quantityAsNumber)) {
+      if (isNaN(quantityValue)) {
         toast({
           title: "Invalid quantity",
           description: "Please enter a valid number for quantity",
@@ -224,6 +227,9 @@ export default function DepositFlow({ warehouses, userLocation }: DepositFlowPro
         return;
       }
       
+      // Always convert quantity to string for the API
+      const quantityString = quantityValue.toString();
+      
       // Include quality parameters from the state
       const formattedData = {
         ...data,
@@ -231,8 +237,8 @@ export default function DepositFlow({ warehouses, userLocation }: DepositFlowPro
         ownerId: user.id,
         status: "processing", // Initial status
         channelType: "green", // Default channel
-        quantity: quantityAsNumber, // Convert to number for API
-        valuation: quantityAsNumber * 2100, // Sample valuation calculation
+        quantity: quantityString, // Send as string to match API expectations
+        valuation: (quantityValue * 2100).toString(), // Also convert valuation to string
         // Add pickup/delivery details
         depositDetails: {
           pickupDate,
@@ -260,12 +266,12 @@ export default function DepositFlow({ warehouses, userLocation }: DepositFlowPro
       console.log("Commodity created:", commodity);
 
       if (commodity && commodity.id) {
-        // Create a process for this deposit
+        // Create a process for this deposit - make sure all IDs are numbers, not strings
         const processData = {
-          commodityId: commodity.id,
-          warehouseId: selectedWarehouse.id,
-          userId: user.id,
-          processType: "inward_processing",
+          commodityId: typeof commodity.id === 'string' ? parseInt(commodity.id) : commodity.id,
+          warehouseId: typeof selectedWarehouse.id === 'string' ? parseInt(selectedWarehouse.id) : selectedWarehouse.id,
+          userId: typeof user.id === 'string' ? parseInt(user.id) : user.id,
+          processType: "deposit", // Using "deposit" as a more standard process type
           status: "pending",
           currentStage: "pickup_scheduled",
           stageProgress: {

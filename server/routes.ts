@@ -790,8 +790,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const process = await storage.createProcess(validData);
       
-      // If this is a deposit process, simulate automatic updates for demo purposes
-      if (process.processType === 'deposit' && process.status === 'pending') {
+      // If this is a deposit or inward_processing process, simulate automatic updates for demo purposes
+      if ((process.processType === 'deposit' || process.processType === 'inward_processing') && process.status === 'pending') {
         setTimeout(() => {
           console.log(`Setting up demo process simulation for process ${process.id}`);
           
