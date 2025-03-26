@@ -37,7 +37,8 @@ enum DepositStep {
   SelectWarehouse = 1,
   SchedulePickup = 2,
   ReviewSubmit = 3,
-  Confirmation = 4
+  Confirmation = 4,
+  TrackDeposit = 5
 }
 
 interface DepositFlowProps {
@@ -56,6 +57,7 @@ export default function DepositFlow({ warehouses, userLocation }: DepositFlowPro
   const [pickupTime, setPickupTime] = useState<string>("");
   const [pickupAddress, setPickupAddress] = useState<string>("");
   const [useWarehouseDelivery, setUseWarehouseDelivery] = useState<boolean>(false);
+  const [processId, setProcessId] = useState<number | null>(null);
   const [selectedQualityParams, setSelectedQualityParams] = useState<Record<string, string>>({
     moisture: "",
     foreignMatter: "",
@@ -158,7 +160,8 @@ export default function DepositFlow({ warehouses, userLocation }: DepositFlowPro
         ownerId: user?.id,
         status: "processing", // Initial status
         channelType: "green", // Default channel
-        valuation: (parseFloat(data.quantity) * 2100).toString(), // Sample valuation calculation
+        quantity: parseFloat(data.quantity.toString()), // Convert to number
+        valuation: parseFloat(data.quantity.toString()) * 2100, // Sample valuation calculation
         // Add pickup/delivery details
         depositDetails: {
           pickupDate,
@@ -194,11 +197,16 @@ export default function DepositFlow({ warehouses, userLocation }: DepositFlowPro
           estimatedCompletionTime: new Date(new Date().setHours(new Date().getHours() + 48)) // 48 hours estimate
         };
         
-        await apiRequest(
+        const processResponse = await apiRequest(
           "POST",
           "/api/processes",
           processData
         );
+        
+        const processResult = await processResponse.json();
+        if (processResult && processResult.id) {
+          setProcessId(processResult.id);
+        }
         
         setCurrentStep(DepositStep.Confirmation);
         toast({
