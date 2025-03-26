@@ -163,7 +163,7 @@ export default function DepositFlow({ warehouses, userLocation }: DepositFlowPro
         ownerId: user?.id,
         status: "processing", // Initial status
         channelType: "green", // Default channel
-        quantity: parseFloat(data.quantity.toString()), // Convert to number
+        quantity: data.quantity.toString(), // Keep as string for API compatibility
         valuation: parseFloat(data.quantity.toString()) * 2100, // Sample valuation calculation
         // Add pickup/delivery details
         depositDetails: {
