@@ -15,8 +15,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { Steps, Step } from "@/components/ui/steps";
 import { Warehouse } from "@shared/schema";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Check, Truck, Package, FileText, ArrowLeft, MapPin, Search, Calendar } from "lucide-react";
+import { Check, Truck, Package, FileText, ArrowLeft, MapPin, Search, Calendar, Activity } from "lucide-react";
 import { calculateDistance } from "@/lib/utils";
+import DepositProgress from "./DepositProgress";
 
 // Create schema for the deposit form
 const depositCommoditySchema = z.object({
@@ -147,6 +148,8 @@ export default function DepositFlow({ warehouses, userLocation }: DepositFlowPro
       setCurrentStep(DepositStep.CommodityDetails);
     } else if (currentStep === DepositStep.ReviewSubmit) {
       setCurrentStep(DepositStep.SchedulePickup);
+    } else if (currentStep === DepositStep.Confirmation && processId) {
+      setCurrentStep(DepositStep.TrackDeposit);
     }
   };
   
@@ -245,12 +248,13 @@ export default function DepositFlow({ warehouses, userLocation }: DepositFlowPro
 
   return (
     <div className="container mx-auto py-6">
-      <Steps currentStep={currentStep} totalSteps={5}>
+      <Steps currentStep={currentStep} totalSteps={6}>
         <Step icon={<Package />} label="Commodity Details" />
         <Step icon={<MapPin />} label="Select Warehouse" />
         <Step icon={<Truck />} label="Schedule Pickup" />
         <Step icon={<FileText />} label="Review & Submit" />
         <Step icon={<Check />} label="Confirmation" />
+        <Step icon={<Activity />} label="Track Deposit" />
       </Steps>
       
       <div className="mt-8">
