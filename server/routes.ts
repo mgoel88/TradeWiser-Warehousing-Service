@@ -4,6 +4,14 @@ import { storage } from "./storage";
 import { insertUserSchema, insertWarehouseSchema, insertCommoditySchema, insertWarehouseReceiptSchema, insertLoanSchema, insertProcessSchema } from "@shared/schema";
 import { z } from "zod";
 import { fromZodError } from "zod-validation-error";
+import 'express-session';
+
+// Extend Express Request to include session
+declare module 'express-session' {
+  interface SessionData {
+    userId: number;
+  }
+}
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // API routes
