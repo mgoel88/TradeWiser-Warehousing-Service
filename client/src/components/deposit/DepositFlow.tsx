@@ -140,27 +140,42 @@ export default function DepositFlow({ warehouses, userLocation }: DepositFlowPro
         console.error("Validation error:", error);
       }
     } else if (currentStep === DepositStep.SchedulePickup) {
-      if (
-        (!useWarehouseDelivery && (!pickupDate || !pickupTime || !pickupAddress)) ||
-        (useWarehouseDelivery && !pickupDate)
-      ) {
-        toast({
-          title: "Missing information",
-          description: "Please fill in all the required pickup/delivery details",
-          variant: "destructive",
-        });
-        return;
+      // Validation for pickup details
+      if (useWarehouseDelivery) {
+        // For self-delivery, only pickup date is required
+        if (!pickupDate) {
+          toast({
+            title: "Missing information",
+            description: "Please select a delivery date",
+            variant: "destructive",
+          });
+          return;
+        }
+      } else {
+        // For managed pickup, we need date, time and address
+        if (!pickupDate || !pickupTime || !pickupAddress) {
+          toast({
+            title: "Missing information",
+            description: "Please fill in all the required pickup details",
+            variant: "destructive",
+          });
+          return;
+        }
       }
+      // All validations passed, proceed to next step
       setCurrentStep(DepositStep.ReviewSubmit);
     }
   };
   
   // Handle going back to previous step
   const handlePreviousStep = () => {
-    if (currentStep === DepositStep.CommodityDetails) {
-      setCurrentStep(DepositStep.SelectWarehouse);
-    } else if (currentStep === DepositStep.SchedulePickup) {
+    if (currentStep === DepositStep.SelectWarehouse) {
       setCurrentStep(DepositStep.CommodityDetails);
+    } else if (currentStep === DepositStep.CommodityDetails) {
+      // This is for cases where we navigate back from CommodityDetails (if applicable)
+      // Just stay in the same step if this is our starting point
+    } else if (currentStep === DepositStep.SchedulePickup) {
+      setCurrentStep(DepositStep.SelectWarehouse);
     } else if (currentStep === DepositStep.ReviewSubmit) {
       setCurrentStep(DepositStep.SchedulePickup);
     } else if (currentStep === DepositStep.TrackDeposit) {
@@ -171,10 +186,34 @@ export default function DepositFlow({ warehouses, userLocation }: DepositFlowPro
   // Handle form submission
   const onSubmit = async (data: DepositCommodityFormValues) => {
     try {
+      // Show loading toast
+      toast({
+        title: "Processing",
+        description: "Initiating your deposit request...",
+      });
+      
+      if (!selectedWarehouse) {
+        toast({
+          title: "Error",
+          description: "Please select a warehouse first",
+          variant: "destructive",
+        });
+        return;
+      }
+      
+      if (!user || !user.id) {
+        toast({
+          title: "Authentication required",
+          description: "Please log in to continue",
+          variant: "destructive",
+        });
+        return;
+      }
+      
       // Convert quantity to number for API compatibility
       const quantityAsNumber = typeof data.quantity === 'string' 
         ? parseFloat(data.quantity) 
-        : (data.quantity as unknown as number);
+        : data.quantity;
         
       if (isNaN(quantityAsNumber)) {
         toast({
@@ -189,7 +228,7 @@ export default function DepositFlow({ warehouses, userLocation }: DepositFlowPro
       const formattedData = {
         ...data,
         qualityParameters: selectedQualityParams,
-        ownerId: user?.id,
+        ownerId: user.id,
         status: "processing", // Initial status
         channelType: "green", // Default channel
         quantity: quantityAsNumber, // Convert to number for API
@@ -203,20 +242,29 @@ export default function DepositFlow({ warehouses, userLocation }: DepositFlowPro
         }
       };
       
+      console.log("Submitting commodity data:", formattedData);
+      
       // Call API to create a new commodity
       const response = await apiRequest(
         "POST",
         "/api/commodities",
         formattedData
       );
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || "Failed to create commodity");
+      }
+      
       const commodity = await response.json();
+      console.log("Commodity created:", commodity);
 
-      if (commodity) {
+      if (commodity && commodity.id) {
         // Create a process for this deposit
         const processData = {
           commodityId: commodity.id,
-          warehouseId: selectedWarehouse?.id,
-          userId: user?.id,
+          warehouseId: selectedWarehouse.id,
+          userId: user.id,
           processType: "inward_processing",
           status: "pending",
           currentStage: "pickup_scheduled",
@@ -229,28 +277,43 @@ export default function DepositFlow({ warehouses, userLocation }: DepositFlowPro
           estimatedCompletionTime: new Date(new Date().setHours(new Date().getHours() + 48)) // 48 hours estimate
         };
         
+        console.log("Creating process:", processData);
+        
         const processResponse = await apiRequest(
           "POST",
           "/api/processes",
           processData
         );
         
-        const processResult = await processResponse.json();
-        if (processResult && processResult.id) {
-          setProcessId(processResult.id);
+        if (!processResponse.ok) {
+          const errorData = await processResponse.json().catch(() => ({}));
+          throw new Error(errorData.message || "Failed to create process");
         }
         
-        setCurrentStep(DepositStep.Confirmation);
-        toast({
-          title: "Deposit initiated successfully",
-          description: "Your commodity deposit process has been started",
-        });
+        const processResult = await processResponse.json();
+        console.log("Process created:", processResult);
+        
+        if (processResult && processResult.id) {
+          setProcessId(processResult.id);
+          
+          // Move to confirmation step
+          setCurrentStep(DepositStep.Confirmation);
+          
+          toast({
+            title: "Deposit initiated successfully",
+            description: "Your commodity deposit process has been started",
+          });
+        } else {
+          throw new Error("Process ID not returned from server");
+        }
+      } else {
+        throw new Error("Commodity ID not returned from server");
       }
     } catch (error) {
       console.error("Error creating deposit:", error);
       toast({
         title: "Error",
-        description: "Failed to create deposit. Please try again.",
+        description: error instanceof Error ? error.message : "Failed to create deposit. Please try again.",
         variant: "destructive",
       });
     }
