@@ -12,6 +12,7 @@ import WarehousePage from "@/pages/WarehousePage";
 import ReceiptsPage from "@/pages/ReceiptsPage";
 import LoansPage from "@/pages/LoansPage";
 import ProfilePage from "@/pages/ProfilePage";
+import DepositPage from "@/pages/DepositPage";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -25,6 +26,7 @@ function Router() {
       <Route path="/receipts" component={ReceiptsPage} />
       <Route path="/loans" component={LoansPage} />
       <Route path="/profile" component={ProfilePage} />
+      <Route path="/deposit" component={DepositPage} />
       <Route path="/green-channel" component={WarehousePage} />
       <Route path="/orange-channel" component={WarehousePage} />
       <Route path="/red-channel" component={WarehousePage} />

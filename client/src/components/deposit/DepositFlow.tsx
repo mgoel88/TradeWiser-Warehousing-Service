@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { useNavigate } from "wouter";
+import { useLocation } from "wouter";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
@@ -48,7 +48,7 @@ interface DepositFlowProps {
 export default function DepositFlow({ warehouses, userLocation }: DepositFlowProps) {
   const { user } = useAuth();
   const { toast } = useToast();
-  const navigate = useNavigate();
+  const [_, setLocation] = useLocation();
   const [currentStep, setCurrentStep] = useState<DepositStep>(DepositStep.SelectWarehouse);
   const [selectedWarehouse, setSelectedWarehouse] = useState<Warehouse | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
@@ -734,7 +734,7 @@ export default function DepositFlow({ warehouses, userLocation }: DepositFlowPro
             <CardFooter className="flex flex-col space-y-2">
               <Button 
                 className="w-full" 
-                onClick={() => navigate("/receipts")}
+                onClick={() => setLocation("/receipts")}
               >
                 Go to Warehouse Receipts
               </Button>
