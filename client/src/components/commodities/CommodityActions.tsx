@@ -102,6 +102,9 @@ export default function CommodityActions({ commodity, users = [], warehouses = [
       
       const response = await apiRequest(`/api/commodities/${commodity.id}/withdraw`, {
         method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
         body: JSON.stringify(data),
       });
       
@@ -142,6 +145,9 @@ export default function CommodityActions({ commodity, users = [], warehouses = [
       
       const response = await apiRequest(`/api/commodities/${commodity.id}/transfer-ownership`, {
         method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
         body: JSON.stringify(data),
       });
       
@@ -182,6 +188,9 @@ export default function CommodityActions({ commodity, users = [], warehouses = [
       
       const response = await apiRequest(`/api/commodities/${commodity.id}/transfer-warehouse`, {
         method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
         body: JSON.stringify(data),
       });
       

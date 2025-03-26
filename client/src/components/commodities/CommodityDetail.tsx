@@ -36,7 +36,8 @@ export default function CommodityDetail({ commodityId }: CommodityDetailProps) {
       const response = await apiRequest(`/api/commodities/${commodityId}`);
       if (!response.ok) throw new Error('Failed to fetch commodity');
       return response.json();
-    }
+    },
+    retry: 1
   });
   
   // Fetch users for ownership transfer dropdown
@@ -47,7 +48,8 @@ export default function CommodityDetail({ commodityId }: CommodityDetailProps) {
       if (!response.ok) return [];
       return response.json();
     },
-    enabled: !!commodity
+    enabled: !!commodity,
+    retry: 1
   });
   
   // Fetch warehouses for warehouse transfer dropdown
@@ -58,7 +60,8 @@ export default function CommodityDetail({ commodityId }: CommodityDetailProps) {
       if (!response.ok) return [];
       return response.json();
     },
-    enabled: !!commodity
+    enabled: !!commodity,
+    retry: 1
   });
   
   // Handle action completion
