@@ -265,11 +265,11 @@ export class MemStorage implements IStorage {
       commodityId: 3,
       warehouseId: 3,
       userId: 1,
-      processType: "inward_processing",
+      processType: "deposit",
       status: "in_progress",
       currentStage: "pre_cleaning",
       stageProgress: {
-        inward_processing: "completed",
+        deposit_reception: "completed",
         pre_cleaning: "in_progress",
         quality_assessment: "pending",
         ewr_generation: "pending"

@@ -273,12 +273,12 @@ export default function DepositFlow({ warehouses, userLocation }: DepositFlowPro
           userId: typeof user.id === 'string' ? parseInt(user.id) : user.id,
           processType: "deposit", // Using "deposit" as a more standard process type
           status: "pending",
-          currentStage: "pickup_scheduled",
+          currentStage: "deposit_reception",
           stageProgress: {
-            pickup_scheduled: "completed",
+            deposit_reception: "pending",
             pre_cleaning: "pending",
             quality_assessment: "pending",
-            ewr_generation: "pending"
+            receipt_generation: "pending"
           },
           // Send as a Date object without stringifying - the schema will handle the conversion
           estimatedCompletionTime: new Date(new Date().setHours(new Date().getHours() + 48)) // 48 hours estimate
