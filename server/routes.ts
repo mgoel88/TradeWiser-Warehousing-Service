@@ -876,11 +876,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
                       // This avoids the typescript error with the empty object
                       const stageProgress: Record<string, string> = {};
                       
-                      // Copy any existing stage progress
-                      if (currentProcess.stageProgress) {
-                        Object.keys(currentProcess.stageProgress).forEach(key => {
-                          if (typeof currentProcess.stageProgress[key] === 'string') {
-                            stageProgress[key] = currentProcess.stageProgress[key];
+                      // Cast stageProgress to a safe type and copy existing values
+                      const currentStageProgress = currentProcess.stageProgress as Record<string, string> | null;
+                      if (currentStageProgress && typeof currentStageProgress === 'object') {
+                        Object.entries(currentStageProgress).forEach(([key, value]) => {
+                          if (typeof value === 'string') {
+                            stageProgress[key] = value;
                           }
                         });
                       }
