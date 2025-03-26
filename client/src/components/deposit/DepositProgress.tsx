@@ -1,12 +1,14 @@
-import React, { useState, useEffect } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import React, { useState, useEffect, useRef } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Process } from '@shared/schema';
 import { apiRequest } from '@/lib/queryClient';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { formatDate, formatDateTime } from '@/lib/utils';
-import { Truck, Package, FileCheck, ClipboardCheck, Clock, AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { Truck, Package, FileCheck, ClipboardCheck, Clock, AlertTriangle, CheckCircle2, MapPin, RefreshCw } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
 
 interface DepositProgressProps {
   processId: number;
@@ -14,15 +16,120 @@ interface DepositProgressProps {
 
 export default function DepositProgress({ processId }: DepositProgressProps) {
   const [progress, setProgress] = useState(0);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isLive, setIsLive] = useState(false);
+  const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
+  const socketRef = useRef<WebSocket | null>(null);
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
   
   // Fetch process data
-  const { data: process, isLoading } = useQuery({
+  const { data: process, isLoading, refetch } = useQuery({
     queryKey: ['/api/processes', processId],
     queryFn: async () => {
       const res = await apiRequest('GET', `/api/processes/${processId}`);
+      if (!res.ok) {
+        throw new Error('Failed to fetch process data');
+      }
       return res.json();
-    }
+    },
+    // Refetch at regular intervals (every 30 seconds) as fallback
+    refetchInterval: 30000,
   });
+  
+  // Set up WebSocket connection for real-time updates
+  useEffect(() => {
+    // Initialize WebSocket connection
+    const connectWebSocket = () => {
+      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      const wsUrl = `${protocol}//${window.location.host}/ws`;
+      
+      try {
+        const socket = new WebSocket(wsUrl);
+        
+        socket.onopen = () => {
+          console.log('WebSocket connection established');
+          setIsLive(true);
+          
+          // Subscribe to updates for this specific process
+          const subscribeMsg = JSON.stringify({
+            type: 'subscribe',
+            entity: 'process',
+            id: processId
+          });
+          socket.send(subscribeMsg);
+          
+          toast({
+            title: 'Live updates activated',
+            description: 'You\'ll receive real-time updates on your deposit process',
+          });
+        };
+        
+        socket.onmessage = (event) => {
+          try {
+            const data = JSON.parse(event.data);
+            console.log('WebSocket message received:', data);
+            
+            if (data.type === 'update' && data.entity === 'process' && data.id === processId) {
+              // Update the cached data with the new process information
+              queryClient.setQueryData(['/api/processes', processId], data.data);
+              setLastUpdate(new Date());
+            }
+          } catch (error) {
+            console.error('Error parsing WebSocket message:', error);
+          }
+        };
+        
+        socket.onclose = () => {
+          console.log('WebSocket connection closed');
+          setIsLive(false);
+          // Try to reconnect after a delay
+          setTimeout(connectWebSocket, 5000);
+        };
+        
+        socket.onerror = (error) => {
+          console.error('WebSocket error:', error);
+          setIsLive(false);
+        };
+        
+        socketRef.current = socket;
+      } catch (error) {
+        console.error('Failed to establish WebSocket connection:', error);
+        setIsLive(false);
+      }
+    };
+    
+    // Start WebSocket connection
+    connectWebSocket();
+    
+    // Clean up WebSocket connection when component unmounts
+    return () => {
+      if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
+        socketRef.current.close();
+      }
+    };
+  }, [processId, queryClient, toast]);
+  
+  // Handle manual refresh
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      await refetch();
+      setLastUpdate(new Date());
+      toast({
+        title: 'Refreshed',
+        description: 'Deposit status has been updated',
+      });
+    } catch (error) {
+      toast({
+        title: 'Refresh failed',
+        description: 'Could not update deposit status',
+        variant: 'destructive'
+      });
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
   
   // Update progress based on current stage
   useEffect(() => {
@@ -131,17 +238,39 @@ export default function DepositProgress({ processId }: DepositProgressProps) {
       <CardHeader>
         <div className="flex justify-between items-start">
           <div>
-            <CardTitle>Deposit Progress</CardTitle>
+            <CardTitle className="flex items-center">
+              Deposit Progress
+              {isLive && (
+                <Badge variant="outline" className="ml-2 bg-green-100 text-green-800 animate-pulse">
+                  <span className="h-2 w-2 rounded-full bg-green-500 mr-1"></span> Live
+                </Badge>
+              )}
+            </CardTitle>
             <CardDescription>
               Tracking deposit #{processId} - Started on {formatDate(process.startTime)}
             </CardDescription>
+            <div className="mt-1 text-xs text-muted-foreground">
+              Last updated: {lastUpdate.toLocaleTimeString()}
+            </div>
           </div>
-          <Badge 
-            variant={process.status === 'completed' ? 'success' : 'secondary'}
-            className={`text-xs ${getBadgeStyle(process.status)}`}
-          >
-            {process.status.replace('_', ' ').toUpperCase()}
-          </Badge>
+          <div className="flex flex-col items-end gap-2">
+            <Badge 
+              variant="outline"
+              className={`text-xs ${getBadgeStyle(process.status)}`}
+            >
+              {process.status.replace('_', ' ').toUpperCase()}
+            </Badge>
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={handleRefresh} 
+              disabled={isRefreshing}
+              className="h-7 px-2 text-xs"
+            >
+              <RefreshCw className={`h-3 w-3 mr-1 ${isRefreshing ? 'animate-spin' : ''}`} />
+              Refresh
+            </Button>
+          </div>
         </div>
       </CardHeader>
       
@@ -168,7 +297,7 @@ export default function DepositProgress({ processId }: DepositProgressProps) {
           </div>
         </div>
         
-        {/* Vehicle assignment (show only in certain stages) */}
+        {/* Vehicle assignment and real-time tracking (show only in certain stages) */}
         {(['pickup_assigned', 'pickup_in_progress'].includes(process.currentStage)) && (
           <div className="border rounded-md overflow-hidden">
             <div className="bg-primary/10 p-3">
@@ -199,6 +328,36 @@ export default function DepositProgress({ processId }: DepositProgressProps) {
                 <div>
                   <p className="text-muted-foreground">ETA</p>
                   <p className="font-medium">{formatDateTime(assignedVehicle.eta)}</p>
+                </div>
+              </div>
+              
+              {/* Live tracking map placeholder */}
+              <div className="mt-2 border rounded">
+                <div className="flex items-center justify-between bg-muted p-2 text-xs">
+                  <span className="font-medium">Live Vehicle Tracking</span>
+                  <Badge variant="outline" className="h-5 bg-blue-50 text-blue-700">
+                    <MapPin className="h-3 w-3 mr-1" /> 
+                    {assignedVehicle.distance}
+                  </Badge>
+                </div>
+                <div className="h-[180px] bg-gray-100 relative">
+                  {/* This would be replaced with a real Leaflet map in production */}
+                  <div className="flex flex-col items-center justify-center h-full">
+                    <MapPin className="h-6 w-6 text-primary" />
+                    <p className="text-xs mt-2 text-center">
+                      {process.currentStage === 'pickup_in_progress' 
+                        ? 'Vehicle is en route to your location'
+                        : 'Vehicle is preparing for pickup'}
+                    </p>
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="mt-2 h-7 text-xs"
+                      onClick={() => window.open('tel:' + assignedVehicle.driver.phone)}
+                    >
+                      Contact Driver
+                    </Button>
+                  </div>
                 </div>
               </div>
             </div>
