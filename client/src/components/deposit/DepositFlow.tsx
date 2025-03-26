@@ -33,8 +33,8 @@ const depositCommoditySchema = z.object({
 type DepositCommodityFormValues = z.infer<typeof depositCommoditySchema>;
 
 enum DepositStep {
-  SelectWarehouse = 0,
-  CommodityDetails = 1,
+  CommodityDetails = 0,
+  SelectWarehouse = 1,
   SchedulePickup = 2,
   ReviewSubmit = 3,
   Confirmation = 4
@@ -49,7 +49,7 @@ export default function DepositFlow({ warehouses, userLocation }: DepositFlowPro
   const { user } = useAuth();
   const { toast } = useToast();
   const [_, setLocation] = useLocation();
-  const [currentStep, setCurrentStep] = useState<DepositStep>(DepositStep.SelectWarehouse);
+  const [currentStep, setCurrentStep] = useState<DepositStep>(DepositStep.CommodityDetails);
   const [selectedWarehouse, setSelectedWarehouse] = useState<Warehouse | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [pickupDate, setPickupDate] = useState<string>("");
@@ -111,15 +111,15 @@ export default function DepositFlow({ warehouses, userLocation }: DepositFlowPro
   const handleSelectWarehouse = (warehouse: Warehouse) => {
     setSelectedWarehouse(warehouse);
     form.setValue("warehouseId", warehouse.id);
-    setCurrentStep(DepositStep.CommodityDetails);
+    setCurrentStep(DepositStep.SchedulePickup);
   };
   
   // Handle moving to next step
   const handleNextStep = () => {
     if (currentStep === DepositStep.CommodityDetails) {
-      const result = form.trigger();
+      const result = form.trigger(['name', 'type', 'quantity', 'measurementUnit']);
       if (result) {
-        setCurrentStep(DepositStep.SchedulePickup);
+        setCurrentStep(DepositStep.SelectWarehouse);
       }
     } else if (currentStep === DepositStep.SchedulePickup) {
       if (
@@ -238,8 +238,8 @@ export default function DepositFlow({ warehouses, userLocation }: DepositFlowPro
   return (
     <div className="container mx-auto py-6">
       <Steps currentStep={currentStep} totalSteps={5}>
-        <Step icon={<MapPin />} label="Select Warehouse" />
         <Step icon={<Package />} label="Commodity Details" />
+        <Step icon={<MapPin />} label="Select Warehouse" />
         <Step icon={<Truck />} label="Schedule Pickup" />
         <Step icon={<FileText />} label="Review & Submit" />
         <Step icon={<Check />} label="Confirmation" />
@@ -497,7 +497,7 @@ export default function DepositFlow({ warehouses, userLocation }: DepositFlowPro
             
             <CardFooter className="flex justify-end">
               <Button onClick={handleNextStep}>
-                Continue to Schedule Pickup
+                Continue to Select Warehouse
               </Button>
             </CardFooter>
           </Card>
