@@ -792,22 +792,123 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // If this is a deposit process, simulate automatic updates for demo purposes
       if (process.processType === 'deposit' && process.status === 'pending') {
-        // We will simulate a simple process update broadcast to demonstrate the websocket functionality
         setTimeout(() => {
           console.log(`Setting up demo process simulation for process ${process.id}`);
           
-          // Simply send a notification about the process being created and ready for tracking
-          const broadcastUpdate = (global as any).broadcastProcessUpdate;
-          if (typeof broadcastUpdate === 'function') {
-            broadcastUpdate(process.userId, process.id, {
-              process: process,
-              update: {
-                message: 'Process tracking initialized',
-                status: 'pending',
-                progress: 5
-              }
-            });
-          }
+          const simulateProcessUpdates = async () => {
+            try {
+              const broadcastUpdate = (global as any).broadcastProcessUpdate;
+              if (typeof broadcastUpdate !== 'function') return;
+              
+              // Initial notification
+              broadcastUpdate(process.userId, process.id, {
+                process: process,
+                update: {
+                  message: 'Process tracking initialized',
+                  status: 'pending',
+                  progress: 5
+                }
+              });
+              
+              // Demo updates - simplified to avoid TypeScript errors
+              const updates = [
+                {
+                  delay: 5000,
+                  message: 'Pickup scheduled successfully',
+                  stage: 'pickup_scheduled',
+                  progress: 15
+                },
+                {
+                  delay: 10000,
+                  message: 'Vehicle assigned for pickup',
+                  stage: 'pickup_assigned',
+                  progress: 30
+                },
+                {
+                  delay: 15000,
+                  message: 'Vehicle en route to pickup location',
+                  stage: 'pickup_in_progress', 
+                  progress: 40
+                },
+                {
+                  delay: 20000,
+                  message: 'Commodity arrived at warehouse',
+                  stage: 'arrived_at_warehouse',
+                  progress: 60
+                },
+                {
+                  delay: 25000,
+                  message: 'Pre-cleaning in progress',
+                  stage: 'pre_cleaning',
+                  progress: 75
+                },
+                {
+                  delay: 30000,
+                  message: 'Quality assessment completed',
+                  stage: 'quality_assessment',
+                  progress: 90
+                },
+                {
+                  delay: 35000,
+                  message: 'Electronic Warehouse Receipt generated',
+                  stage: 'ewr_generation',
+                  progress: 100
+                }
+              ];
+              
+              // Simulate each update with appropriate delay
+              updates.forEach((update, index) => {
+                setTimeout(() => {
+                  try {
+                    // Get latest process data before update
+                    storage.getProcess(process.id).then(currentProcess => {
+                      if (!currentProcess) return;
+                      
+                      // Create simple stage progress tracker
+                      const stageProgress = currentProcess.stageProgress || {};
+                      stageProgress[update.stage] = 'in_progress';
+                      
+                      // Mark previous stages as completed
+                      if (index > 0) {
+                        const prevStage = updates[index - 1].stage;
+                        stageProgress[prevStage] = 'completed';
+                      }
+                      
+                      // Prepare process update
+                      const processStatus = index === updates.length - 1 ? 'completed' : 'in_progress';
+                      
+                      // Update process in database
+                      storage.updateProcess(process.id, {
+                        status: processStatus as any,
+                        currentStage: update.stage,
+                        stageProgress: stageProgress
+                      }).then(updatedProcess => {
+                        // Broadcast update via WebSocket
+                        broadcastUpdate(process.userId, process.id, {
+                          process: updatedProcess,
+                          update: {
+                            message: update.message,
+                            stage: update.stage,
+                            status: processStatus,
+                            progress: update.progress
+                          }
+                        });
+                        
+                        console.log(`Process ${process.id} updated to stage: ${update.stage} (${update.progress}%)`);
+                      });
+                    });
+                  } catch (err) {
+                    console.error(`Error in process update simulation:`, err);
+                  }
+                }, update.delay);
+              });
+            } catch (err) {
+              console.error('Error in process simulation:', err);
+            }
+          };
+          
+          // Start the simulation
+          simulateProcessUpdates();
         }, 2000);
       }
       

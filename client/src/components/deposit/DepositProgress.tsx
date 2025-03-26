@@ -39,6 +39,9 @@ export default function DepositProgress({ processId }: DepositProgressProps) {
   
   // Set up WebSocket connection for real-time updates
   useEffect(() => {
+    // Only connect WebSocket when we have process data
+    if (!process || !process.userId) return;
+
     // Initialize WebSocket connection
     const connectWebSocket = () => {
       const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -48,16 +51,13 @@ export default function DepositProgress({ processId }: DepositProgressProps) {
         const socket = new WebSocket(wsUrl);
         
         socket.onopen = () => {
-          console.log('WebSocket connection established');
+          console.log('WebSocket connection established for process', processId);
           setIsLive(true);
-          
-          // Get the user ID from session (you would normally get this from your auth context)
-          const userId = localStorage.getItem('userId');
           
           // Subscribe to updates for this process
           socket.send(JSON.stringify({
             type: 'subscribe',
-            userId: userId || 1, // Fallback to ID 1 for demo
+            userId: process.userId,
             processId
           }));
           
@@ -77,6 +77,20 @@ export default function DepositProgress({ processId }: DepositProgressProps) {
               if (data.process) {
                 queryClient.setQueryData(['/api/processes', processId], data.process);
               }
+              
+              // Update progress bar if progress is provided
+              if (data.update && typeof data.update.progress === 'number') {
+                setProgress(data.update.progress);
+              }
+              
+              // Show toast notification for important updates
+              if (data.update && data.update.message) {
+                toast({
+                  title: 'Process Update',
+                  description: data.update.message,
+                });
+              }
+              
               setLastUpdate(new Date());
             }
           } catch (error) {
@@ -112,7 +126,7 @@ export default function DepositProgress({ processId }: DepositProgressProps) {
         socketRef.current.close();
       }
     };
-  }, [processId, queryClient, toast]);
+  }, [processId, queryClient, toast, process]);
   
   // Handle manual refresh
   const handleRefresh = async () => {
