@@ -647,7 +647,7 @@ export default function DepositFlow({ warehouses, userLocation }: DepositFlowPro
                     <div>
                       <p className="text-sm font-medium">Estimated Value</p>
                       <p className="text-sm text-muted-foreground">
-                        ₹ {(parseFloat(form.getValues("quantity")) * 2100).toLocaleString('en-IN')}
+                        ₹ {(parseFloat(form.getValues("quantity").toString()) * 2100).toLocaleString('en-IN')}
                       </p>
                     </div>
                   </div>
