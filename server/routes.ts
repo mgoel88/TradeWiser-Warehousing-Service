@@ -810,8 +810,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 }
               });
               
-              // Demo updates - simplified to avoid TypeScript errors
-              const updates = [
+              // Define update stages with proper typing
+              interface ProcessUpdate {
+                delay: number;
+                message: string;
+                stage: string;
+                progress: number;
+              }
+              
+              // Demo updates with process stages
+              const updates: ProcessUpdate[] = [
                 {
                   delay: 5000,
                   message: 'Pickup scheduled successfully',
@@ -864,8 +872,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
                     storage.getProcess(process.id).then(currentProcess => {
                       if (!currentProcess) return;
                       
-                      // Create simple stage progress tracker
-                      const stageProgress = currentProcess.stageProgress || {};
+                      // Directly create a new object with the proper type signature
+                      // This avoids the typescript error with the empty object
+                      const stageProgress: Record<string, string> = {};
+                      
+                      // Copy any existing stage progress
+                      if (currentProcess.stageProgress) {
+                        Object.keys(currentProcess.stageProgress).forEach(key => {
+                          if (typeof currentProcess.stageProgress[key] === 'string') {
+                            stageProgress[key] = currentProcess.stageProgress[key];
+                          }
+                        });
+                      }
+                      
+                      // Set current stage to in_progress
                       stageProgress[update.stage] = 'in_progress';
                       
                       // Mark previous stages as completed

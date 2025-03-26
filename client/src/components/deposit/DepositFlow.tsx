@@ -280,7 +280,8 @@ export default function DepositFlow({ warehouses, userLocation }: DepositFlowPro
             quality_assessment: "pending",
             ewr_generation: "pending"
           },
-          estimatedCompletionTime: new Date(new Date().setHours(new Date().getHours() + 48)) // 48 hours estimate
+          // Use ISO string format for the date to ensure it's correctly parsed
+          estimatedCompletionTime: new Date(new Date().setHours(new Date().getHours() + 48)).toISOString() // 48 hours estimate
         };
         
         console.log("Creating process:", processData);
