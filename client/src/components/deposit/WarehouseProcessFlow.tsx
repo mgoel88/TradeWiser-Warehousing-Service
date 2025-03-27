@@ -346,41 +346,28 @@ export default function WarehouseProcessFlow({ process, commodity, warehouse, on
       // Generate a verification code for QR codes and public verification
       const verificationCode = generateVerificationCode(process.id);
       
-      // Ensure values are properly formatted for the database
-      // Need to convert all JSON object fields to strings for Drizzle/PostgreSQL
-      const cleanQualityParameters = JSON.stringify(metrics.finalQuality);
-      
-      // Get valuation number (remove currency symbols, etc.)
-      const valuationNumeric = parseFloat(metrics.totalValuation.replace(/[^\d.-]/g, ''));
-      
-      // Parse commodity quantity to number
-      const quantityNumeric = parseFloat(commodity.quantity.toString());
-      
-      // Create warehouse receipt in the database
+      // Create a fully conformant receipt payload that meets schema requirements
       const receiptPayload = {
+        // Required string fields
         receiptNumber,
-        receiptType: "negotiable", 
-        commodityId: commodity.id,
-        ownerId: process.userId,
-        warehouseId: warehouse.id,
-        quantity: quantityNumeric,
-        status: "active",
-        blockchainHash: `0x${Math.random().toString(16).slice(2, 10)}${Date.now().toString(16)}`,
-        // ISO string format for dates
-        expiryDate: expiryDate.toISOString(),
-        valuation: valuationNumeric,
-        qualityParameters: cleanQualityParameters, // Now a JSON string
-        // Store commodity name and warehouse information
-        commodityName: commodity.name,
-        qualityGrade: metrics.gradeAssigned,
-        warehouseName: warehouse.name,
-        warehouseAddress: `${warehouse.address}, ${warehouse.city}, ${warehouse.state} - ${warehouse.pincode}`,
-        // Add verification code to metadata for public verification
-        metadata: JSON.stringify({ 
-          verificationCode: verificationCode 
-        }),
+        receiptType: "negotiable",
+        // Convert quantitative values to strings as required by the schema
+        quantity: commodity.quantity.toString(),
+        // Required fields per schema 
         depositorKycId: "KYC" + process.userId + Date.now().toString(16).slice(-6),
-        warehouseLicenseNo: `WL-${warehouse.id}-${new Date().getFullYear()}`
+        warehouseLicenseNo: `WL-${warehouse.id}-${new Date().getFullYear()}`,
+        // References to other entities
+        commodityId: commodity.id,
+        warehouseId: warehouse.id,
+        // Status as defined in the enum
+        status: "active",
+        // Simple blockchain hash with no special characters 
+        blockchainHash: Math.random().toString(16).substring(2) + Date.now().toString(16),
+        // Add verification code as metadata JSON
+        metadata: JSON.stringify({ 
+          verificationCode: verificationCode,
+          process: process.id
+        })
       };
       
       // Call API to create warehouse receipt

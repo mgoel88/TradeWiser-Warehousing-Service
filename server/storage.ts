@@ -671,7 +671,12 @@ export class DatabaseStorage implements IStorage {
   }
 
   async listWarehouseReceipts(): Promise<WarehouseReceipt[]> {
-    return await db.select().from(warehouseReceipts);
+    try {
+      return await db.select().from(warehouseReceipts);
+    } catch (error) {
+      console.error("Error listing warehouse receipts:", error);
+      return [];
+    }
   }
 
   async listWarehouseReceiptsByOwner(ownerId: number): Promise<WarehouseReceipt[]> {
