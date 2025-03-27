@@ -785,12 +785,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const completeReceiptData = {
         receiptNumber: `WR-${Date.now().toString(16).toUpperCase()}`,
-        receiptType: "non_negotiable",
         commodityId: req.body.commodityId,
         warehouseId: req.body.warehouseId,
         ownerId: req.session.userId,
         quantity: req.body.quantity,
-        status: "active",
+        status: "active" as const,
         expiryDate: new Date(Date.now() + 180 * 24 * 60 * 60 * 1000),
         blockchainHash: generateBlockchainHash(),
         valuation: req.body.valuation,
@@ -799,7 +798,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         issuedDate: new Date(),
         qualityParameters: req.body.qualityParameters || {},
         commodityName: req.body.commodityName,
-        metadata: {
+        metadata: req.body.metadata || {
           verificationCode: `V${Date.now().toString(16).slice(-8)}`
         }
       };

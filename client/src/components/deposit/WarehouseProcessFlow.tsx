@@ -350,7 +350,6 @@ export default function WarehouseProcessFlow({ process, commodity, warehouse, on
       const receiptPayload = {
         // Required string fields
         receiptNumber,
-        receiptType: "negotiable",
         // Convert quantitative values to strings as required by the schema
         quantity: commodity.quantity.toString(),
         // Required fields per schema 
