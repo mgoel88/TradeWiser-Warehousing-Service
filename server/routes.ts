@@ -783,29 +783,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return `0x${timestamp.toString(16)}${randomStr}`;
       };
       
-      const completeReceiptData = {
-        receiptNumber: `WR-${Date.now().toString(16).toUpperCase()}`,
+      // Create a receipt without the problematic receiptType field
+      // Use type assertion to ensure TypeScript accepts our payload
+      // with the status properly typed
+      const receiptPayload = {
+        // Required string fields
+        receiptNumber: req.body.receiptNumber || `WR-${Date.now().toString(16).toUpperCase()}`,
+        quantity: req.body.quantity,
+        depositorKycId: req.body.depositorKycId || `KYC${req.session.userId}${Date.now().toString(16).slice(-6)}`,
+        warehouseLicenseNo: req.body.warehouseLicenseNo || `WL-${req.body.warehouseId}-${new Date().getFullYear()}`,
+        
+        // References to other entities
         commodityId: req.body.commodityId,
         warehouseId: req.body.warehouseId,
         ownerId: req.session.userId,
-        quantity: req.body.quantity,
+        
+        // Status as specified enum value
         status: "active" as const,
-        expiryDate: new Date(Date.now() + 180 * 24 * 60 * 60 * 1000),
-        blockchainHash: generateBlockchainHash(),
+        
+        // Optional fields with default values
+        expiryDate: req.body.expiryDate || new Date(Date.now() + 180 * 24 * 60 * 60 * 1000),
+        blockchainHash: req.body.blockchainHash || generateBlockchainHash(),
         valuation: req.body.valuation,
-        depositorKycId: `KYC${req.session.userId}${Date.now().toString(16).slice(-6)}`,
-        warehouseLicenseNo: `WL-${req.body.warehouseId}-${new Date().getFullYear()}`,
-        issuedDate: new Date(),
+        
+        // Additional data
         qualityParameters: req.body.qualityParameters || {},
         commodityName: req.body.commodityName,
+        
+        // Metadata with verification data
         metadata: req.body.metadata || {
           verificationCode: `V${Date.now().toString(16).slice(-8)}`
         }
       };
-            
-      // Direct creation avoids Zod validation issues
-      const receipt = await storage.createWarehouseReceipt(completeReceiptData);
       
+      console.log("Creating warehouse receipt with payload:", JSON.stringify(receiptPayload, null, 2));
+            
+      // Direct creation while ensuring type safety
+      const receipt = await storage.createWarehouseReceipt(receiptPayload);
+      
+      console.log("Receipt created successfully:", receipt.id);
       res.status(201).json(receipt);
     } catch (error) {
       console.error("Error creating receipt:", error);
@@ -813,7 +829,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const validationError = fromZodError(error);
         res.status(400).json({ message: validationError.message });
       } else {
-        res.status(500).json({ message: "Server error: " + (error instanceof Error ? error.message : String(error)) });
+        res.status(500).json({ 
+          message: "Server error: " + (error instanceof Error ? error.message : String(error)),
+          details: error instanceof Error ? error.stack : undefined
+        });
       }
     }
   });

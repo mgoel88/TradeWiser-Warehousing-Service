@@ -106,7 +106,8 @@ export const receiptTypeEnum = pgEnum('receipt_type', ['negotiable', 'non_negoti
 export const warehouseReceipts = pgTable('warehouse_receipts', {
   id: serial('id').primaryKey(),
   receiptNumber: text('receipt_number').notNull().unique(),
-  receiptType: receiptTypeEnum('receipt_type').notNull().default('non_negotiable'),
+  // Note: receiptType is defined in the schema but not in the actual database
+  // receiptType: receiptTypeEnum('receipt_type').notNull().default('non_negotiable'),
   commodityId: integer('commodity_id').references(() => commodities.id),
   ownerId: integer('owner_id').references(() => users.id),
   warehouseId: integer('warehouse_id').references(() => warehouses.id),

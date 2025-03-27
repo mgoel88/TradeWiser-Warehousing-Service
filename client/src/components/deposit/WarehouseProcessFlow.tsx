@@ -346,7 +346,11 @@ export default function WarehouseProcessFlow({ process, commodity, warehouse, on
       // Generate a verification code for QR codes and public verification
       const verificationCode = generateVerificationCode(process.id);
       
-      // Create a fully conformant receipt payload that meets schema requirements
+      // Create valuation values for the receipt
+      const valuationAmount = parseFloat(metrics.totalValuation.replace(/[^0-9.]/g, ''));
+      
+      // Create a complete receipt payload that matches the server-side schema
+      // Note: receiptType is deliberately omitted as it doesn't exist in the database
       const receiptPayload = {
         // Required string fields
         receiptNumber,
@@ -362,6 +366,16 @@ export default function WarehouseProcessFlow({ process, commodity, warehouse, on
         status: "active",
         // Simple blockchain hash with no special characters 
         blockchainHash: Math.random().toString(16).substring(2) + Date.now().toString(16),
+        // Additional data
+        expiryDate: expiryDate.toISOString(),
+        valuation: valuationAmount.toString(),
+        commodityName: commodity.name,
+        qualityGrade: metrics.gradeAssigned,
+        qualityParameters: {
+          moisture: metrics.finalQuality.moisture,
+          foreignMatter: metrics.finalQuality.foreignMatter,
+          brokenGrains: metrics.finalQuality.brokenGrains
+        },
         // Add verification code as metadata - should be a JSON object, not a string
         metadata: { 
           verificationCode: verificationCode,
