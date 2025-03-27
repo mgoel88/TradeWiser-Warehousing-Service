@@ -864,4 +864,5 @@ export class DatabaseStorage implements IStorage {
 }
 
 // Use the database storage implementation
+// Changed from MemStorage to DatabaseStorage for permanent storage
 export const storage = new DatabaseStorage();
