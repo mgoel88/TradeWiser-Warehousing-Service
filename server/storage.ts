@@ -6,7 +6,7 @@ import {
   loans, Loan, InsertLoan,
   processes, Process, InsertProcess
 } from "@shared/schema";
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import { db } from "./db";
 
 // Interface for storage operations
@@ -57,10 +57,12 @@ export interface IStorage {
   // Warehouse Receipt operations
   getWarehouseReceipt(id: number): Promise<WarehouseReceipt | undefined>;
   getWarehouseReceiptByNumber(receiptNumber: string): Promise<WarehouseReceipt | undefined>;
+  getWarehouseReceiptByExternalId(externalId: string, source: string): Promise<WarehouseReceipt | undefined>;
   createWarehouseReceipt(receipt: InsertWarehouseReceipt): Promise<WarehouseReceipt>;
   listWarehouseReceipts(): Promise<WarehouseReceipt[]>;
   listWarehouseReceiptsByOwner(ownerId: number): Promise<WarehouseReceipt[]>;
   listWarehouseReceiptsByCommodity(commodityId: number): Promise<WarehouseReceipt[]>;
+  listWarehouseReceiptsByExternalSource(source: string): Promise<WarehouseReceipt[]>;
   updateWarehouseReceipt(id: number, receipt: Partial<InsertWarehouseReceipt>): Promise<WarehouseReceipt | undefined>;
   
   // Receipt transfer operations (blockchain)
@@ -436,6 +438,12 @@ export class MemStorage implements IStorage {
     );
   }
   
+  async getWarehouseReceiptByExternalId(externalId: string, source: string): Promise<WarehouseReceipt | undefined> {
+    return Array.from(this.warehouseReceipts.values()).find(
+      receipt => receipt.externalId === externalId && receipt.externalSource === source
+    );
+  }
+  
   async createWarehouseReceipt(insertReceipt: InsertWarehouseReceipt): Promise<WarehouseReceipt> {
     const id = this.currentReceiptId++;
     const now = new Date();
@@ -457,6 +465,12 @@ export class MemStorage implements IStorage {
   async listWarehouseReceiptsByCommodity(commodityId: number): Promise<WarehouseReceipt[]> {
     return Array.from(this.warehouseReceipts.values()).filter(
       receipt => receipt.commodityId === commodityId
+    );
+  }
+  
+  async listWarehouseReceiptsByExternalSource(source: string): Promise<WarehouseReceipt[]> {
+    return Array.from(this.warehouseReceipts.values()).filter(
+      receipt => receipt.externalSource === source
     );
   }
   
@@ -715,6 +729,15 @@ export class DatabaseStorage implements IStorage {
     const [receipt] = await db.select().from(warehouseReceipts).where(eq(warehouseReceipts.receiptNumber, receiptNumber));
     return receipt || undefined;
   }
+  
+  async getWarehouseReceiptByExternalId(externalId: string, source: string): Promise<WarehouseReceipt | undefined> {
+    const [receipt] = await db.select().from(warehouseReceipts)
+      .where(and(
+        eq(warehouseReceipts.externalId, externalId),
+        eq(warehouseReceipts.externalSource, source)
+      ));
+    return receipt || undefined;
+  }
 
   async createWarehouseReceipt(insertReceipt: InsertWarehouseReceipt): Promise<WarehouseReceipt> {
     const now = new Date();
@@ -741,6 +764,10 @@ export class DatabaseStorage implements IStorage {
   
   async listWarehouseReceiptsByCommodity(commodityId: number): Promise<WarehouseReceipt[]> {
     return await db.select().from(warehouseReceipts).where(eq(warehouseReceipts.commodityId, commodityId));
+  }
+  
+  async listWarehouseReceiptsByExternalSource(source: string): Promise<WarehouseReceipt[]> {
+    return await db.select().from(warehouseReceipts).where(eq(warehouseReceipts.externalSource, source));
   }
 
   async updateWarehouseReceipt(id: number, receiptData: Partial<InsertWarehouseReceipt>): Promise<WarehouseReceipt | undefined> {

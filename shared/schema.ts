@@ -115,6 +115,15 @@ export const warehouseReceipts = pgTable('warehouse_receipts', {
   expiryDate: timestamp('expiry_date'),
   valuation: numeric('valuation', { precision: 14, scale: 2 }),
   liens: json('liens'),
+  // Orange Channel: External Receipt fields
+  externalId: text('external_id'),                       // ID in external system
+  externalSource: text('external_source'),               // Source provider (e.g., 'agriapp')
+  commodityName: text('commodity_name'),                 // Name of commodity from external source
+  qualityGrade: text('quality_grade'),                   // Quality grade from external source
+  warehouseName: text('warehouse_name'),                 // External warehouse name
+  warehouseAddress: text('warehouse_address'),           // External warehouse address
+  measurementUnit: text('measurement_unit'),             // Unit of measurement
+  metadata: json('metadata'),                            // Additional metadata from external source
 });
 
 // Receipt transfers tracking
