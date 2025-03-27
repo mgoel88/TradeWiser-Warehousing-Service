@@ -6,6 +6,7 @@ import { insertUserSchema, insertWarehouseSchema, insertCommoditySchema, insertW
 import { z } from "zod";
 import { fromZodError } from "zod-validation-error";
 import 'express-session';
+import { paymentService, PaymentMethod, PaymentStatus } from './services/PaymentService';
 
 // Extend Express Request to include session
 declare module 'express-session' {
@@ -1401,57 +1402,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ message: "Not authenticated" });
       }
       
-      // Return available payment methods
-      res.status(200).json([
-        {
-          id: 'upi',
-          name: 'UPI',
-          description: 'Pay using UPI (Google Pay, PhonePe, etc.)',
-          enabled: true
-        },
-        {
-          id: 'card',
-          name: 'Credit/Debit Card',
-          description: 'Pay using credit or debit card',
-          enabled: true
-        },
-        {
-          id: 'netbanking',
-          name: 'Net Banking',
-          description: 'Pay using net banking',
-          enabled: true
-        },
-        {
-          id: 'wallet',
-          name: 'Wallet',
-          description: 'Pay using Paytm, PhonePe, or other wallets',
-          enabled: true
-        }
-      ]);
+      // Use our PaymentService to get available payment methods
+      const paymentMethods = paymentService.getPaymentMethods();
+      
+      res.status(200).json(paymentMethods);
     } catch (error) {
       console.error("Failed to fetch payment methods:", error);
       res.status(500).json({ message: "Failed to fetch payment methods" });
     }
   });
   
-  apiRouter.get("/payment/initialize", async (req: Request, res: Response) => {
+  apiRouter.get("/payment/history", async (req: Request, res: Response) => {
     try {
       // Check if user is authenticated
       if (!req.session || !req.session.userId) {
         return res.status(401).json({ message: "Not authenticated" });
       }
       
-      const gateway = req.query.gateway || "razorpay";
+      // Get payment history for the current user
+      const payments = paymentService.getUserPayments(req.session.userId);
       
-      // In a real app, this would initialize the specified payment gateway
-      res.status(200).json({
-        initialized: true,
-        gateway,
-        merchantId: `demo_merchant_${gateway}`,
-        timestamp: new Date().toISOString()
-      });
+      res.status(200).json(payments);
     } catch (error) {
-      res.status(500).json({ message: "Failed to initialize payment gateway" });
+      console.error("Failed to fetch payment history:", error);
+      res.status(500).json({ message: "Failed to fetch payment history" });
     }
   });
   
@@ -1464,25 +1438,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const { amount, description, referenceId, paymentMethod, metadata } = req.body;
       
-      if (!amount || !description || !referenceId) {
+      if (!amount || !description) {
         return res.status(400).json({ 
-          message: "Missing required fields: amount, description, and referenceId are required" 
+          message: "Missing required fields: amount and description are required" 
         });
       }
       
-      // In a real app, this would create a payment in the specified payment gateway
-      // and return the payment details including a transaction ID
-      const transactionId = `txn_${Date.now()}_${Math.floor(Math.random() * 1000000)}`;
+      // Use our PaymentService to create a payment
+      const payment = await paymentService.createPayment(
+        req.session.userId,
+        amount,
+        description,
+        paymentMethod as PaymentMethod,
+        referenceId,
+        metadata
+      );
       
-      // Return success response
+      // Return payment details
       res.status(200).json({
         success: true,
-        transactionId,
-        gatewayReference: `gw_ref_${Date.now()}`,
-        paymentMethod: paymentMethod || 'upi',
-        timestamp: new Date().toISOString(),
-        amount,
-        status: 'completed'
+        payment
       });
     } catch (error) {
       console.error("Payment creation error:", error);
@@ -1494,34 +1469,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-  apiRouter.get("/payment/verify/:transactionId", async (req: Request, res: Response) => {
+  apiRouter.get("/payment/verify/:paymentId", async (req: Request, res: Response) => {
     try {
       // Check if user is authenticated
       if (!req.session || !req.session.userId) {
         return res.status(401).json({ message: "Not authenticated" });
       }
       
-      const { transactionId } = req.params;
+      const { paymentId } = req.params;
       
-      if (!transactionId) {
-        return res.status(400).json({ message: "Transaction ID is required" });
+      if (!paymentId) {
+        return res.status(400).json({ message: "Payment ID is required" });
       }
       
-      // In a real app, this would verify the payment status with the payment gateway
-      // and update the payment status in the database accordingly
+      // Use our PaymentService to verify the payment
+      const verification = paymentService.verifyPayment(paymentId);
       
-      // Return verification response (simulating success)
       res.status(200).json({
-        success: true,
-        transactionId,
-        gatewayReference: `gw_ref_${transactionId.split('_')[1]}`,
-        timestamp: new Date().toISOString(),
-        status: 'completed',
-        verificationDetails: {
-          verifiedAt: new Date().toISOString(),
-          verificationMethod: 'api',
-          verificationSource: 'gateway'
-        }
+        success: verification.verified,
+        status: verification.status,
+        details: verification.details,
+        verified: verification.verified,
+        timestamp: new Date().toISOString()
       });
     } catch (error) {
       console.error("Payment verification error:", error);
@@ -1547,26 +1516,99 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Payment amount is required" });
       }
       
-      // In a real app, this would process the loan repayment through a payment gateway
-      // and update the loan status in the database accordingly
-      const transactionId = `txn_${Date.now()}_${Math.floor(Math.random() * 1000000)}`;
+      // Check if loan exists and belongs to the user
+      const loan = await storage.getLoan(parseInt(id));
+      if (!loan) {
+        return res.status(404).json({ message: "Loan not found" });
+      }
       
-      // Return success response
-      res.status(200).json({
-        success: true,
-        loanId: Number(id),
-        transactionId,
-        paymentMethod: paymentMethod || 'upi',
-        timestamp: new Date().toISOString(),
+      if (loan.userId !== req.session.userId) {
+        return res.status(403).json({ message: "Not authorized to repay this loan" });
+      }
+      
+      // Use our PaymentService to process loan repayment
+      const result = await paymentService.processLoanRepayment(
+        req.session.userId,
+        parseInt(id),
         amount,
-        status: 'completed'
-      });
+        paymentMethod as PaymentMethod
+      );
+      
+      if (result.success) {
+        res.status(200).json({
+          success: true,
+          loanId: parseInt(id),
+          payment: result.payment,
+          message: "Loan repayment processed successfully"
+        });
+      } else {
+        res.status(400).json({
+          success: false,
+          loanId: parseInt(id),
+          payment: result.payment,
+          message: "Loan repayment failed"
+        });
+      }
     } catch (error) {
       console.error("Loan repayment error:", error);
       res.status(500).json({ 
         success: false,
         message: "Failed to process loan repayment",
         errorMessage: "Loan repayment failed. Please try again."
+      });
+    }
+  });
+  
+  // New endpoint for warehouse storage fees payment
+  apiRouter.post("/warehouses/:id/pay-fees", async (req: Request, res: Response) => {
+    try {
+      // Check if user is authenticated
+      if (!req.session || !req.session.userId) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+      
+      const { id } = req.params;
+      const { amount, paymentMethod } = req.body;
+      
+      if (!amount) {
+        return res.status(400).json({ message: "Payment amount is required" });
+      }
+      
+      // Check if warehouse exists
+      const warehouse = await storage.getWarehouse(parseInt(id));
+      if (!warehouse) {
+        return res.status(404).json({ message: "Warehouse not found" });
+      }
+      
+      // Use our PaymentService to process warehouse fee payment
+      const result = await paymentService.payWarehouseFees(
+        req.session.userId,
+        parseInt(id),
+        amount,
+        paymentMethod as PaymentMethod
+      );
+      
+      if (result.success) {
+        res.status(200).json({
+          success: true,
+          warehouseId: parseInt(id),
+          payment: result.payment,
+          message: "Warehouse storage fees paid successfully"
+        });
+      } else {
+        res.status(400).json({
+          success: false,
+          warehouseId: parseInt(id),
+          payment: result.payment,
+          message: "Warehouse fee payment failed"
+        });
+      }
+    } catch (error) {
+      console.error("Warehouse fee payment error:", error);
+      res.status(500).json({ 
+        success: false,
+        message: "Failed to process storage fee payment",
+        errorMessage: "Payment failed. Please try again."
       });
     }
   });

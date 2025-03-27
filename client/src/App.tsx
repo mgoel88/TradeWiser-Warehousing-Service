@@ -15,6 +15,7 @@ import ProfilePage from "@/pages/ProfilePage";
 import DepositPage from "@/pages/DepositPage";
 import CommodityDetailPage from "@/pages/CommodityDetailPage";
 import ReceiptVerificationPage from "@/pages/ReceiptVerificationPage";
+import PaymentsPage from "@/pages/PaymentsPage";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -27,6 +28,7 @@ function Router() {
       <Route path="/warehouses" component={WarehousePage} />
       <Route path="/receipts" component={ReceiptsPage} />
       <Route path="/loans" component={LoansPage} />
+      <Route path="/payments" component={PaymentsPage} />
       <Route path="/profile" component={ProfilePage} />
       <Route path="/deposit" component={DepositPage} />
       <Route path="/commodities/:id" component={CommodityDetailPage} />

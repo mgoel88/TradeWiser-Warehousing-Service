@@ -24,6 +24,8 @@ export default function Header({ toggleSidebar }: HeaderProps) {
         return 'Warehouse Receipts';
       case '/loans':
         return 'Loans';
+      case '/payments':
+        return 'Payments';
       case '/profile':
         return 'Profile';
       case '/settings':

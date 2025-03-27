@@ -90,6 +90,19 @@ export default function Sidebar() {
               Loans
             </Link>
           </li>
+          <li className="mb-1">
+            <Link href="/payments" className={cn(
+              "flex items-center p-2 rounded-md",
+              location === "/payments" 
+                ? "bg-primary-50 text-primary-600 font-medium" 
+                : "text-gray-700 hover:bg-gray-100"
+            )}>
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2z" />
+              </svg>
+              Payments
+            </Link>
+          </li>
         </ul>
         
         <p className="mt-6 text-xs font-medium uppercase text-gray-500 mb-2">Channels</p>
