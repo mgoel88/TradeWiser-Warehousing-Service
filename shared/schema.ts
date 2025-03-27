@@ -113,19 +113,9 @@ export const insertWarehouseSchema = createInsertSchema(warehouses).omit({ id: t
 export const insertCommoditySchema = createInsertSchema(commodities).omit({ id: true, depositDate: true, lastUpdated: true });
 export const insertWarehouseReceiptSchema = createInsertSchema(warehouseReceipts).omit({ id: true, issuedDate: true });
 export const insertLoanSchema = createInsertSchema(loans).omit({ id: true, startDate: true });
-// Create process schema with proper date handling
+// Create process schema with proper date handling (without transformation)
 export const insertProcessSchema = createInsertSchema(processes)
-  .omit({ id: true, startTime: true, completedTime: true })
-  .transform((data) => {
-    // Convert string dates to Date objects if they're provided as strings
-    if (data.estimatedCompletionTime && typeof data.estimatedCompletionTime === 'string') {
-      return {
-        ...data,
-        estimatedCompletionTime: new Date(data.estimatedCompletionTime)
-      };
-    }
-    return data;
-  });
+  .omit({ id: true, startTime: true, completedTime: true });
 
 // Types
 export type InsertUser = z.infer<typeof insertUserSchema>;

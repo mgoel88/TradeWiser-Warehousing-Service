@@ -783,10 +783,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ message: "Not authenticated" });
       }
       
-      const validData = insertProcessSchema.parse({
-        ...req.body,
-        userId: req.session.userId
-      });
+      // Ensure we properly handle the estimatedCompletionTime
+      let processData = { ...req.body, userId: req.session.userId };
+      
+      // If we have a date string, convert it to a proper Date object
+      if (processData.estimatedCompletionTime && typeof processData.estimatedCompletionTime === 'string') {
+        processData.estimatedCompletionTime = new Date(processData.estimatedCompletionTime);
+      }
+      
+      const validData = insertProcessSchema.parse(processData);
       
       const process = await storage.createProcess(validData);
       
