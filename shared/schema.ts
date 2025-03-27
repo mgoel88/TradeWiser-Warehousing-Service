@@ -100,14 +100,11 @@ export const commodities = pgTable('commodities', {
   lastUpdated: timestamp('last_updated').defaultNow(),
 });
 
-// Warehouse Receipt table
-// Enhanced receipt types
+// Warehouse Receipt table - Simplified to match actual database structure
 export const receiptTypeEnum = pgEnum('receipt_type', ['negotiable', 'non_negotiable']);
 export const warehouseReceipts = pgTable('warehouse_receipts', {
   id: serial('id').primaryKey(),
   receiptNumber: text('receipt_number').notNull().unique(),
-  // Note: receiptType is defined in the schema but not in the actual database
-  // receiptType: receiptTypeEnum('receipt_type').notNull().default('non_negotiable'),
   commodityId: integer('commodity_id').references(() => commodities.id),
   ownerId: integer('owner_id').references(() => users.id),
   warehouseId: integer('warehouse_id').references(() => warehouses.id),
@@ -117,27 +114,7 @@ export const warehouseReceipts = pgTable('warehouse_receipts', {
   issuedDate: timestamp('issued_date').defaultNow(),
   expiryDate: timestamp('expiry_date'),
   valuation: numeric('valuation', { precision: 14, scale: 2 }),
-  storageFee: numeric('storage_fee', { precision: 10, scale: 2 }),
-  insuranceDetails: json('insurance_details'),
-  qualityParameters: json('quality_parameters'),
   liens: json('liens'),
-  endorsementChain: json('endorsement_chain'), // Track ownership transfers
-  pledgeDetails: json('pledge_details'), // For tracking pledges/loans
-  // Additional data fields
-  commodityName: text('commodity_name'), // Added for easy retrieval
-  qualityGrade: text('quality_grade'), // Added for easy retrieval
-  warehouseName: text('warehouse_name'), // Added for easy retrieval
-  warehouseAddress: text('warehouse_address'), // Added for easy retrieval
-  metadata: json('metadata'), // For verification codes and other receipt-specific data
-  // Fields required by Indian standards
-  regulatoryCompliance: json('regulatory_compliance'), // WDRA registration, etc.
-  disputeResolution: text('dispute_resolution'),
-  termsAndConditions: text('terms_and_conditions'),
-  depositorKycId: text('depositor_kyc_id').notNull(),
-  warehouseLicenseNo: text('warehouse_license_no').notNull(),
-  // Smart contract integration
-  smartContractAddress: text('smart_contract_address'),
-  transferHistory: json('transfer_history'),
 });
 
 // Receipt transfers tracking

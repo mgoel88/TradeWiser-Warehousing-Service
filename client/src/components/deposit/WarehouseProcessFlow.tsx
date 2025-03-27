@@ -356,37 +356,35 @@ export default function WarehouseProcessFlow({ process, commodity, warehouse, on
       // Create valuation values for the receipt
       const valuationAmount = parseFloat(metrics.totalValuation.replace(/[^0-9.]/g, ''));
       
-      // Create a complete receipt payload that matches the server-side schema
-      // Note: receiptType is deliberately omitted as it doesn't exist in the database
+      // Create a simplified receipt payload that matches the actual database schema
       const receiptPayload = {
-        // Required string fields
+        // Required fields
         receiptNumber,
-        // Convert quantitative values to strings as required by the schema
         quantity: commodity.quantity.toString(),
-        // Required fields per schema 
-        depositorKycId: "KYC" + process.userId + Date.now().toString(16).slice(-6),
-        warehouseLicenseNo: `WL-${warehouse.id}-${new Date().getFullYear()}`,
-        // References to other entities
+        
+        // Foreign keys
         commodityId: commodity.id,
         warehouseId: warehouse.id,
+        
         // Status as defined in the enum
         status: "active",
-        // Simple blockchain hash with no special characters 
-        blockchainHash: Math.random().toString(16).substring(2) + Date.now().toString(16),
-        // Additional data
+        
+        // Optional fields that exist in the database
+        blockchainHash: Date.now().toString(16) + Math.random().toString(16).substring(2),
         expiryDate: expiryDate.toISOString(),
         valuation: valuationAmount.toString(),
-        commodityName: commodity.name,
-        qualityGrade: metrics.gradeAssigned,
-        qualityParameters: {
-          moisture: metrics.finalQuality.moisture,
-          foreignMatter: metrics.finalQuality.foreignMatter,
-          brokenGrains: metrics.finalQuality.brokenGrains
-        },
-        // Add verification code as metadata - should be a JSON object, not a string
-        metadata: { 
-          verificationCode: verificationCode,
-          process: process.id
+        
+        // Store additional data in the liens JSON field since we don't have metadata
+        liens: {
+          verificationCode,
+          processId: process.id,
+          commodityName: commodity.name,
+          qualityGrade: metrics.gradeAssigned,
+          qualityParameters: {
+            moisture: metrics.finalQuality.moisture,
+            foreignMatter: metrics.finalQuality.foreignMatter,
+            brokenGrains: metrics.finalQuality.brokenGrains
+          }
         }
       };
       

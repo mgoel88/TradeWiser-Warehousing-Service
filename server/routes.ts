@@ -600,8 +600,47 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       const receipts = await storage.listWarehouseReceiptsByOwner(req.session.userId);
-      res.status(200).json(receipts);
+      
+      // Enhance receipts with commodity and warehouse data
+      const enhancedReceipts = await Promise.all(receipts.map(async (receipt) => {
+        // Get the liens field as a properly typed object
+        const liens: Record<string, any> = typeof receipt.liens === 'object' && receipt.liens !== null 
+          ? (receipt.liens as any) 
+          : {};
+        
+        // Get related entities
+        let commodity = null;
+        let warehouse = null;
+        
+        if (receipt.commodityId) {
+          commodity = await storage.getCommodity(receipt.commodityId);
+        }
+        
+        if (receipt.warehouseId) {
+          warehouse = await storage.getWarehouse(receipt.warehouseId);
+        }
+        
+        // Return an enhanced receipt with client-expected fields
+        return {
+          ...receipt,
+          // Add fields that the client might expect, sourced from liens and related entities
+          commodityName: commodity ? commodity.name : liens.commodityName || 'Unknown',
+          qualityGrade: liens.qualityGrade || 'Standard',
+          warehouseName: warehouse ? warehouse.name : liens.warehouseName || 'Unknown',
+          warehouseAddress: warehouse ? warehouse.address : liens.warehouseAddress || 'Unknown',
+          // Add a metadata field for compatibility with client code
+          metadata: {
+            verificationCode: liens.verificationCode || '',
+            processId: liens.processId || 0,
+            depositDate: liens.depositDate || receipt.issuedDate,
+            expiryDate: liens.expiryDate || receipt.expiryDate
+          }
+        };
+      }));
+      
+      res.status(200).json(enhancedReceipts);
     } catch (error) {
+      console.error("Error retrieving receipts:", error);
       res.status(500).json({ message: "Server error" });
     }
   });
@@ -618,10 +657,48 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Get all receipts owned by the user that are active (not collateralized)
       const receipts = await storage.listWarehouseReceiptsByOwner(req.session.userId);
-      const availableReceipts = receipts.filter(receipt => receipt.status === "active");
+      const activeReceipts = receipts.filter(receipt => receipt.status === "active");
       
-      res.status(200).json(availableReceipts);
+      // Enhance receipts with commodity and warehouse data
+      const enhancedReceipts = await Promise.all(activeReceipts.map(async (receipt) => {
+        // Get the liens field as a properly typed object
+        const liens: Record<string, any> = typeof receipt.liens === 'object' && receipt.liens !== null 
+          ? (receipt.liens as any) 
+          : {};
+        
+        // Get related entities
+        let commodity = null;
+        let warehouse = null;
+        
+        if (receipt.commodityId) {
+          commodity = await storage.getCommodity(receipt.commodityId);
+        }
+        
+        if (receipt.warehouseId) {
+          warehouse = await storage.getWarehouse(receipt.warehouseId);
+        }
+        
+        // Return an enhanced receipt with client-expected fields
+        return {
+          ...receipt,
+          // Add fields that the client might expect, sourced from liens and related entities
+          commodityName: commodity ? commodity.name : liens.commodityName || 'Unknown',
+          qualityGrade: liens.qualityGrade || 'Standard',
+          warehouseName: warehouse ? warehouse.name : liens.warehouseName || 'Unknown',
+          warehouseAddress: warehouse ? warehouse.address : liens.warehouseAddress || 'Unknown',
+          // Add a metadata field for compatibility with client code
+          metadata: {
+            verificationCode: liens.verificationCode || '',
+            processId: liens.processId || 0,
+            depositDate: liens.depositDate || receipt.issuedDate,
+            expiryDate: liens.expiryDate || receipt.expiryDate
+          }
+        };
+      }));
+      
+      res.status(200).json(enhancedReceipts);
     } catch (error) {
+      console.error("Error retrieving available collateral receipts:", error);
       res.status(500).json({ message: "Server error" });
     }
   });
@@ -678,19 +755,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Create the transfer record
       await storage.createReceiptTransfer(transferRecord);
       
-      // Update receipt ownership
+      // Get the current receipt to access existing liens
+      const currentReceipt = await storage.getWarehouseReceipt(receiptId);
+      
+      // Get existing liens as an object or create new empty object
+      const liens = (currentReceipt && currentReceipt.liens && typeof currentReceipt.liens === 'object')
+        ? { ...(currentReceipt.liens as Record<string, any>) }
+        : {};
+      
+      // Add transfer history to liens
+      liens.transferHistory = liens.transferHistory || [];
+      liens.transferHistory.push({
+        date: new Date().toISOString(),
+        fromUserId: req.session.userId,
+        toUserId: receiverId,
+        transferType,
+        transactionHash
+      });
+      
+      // Update receipt ownership with new liens
       const updatedReceipt = await storage.updateWarehouseReceipt(receiptId, {
         ownerId: receiverId,
-        // Update transfer history in metadata
-        transferHistory: JSON.stringify({
-          lastTransfer: {
-            date: new Date().toISOString(),
-            fromUserId: req.session.userId,
-            toUserId: receiverId,
-            transferType,
-            transactionHash
-          }
-        })
+        liens: liens
       });
       
       if (!updatedReceipt) {
@@ -716,10 +802,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // In a real blockchain app, we would verify this with the blockchain network
       const receipts = await storage.listWarehouseReceipts();
       const receipt = receipts.find(r => {
-        // First check in metadata for verification code
-        if (r.metadata && typeof r.metadata === 'object') {
-          const metadata = r.metadata as Record<string, any>;
-          if (metadata.verificationCode === verificationCode) {
+        // Check in liens field for verification code (we're storing metadata in liens)
+        if (r.liens && typeof r.liens === 'object') {
+          const liens = r.liens as Record<string, any>;
+          if (liens.verificationCode === verificationCode) {
             return true;
           }
         }
@@ -732,7 +818,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Receipt verification failed" });
       }
       
-      res.status(200).json(receipt);
+      // Get the liens field as a properly typed object
+      const liens: Record<string, any> = typeof receipt.liens === 'object' && receipt.liens !== null 
+        ? (receipt.liens as any) 
+        : {};
+      
+      // Return a cleaned version of the receipt with essential data derived from the liens field
+      const cleanedReceipt = {
+        ...receipt,
+        // Add any missing fields that the client might expect
+        commodityName: liens.commodityName || 'Unknown',
+        qualityGrade: liens.qualityGrade || 'Unknown',
+        // Add a metadata field for compatibility with client code
+        metadata: {
+          verificationCode: liens.verificationCode || verificationCode,
+          processId: liens.processId || 0
+        }
+      };
+      
+      res.status(200).json(cleanedReceipt);
     } catch (error) {
       console.error("Receipt verification error:", error);
       res.status(500).json({ message: "Server error" });
@@ -763,8 +867,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: "Not authorized to access this receipt" });
       }
       
-      res.status(200).json(receipt);
+      // Get the liens field as a properly typed object (used for additional metadata)
+      const liens: Record<string, any> = typeof receipt.liens === 'object' && receipt.liens !== null 
+        ? (receipt.liens as any) 
+        : {};
+      
+      // Fetch related commodity and warehouse info to enhance the receipt data
+      let commodity = null;
+      let warehouse = null;
+      
+      if (receipt.commodityId) {
+        commodity = await storage.getCommodity(receipt.commodityId);
+      }
+      
+      if (receipt.warehouseId) {
+        warehouse = await storage.getWarehouse(receipt.warehouseId);
+      }
+      
+      // Return an enhanced receipt with client-expected fields
+      const enhancedReceipt = {
+        ...receipt,
+        // Add fields that the client might expect, sourced from liens and related entities
+        commodityName: commodity ? commodity.name : liens.commodityName || 'Unknown',
+        qualityGrade: liens.qualityGrade || 'Standard',
+        warehouseName: warehouse ? warehouse.name : liens.warehouseName || 'Unknown',
+        warehouseAddress: warehouse ? warehouse.address : liens.warehouseAddress || 'Unknown',
+        // Add a metadata field for compatibility with client code
+        metadata: {
+          verificationCode: liens.verificationCode || '',
+          processId: liens.processId || 0,
+          depositDate: liens.depositDate || receipt.issuedDate,
+          expiryDate: liens.expiryDate || receipt.expiryDate
+        }
+      };
+      
+      res.status(200).json(enhancedReceipt);
     } catch (error) {
+      console.error("Error retrieving receipt:", error);
       res.status(500).json({ message: "Server error" });
     }
   });
