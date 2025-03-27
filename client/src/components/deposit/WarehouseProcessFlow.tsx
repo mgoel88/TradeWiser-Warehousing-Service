@@ -347,7 +347,8 @@ export default function WarehouseProcessFlow({ process, commodity, warehouse, on
       const verificationCode = generateVerificationCode(process.id);
       
       // Ensure values are properly formatted for the database
-      const cleanQualityParameters = { ...metrics.finalQuality };
+      // Need to convert all JSON object fields to strings for Drizzle/PostgreSQL
+      const cleanQualityParameters = JSON.stringify(metrics.finalQuality);
       
       // Get valuation number (remove currency symbols, etc.)
       const valuationNumeric = parseFloat(metrics.totalValuation.replace(/[^\d.-]/g, ''));
@@ -368,16 +369,16 @@ export default function WarehouseProcessFlow({ process, commodity, warehouse, on
         // ISO string format for dates
         expiryDate: expiryDate.toISOString(),
         valuation: valuationNumeric,
-        qualityParameters: cleanQualityParameters,
+        qualityParameters: cleanQualityParameters, // Now a JSON string
         // Store commodity name and warehouse information
         commodityName: commodity.name,
         qualityGrade: metrics.gradeAssigned,
         warehouseName: warehouse.name,
         warehouseAddress: `${warehouse.address}, ${warehouse.city}, ${warehouse.state} - ${warehouse.pincode}`,
         // Add verification code to metadata for public verification
-        metadata: { 
+        metadata: JSON.stringify({ 
           verificationCode: verificationCode 
-        },
+        }),
         depositorKycId: "KYC" + process.userId + Date.now().toString(16).slice(-6),
         warehouseLicenseNo: `WL-${warehouse.id}-${new Date().getFullYear()}`
       };
