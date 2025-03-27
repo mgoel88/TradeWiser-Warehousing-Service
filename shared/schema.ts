@@ -4,6 +4,43 @@ import { z } from "zod";
 
 // Enums
 export const userRoleEnum = pgEnum('user_role', ['farmer', 'trader', 'warehouse_owner', 'logistics_provider']);
+export const commodityCategoryEnum = pgEnum('commodity_category', ['cereals', 'pulses', 'oilseeds', 'spices', 'others']);
+
+// Commodity categories and parameters table
+export const commodityCategories = pgTable('commodity_categories', {
+  id: serial('id').primaryKey(),
+  name: text('name').notNull(),
+  category: commodityCategoryEnum('category').notNull(),
+  qualityParameters: json('quality_parameters').notNull(),
+  createdAt: timestamp('created_at').defaultNow(),
+});
+
+// Commodity parameter defaults
+export const defaultQualityParameters = {
+  cereals: {
+    moisture: { min: 10, max: 14, unit: '%' },
+    foreignMatter: { min: 0, max: 2, unit: '%' },
+    brokenGrains: { min: 0, max: 4, unit: '%' },
+    weeviled: { min: 0, max: 1, unit: '%' }
+  },
+  pulses: {
+    moisture: { min: 8, max: 12, unit: '%' },
+    foreignMatter: { min: 0, max: 1, unit: '%' },
+    damaged: { min: 0, max: 3, unit: '%' },
+    weeviled: { min: 0, max: 1, unit: '%' }
+  },
+  oilseeds: {
+    moisture: { min: 6, max: 12, unit: '%' },
+    foreignMatter: { min: 0, max: 2, unit: '%' },
+    oilContent: { min: 35, max: 45, unit: '%' },
+    freefattyAcid: { min: 0, max: 2, unit: '%' }
+  },
+  spices: {
+    moisture: { min: 8, max: 12, unit: '%' },
+    foreignMatter: { min: 0, max: 1, unit: '%' },
+    volatileOil: { min: 1, max: 4, unit: '%' }
+  }
+};
 export const commodityStatusEnum = pgEnum('commodity_status', ['active', 'processing', 'withdrawn', 'transferred']);
 export const channelTypeEnum = pgEnum('channel_type', ['green', 'orange', 'red']);
 export const receiptStatusEnum = pgEnum('receipt_status', ['active', 'processing', 'withdrawn', 'transferred', 'collateralized']);
