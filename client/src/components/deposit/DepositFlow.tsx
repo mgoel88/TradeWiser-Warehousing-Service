@@ -69,6 +69,7 @@ export default function DepositFlow({ warehouses, userLocation }: DepositFlowPro
   const [pickupDate, setPickupDate] = useState<string>("");
   const [pickupTime, setPickupTime] = useState<string>("");
   const [pickupAddress, setPickupAddress] = useState<string>("");
+  const [pickupCoordinates, setPickupCoordinates] = useState<[number, number] | null>(null);
   const [useWarehouseDelivery, setUseWarehouseDelivery] = useState<boolean>(false);
   const [processId, setProcessId] = useState<number | null>(null);
   const [selectedQualityParams, setSelectedQualityParams] = useState<Record<string, string>>({
@@ -259,6 +260,7 @@ export default function DepositFlow({ warehouses, userLocation }: DepositFlowPro
           pickupDate,
           pickupTime: useWarehouseDelivery ? null : pickupTime,
           pickupAddress: useWarehouseDelivery ? null : pickupAddress,
+          pickupCoordinates: useWarehouseDelivery ? null : pickupCoordinates,
           useWarehouseDelivery,
         }
       };
@@ -697,17 +699,16 @@ export default function DepositFlow({ warehouses, userLocation }: DepositFlowPro
                     </div>
 
                     <div>
-                      <label className="text-sm font-medium">Pickup Address *</label>
+                      <label className="text-sm font-medium mb-2 block">Pickup Address *</label>
                       <LocationPicker 
                         onLocationSelect={(address, coordinates) => {
                           setPickupAddress(address);
-                          console.log("Selected coordinates:", coordinates); // For future use with logistics
+                          setPickupCoordinates(coordinates); // Store coordinates in state
+                          console.log("Selected coordinates:", coordinates);
                         }}
                         initialAddress={pickupAddress}
+                        className="mt-2"
                       />
-                      {!useWarehouseDelivery && !pickupAddress && (
-                        <p className="text-sm text-red-500 mt-1">Pickup address is required</p>
-                      )}
                     </div>
                   </>
                 )}
