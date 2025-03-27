@@ -776,50 +776,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ message: "Not authenticated" });
       }
       
-      // Create complete receipt data with all required fields and default values
-      const generateBlockchainHash = () => {
-        const timestamp = Date.now();
-        const randomStr = Math.random().toString(36).substring(7);
-        return `0x${timestamp.toString(16)}${randomStr}`;
-      };
+      // Import receipt service dynamically to avoid circular dependencies
+      const { receiptService } = await import('./services/ReceiptService');
       
-      // Create a receipt without the problematic receiptType field
-      // Use type assertion to ensure TypeScript accepts our payload
-      // with the status properly typed
-      const receiptPayload = {
-        // Required string fields
-        receiptNumber: req.body.receiptNumber || `WR-${Date.now().toString(16).toUpperCase()}`,
-        quantity: req.body.quantity,
-        depositorKycId: req.body.depositorKycId || `KYC${req.session.userId}${Date.now().toString(16).slice(-6)}`,
-        warehouseLicenseNo: req.body.warehouseLicenseNo || `WL-${req.body.warehouseId}-${new Date().getFullYear()}`,
-        
-        // References to other entities
-        commodityId: req.body.commodityId,
-        warehouseId: req.body.warehouseId,
-        ownerId: req.session.userId,
-        
-        // Status as specified enum value
-        status: "active" as const,
-        
-        // Optional fields with default values
-        expiryDate: req.body.expiryDate || new Date(Date.now() + 180 * 24 * 60 * 60 * 1000),
-        blockchainHash: req.body.blockchainHash || generateBlockchainHash(),
-        valuation: req.body.valuation,
-        
-        // Additional data
-        qualityParameters: req.body.qualityParameters || {},
-        commodityName: req.body.commodityName,
-        
-        // Metadata with verification data
-        metadata: req.body.metadata || {
-          verificationCode: `V${Date.now().toString(16).slice(-8)}`
-        }
-      };
+      // Log the raw payload for debugging
+      console.log("Creating warehouse receipt with payload:", req.body);
       
-      console.log("Creating warehouse receipt with payload:", JSON.stringify(receiptPayload, null, 2));
-            
-      // Direct creation while ensuring type safety
-      const receipt = await storage.createWarehouseReceipt(receiptPayload);
+      // Use the dedicated receipt service to create the receipt
+      // This will handle all the data conversion, validation, and defaults
+      const receipt = await receiptService.createReceipt(req.body, req.session.userId);
       
       console.log("Receipt created successfully:", receipt.id);
       res.status(201).json(receipt);

@@ -13,7 +13,7 @@ import {
   FileCheck, ClipboardList, Scale, Droplets, FileText, Package, Truck, RefreshCw, Download, 
   AlertTriangle, ThumbsUp, Clipboard, CheckCircle2, Printer, Clock, Ban
 } from "lucide-react";
-import { generateVerificationCode, downloadReceiptPDF } from "@/lib/receiptGenerator";
+import { downloadReceiptPDF } from "@/lib/receiptGenerator";
 
 import { Process, Commodity, Warehouse } from "@shared/schema";
 import { apiRequest } from "@/lib/queryClient";
@@ -65,6 +65,13 @@ interface ReceiptData {
 
 export default function WarehouseProcessFlow({ process, commodity, warehouse, onComplete }: WarehouseProcessFlowProps) {
   const { toast } = useToast();
+  
+  // Generate a unique verification code for receipts
+  const generateVerificationCode = (processId: number) => {
+    const timestamp = Date.now().toString(16).toUpperCase();
+    const randomStr = Math.random().toString(16).substring(2, 6).toUpperCase();
+    return `WR-${processId}-${timestamp}-${randomStr}`;
+  };
   const [activeTab, setActiveTab] = useState("overview");
   const [metrics, setMetrics] = useState<ProcessMetrics>({
     initialWeight: "0.00",
