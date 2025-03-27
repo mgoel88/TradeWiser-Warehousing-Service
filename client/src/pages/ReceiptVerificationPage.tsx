@@ -13,13 +13,10 @@ import { useToast } from '@/hooks/use-toast';
 import { Link } from 'wouter';
 import { downloadReceiptPDF, generateReceiptPDF } from '@/lib/receiptGenerator';
 
-// Extended type including the fields we added to the database schema
-interface ExtendedWarehouseReceipt extends WarehouseReceipt {
-  metadata?: Record<string, any>;
-  commodityName?: string;
-  qualityGrade?: string;
-  warehouseName?: string;
-  warehouseAddress?: string;
+// Extending the WarehouseReceipt type with proper typing for various fields 
+type ExtendedWarehouseReceipt = WarehouseReceipt & {
+  // Ensure the metadata is properly typed for verification
+  metadata: Record<string, any>;
 }
 
 // Verification page that doesn't require authentication
@@ -63,7 +60,7 @@ export default function ReceiptVerificationPage() {
   }, [verificationCode]);
   
   // Format dates
-  const formatExpiryDate = (issueDate: Date | null) => {
+  const formatExpiryDate = (issueDate: Date | string | null) => {
     if (!issueDate) return 'Not available';
     
     const expiryDate = new Date(issueDate);

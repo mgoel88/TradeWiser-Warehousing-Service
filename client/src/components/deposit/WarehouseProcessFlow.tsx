@@ -13,6 +13,7 @@ import {
   FileCheck, ClipboardList, Scale, Droplets, FileText, Package, Truck, RefreshCw, Download, 
   AlertTriangle, ThumbsUp, Clipboard, CheckCircle2, Printer, Clock, Ban
 } from "lucide-react";
+import { generateVerificationCode, downloadReceiptPDF } from "@/lib/receiptGenerator";
 
 import { Process, Commodity, Warehouse } from "@shared/schema";
 import { apiRequest } from "@/lib/queryClient";
@@ -327,6 +328,9 @@ export default function WarehouseProcessFlow({ process, commodity, warehouse, on
       const expiryDate = new Date(now);
       expiryDate.setMonth(expiryDate.getMonth() + 6);
       
+      // Generate a verification code for QR codes and public verification
+      const verificationCode = generateVerificationCode(process.id);
+      
       // Create warehouse receipt in the database
       const receiptPayload = {
         receiptNumber,
@@ -340,6 +344,15 @@ export default function WarehouseProcessFlow({ process, commodity, warehouse, on
         expiryDate: expiryDate.toISOString(),
         valuation: parseFloat(metrics.totalValuation.replace(/[^\d.-]/g, '')),
         qualityParameters: metrics.finalQuality,
+        // Store commodity name and warehouse information
+        commodityName: commodity.name,
+        qualityGrade: metrics.gradeAssigned,
+        warehouseName: warehouse.name,
+        warehouseAddress: `${warehouse.address}, ${warehouse.city}, ${warehouse.state} - ${warehouse.pincode}`,
+        // Add verification code to metadata for public verification
+        metadata: { 
+          verificationCode: verificationCode 
+        },
         depositorKycId: "KYC" + process.userId + Date.now().toString(16).slice(-6),
         warehouseLicenseNo: `WL-${warehouse.id}-${new Date().getFullYear()}`
       };
@@ -418,13 +431,13 @@ export default function WarehouseProcessFlow({ process, commodity, warehouse, on
     if (!receiptData) return;
     
     try {
-      // Import the receipt generator functionality
-      const { downloadReceiptPDF } = await import('@/lib/receiptGenerator');
+      // Use the verification code we generated earlier for the PDF
+      const verificationCode = generateVerificationCode(process.id);
       
       // Generate and download the receipt PDF
       await downloadReceiptPDF({
         ...receiptData,
-        verificationCode: `WR-${process.id}-${Math.floor(Date.now()/1000).toString(16).toUpperCase()}`
+        verificationCode: verificationCode
       });
       
       toast({

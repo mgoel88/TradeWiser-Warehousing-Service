@@ -615,8 +615,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // In a real blockchain app, we would verify this with the blockchain network
       const receipts = await storage.listWarehouseReceipts();
       const receipt = receipts.find(r => {
-        // Check in receipt number for now
-        // In a real implementation, we would check in blockchain
+        // First check in metadata for verification code
+        if (r.metadata && typeof r.metadata === 'object') {
+          const metadata = r.metadata as Record<string, any>;
+          if (metadata.verificationCode === verificationCode) {
+            return true;
+          }
+        }
+        
+        // Fallback to checking receipt number (for backward compatibility)
         return r.receiptNumber.includes(verificationCode);
       });
       
@@ -626,6 +633,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       res.status(200).json(receipt);
     } catch (error) {
+      console.error("Receipt verification error:", error);
       res.status(500).json({ message: "Server error" });
     }
   });
