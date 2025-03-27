@@ -46,6 +46,7 @@ export const channelTypeEnum = pgEnum('channel_type', ['green', 'orange', 'red']
 export const receiptStatusEnum = pgEnum('receipt_status', ['active', 'processing', 'withdrawn', 'transferred', 'collateralized']);
 export const loanStatusEnum = pgEnum('loan_status', ['pending', 'active', 'repaid', 'defaulted']);
 export const processStatusEnum = pgEnum('process_status', ['pending', 'in_progress', 'completed', 'failed']);
+export const transferTypeEnum = pgEnum('transfer_type', ['ownership', 'collateral', 'pledge', 'release']);
 
 // User table
 export const users = pgTable('users', {
@@ -184,6 +185,7 @@ export const insertUserSchema = createInsertSchema(users).omit({ id: true, creat
 export const insertWarehouseSchema = createInsertSchema(warehouses).omit({ id: true, createdAt: true });
 export const insertCommoditySchema = createInsertSchema(commodities).omit({ id: true, depositDate: true, lastUpdated: true });
 export const insertWarehouseReceiptSchema = createInsertSchema(warehouseReceipts).omit({ id: true, issuedDate: true });
+export const insertReceiptTransferSchema = createInsertSchema(receiptTransfers).omit({ id: true, transferDate: true });
 export const insertLoanSchema = createInsertSchema(loans).omit({ id: true, startDate: true });
 // Create process schema with proper date handling (without transformation)
 export const insertProcessSchema = createInsertSchema(processes)
@@ -201,6 +203,9 @@ export type Commodity = typeof commodities.$inferSelect;
 
 export type InsertWarehouseReceipt = z.infer<typeof insertWarehouseReceiptSchema>;
 export type WarehouseReceipt = typeof warehouseReceipts.$inferSelect;
+
+export type InsertReceiptTransfer = z.infer<typeof insertReceiptTransferSchema>;
+export type ReceiptTransfer = typeof receiptTransfers.$inferSelect;
 
 export type InsertLoan = z.infer<typeof insertLoanSchema>;
 export type Loan = typeof loans.$inferSelect;
