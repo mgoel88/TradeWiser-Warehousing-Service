@@ -101,9 +101,6 @@ export const commodities = pgTable('commodities', {
 
 // Warehouse Receipt table
 // Enhanced receipt types
-export const receiptTypeEnum = pgEnum('receipt_type', ['negotiable', 'non_negotiable']);
-export const transferTypeEnum = pgEnum('transfer_type', ['endorsement', 'delivery', 'pledge']);
-
 export const warehouseReceipts = pgTable('warehouse_receipts', {
   id: serial('id').primaryKey(),
   receiptNumber: text('receipt_number').notNull().unique(),
