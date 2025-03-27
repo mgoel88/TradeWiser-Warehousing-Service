@@ -1,5 +1,5 @@
 import { db } from '../server/db';
-import { users, warehouses, InsertUser, InsertWarehouse } from '../shared/schema';
+import { users, warehouses, warehouseReceipts, InsertUser, InsertWarehouse } from '../shared/schema';
 
 async function seedDatabase() {
   console.log('Starting database seeding...');
