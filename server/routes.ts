@@ -1141,6 +1141,184 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Payment routes
+  apiRouter.get("/payment/methods", async (req: Request, res: Response) => {
+    try {
+      // Check if user is authenticated
+      if (!req.session || !req.session.userId) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+      
+      // Return available payment methods
+      res.status(200).json([
+        {
+          id: 'upi',
+          name: 'UPI',
+          description: 'Pay using UPI (Google Pay, PhonePe, etc.)',
+          enabled: true
+        },
+        {
+          id: 'card',
+          name: 'Credit/Debit Card',
+          description: 'Pay using credit or debit card',
+          enabled: true
+        },
+        {
+          id: 'netbanking',
+          name: 'Net Banking',
+          description: 'Pay using net banking',
+          enabled: true
+        },
+        {
+          id: 'wallet',
+          name: 'Wallet',
+          description: 'Pay using Paytm, PhonePe, or other wallets',
+          enabled: true
+        }
+      ]);
+    } catch (error) {
+      console.error("Failed to fetch payment methods:", error);
+      res.status(500).json({ message: "Failed to fetch payment methods" });
+    }
+  });
+  
+  apiRouter.get("/payment/initialize", async (req: Request, res: Response) => {
+    try {
+      // Check if user is authenticated
+      if (!req.session || !req.session.userId) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+      
+      const gateway = req.query.gateway || "razorpay";
+      
+      // In a real app, this would initialize the specified payment gateway
+      res.status(200).json({
+        initialized: true,
+        gateway,
+        merchantId: `demo_merchant_${gateway}`,
+        timestamp: new Date().toISOString()
+      });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to initialize payment gateway" });
+    }
+  });
+  
+  apiRouter.post("/payment/create", async (req: Request, res: Response) => {
+    try {
+      // Check if user is authenticated
+      if (!req.session || !req.session.userId) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+      
+      const { amount, description, referenceId, paymentMethod, metadata } = req.body;
+      
+      if (!amount || !description || !referenceId) {
+        return res.status(400).json({ 
+          message: "Missing required fields: amount, description, and referenceId are required" 
+        });
+      }
+      
+      // In a real app, this would create a payment in the specified payment gateway
+      // and return the payment details including a transaction ID
+      const transactionId = `txn_${Date.now()}_${Math.floor(Math.random() * 1000000)}`;
+      
+      // Return success response
+      res.status(200).json({
+        success: true,
+        transactionId,
+        gatewayReference: `gw_ref_${Date.now()}`,
+        paymentMethod: paymentMethod || 'upi',
+        timestamp: new Date().toISOString(),
+        amount,
+        status: 'completed'
+      });
+    } catch (error) {
+      console.error("Payment creation error:", error);
+      res.status(500).json({ 
+        success: false,
+        message: "Failed to process payment",
+        errorMessage: "Payment processing failed. Please try again."
+      });
+    }
+  });
+  
+  apiRouter.get("/payment/verify/:transactionId", async (req: Request, res: Response) => {
+    try {
+      // Check if user is authenticated
+      if (!req.session || !req.session.userId) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+      
+      const { transactionId } = req.params;
+      
+      if (!transactionId) {
+        return res.status(400).json({ message: "Transaction ID is required" });
+      }
+      
+      // In a real app, this would verify the payment status with the payment gateway
+      // and update the payment status in the database accordingly
+      
+      // Return verification response (simulating success)
+      res.status(200).json({
+        success: true,
+        transactionId,
+        gatewayReference: `gw_ref_${transactionId.split('_')[1]}`,
+        timestamp: new Date().toISOString(),
+        status: 'completed',
+        verificationDetails: {
+          verifiedAt: new Date().toISOString(),
+          verificationMethod: 'api',
+          verificationSource: 'gateway'
+        }
+      });
+    } catch (error) {
+      console.error("Payment verification error:", error);
+      res.status(500).json({ 
+        success: false,
+        message: "Failed to verify payment",
+        errorMessage: "Payment verification failed. Please contact support."
+      });
+    }
+  });
+  
+  apiRouter.post("/loans/:id/repay", async (req: Request, res: Response) => {
+    try {
+      // Check if user is authenticated
+      if (!req.session || !req.session.userId) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+      
+      const { id } = req.params;
+      const { amount, paymentMethod } = req.body;
+      
+      if (!amount) {
+        return res.status(400).json({ message: "Payment amount is required" });
+      }
+      
+      // In a real app, this would process the loan repayment through a payment gateway
+      // and update the loan status in the database accordingly
+      const transactionId = `txn_${Date.now()}_${Math.floor(Math.random() * 1000000)}`;
+      
+      // Return success response
+      res.status(200).json({
+        success: true,
+        loanId: Number(id),
+        transactionId,
+        paymentMethod: paymentMethod || 'upi',
+        timestamp: new Date().toISOString(),
+        amount,
+        status: 'completed'
+      });
+    } catch (error) {
+      console.error("Loan repayment error:", error);
+      res.status(500).json({ 
+        success: false,
+        message: "Failed to process loan repayment",
+        errorMessage: "Loan repayment failed. Please try again."
+      });
+    }
+  });
+
   // Add all API routes under /api prefix
   app.use("/api", apiRouter);
 

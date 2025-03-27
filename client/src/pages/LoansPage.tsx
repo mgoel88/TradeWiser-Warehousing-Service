@@ -4,6 +4,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import ReceiptCollateralLoanForm from "@/components/loans/ReceiptCollateralLoanForm";
+import LoanRepaymentButton from "@/components/loans/LoanRepaymentButton";
 import { PlusCircle, CreditCard, CircleDollarSign, Clock, Check, AlertCircle, BadgeIndianRupee } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { format } from "date-fns";
@@ -205,10 +206,13 @@ export default function LoansPage() {
                               <Button variant="outline" size="sm">
                                 View Details
                               </Button>
-                              {loan.status === "active" && (
-                                <Button variant="secondary" size="sm">
-                                  Make Payment
-                                </Button>
+                              {(loan.status === "active" || loan.status === "pending") && (
+                                <LoanRepaymentButton
+                                  loanId={loan.id}
+                                  amount={Number(loan.amount)}
+                                  outstandingAmount={loan.outstandingAmount}
+                                  status={loan.status}
+                                />
                               )}
                             </div>
                           </div>
