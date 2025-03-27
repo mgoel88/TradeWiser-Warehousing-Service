@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Process } from '@shared/schema';
+import { Process, Commodity, Warehouse } from '@shared/schema';
 import { apiRequest } from '@/lib/queryClient';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { formatDate, formatDateTime } from '@/lib/utils';
 import { Truck, Package, FileCheck, ClipboardCheck, Clock, AlertTriangle, CheckCircle2, MapPin, RefreshCw } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import WarehouseProcessFlow from './WarehouseProcessFlow';
 
 interface DepositProgressProps {
   processId: number;
@@ -24,7 +25,7 @@ export default function DepositProgress({ processId }: DepositProgressProps) {
   const { toast } = useToast();
   
   // Fetch process data
-  const { data: process, isLoading, refetch } = useQuery({
+  const { data: process, isLoading: processLoading, refetch } = useQuery({
     queryKey: ['/api/processes', processId],
     queryFn: async () => {
       const res = await apiRequest('GET', `/api/processes/${processId}`);
@@ -36,6 +37,37 @@ export default function DepositProgress({ processId }: DepositProgressProps) {
     // Refetch at regular intervals (every 30 seconds) as fallback
     refetchInterval: 30000,
   });
+  
+  // Fetch commodity data when we have process
+  const { data: commodity, isLoading: commodityLoading } = useQuery({
+    queryKey: ['/api/commodities', process?.commodityId],
+    queryFn: async () => {
+      if (!process?.commodityId) return null;
+      const res = await apiRequest('GET', `/api/commodities/${process.commodityId}`);
+      if (!res.ok) {
+        throw new Error('Failed to fetch commodity data');
+      }
+      return res.json();
+    },
+    enabled: !!process?.commodityId,
+  });
+  
+  // Fetch warehouse data when we have process
+  const { data: warehouse, isLoading: warehouseLoading } = useQuery({
+    queryKey: ['/api/warehouses', process?.warehouseId],
+    queryFn: async () => {
+      if (!process?.warehouseId) return null;
+      const res = await apiRequest('GET', `/api/warehouses/${process.warehouseId}`);
+      if (!res.ok) {
+        throw new Error('Failed to fetch warehouse data');
+      }
+      return res.json();
+    },
+    enabled: !!process?.warehouseId,
+  });
+  
+  // Combined loading state
+  const isLoading = processLoading || commodityLoading || warehouseLoading;
   
   // Set up WebSocket connection for real-time updates
   useEffect(() => {
@@ -315,7 +347,7 @@ export default function DepositProgress({ processId }: DepositProgressProps) {
           </div>
         </div>
         
-        {/* Vehicle assignment and real-time tracking (show only in certain stages) */}
+        {/* Vehicle assignment and real-time tracking (show only during pickup stages) */}
         {(['pickup_assigned', 'pickup_in_progress'].includes(process.currentStage)) && (
           <div className="border rounded-md overflow-hidden">
             <div className="bg-primary/10 p-3">
@@ -378,6 +410,27 @@ export default function DepositProgress({ processId }: DepositProgressProps) {
                   </div>
                 </div>
               </div>
+            </div>
+          </div>
+        )}
+        
+        {/* Warehouse process flow (show only when at warehouse or later stages) */}
+        {(['arrived_at_warehouse', 'pre_cleaning', 'quality_assessment', 'ewr_generation'].includes(process.currentStage) && 
+          commodity && warehouse) && (
+          <div className="border rounded-md overflow-hidden mt-4">
+            <div className="bg-primary/10 p-3">
+              <h3 className="font-medium flex items-center">
+                <ClipboardCheck className="h-4 w-4 mr-2" />
+                Warehouse Processing
+              </h3>
+            </div>
+            <div className="p-3">
+              <WarehouseProcessFlow 
+                process={process} 
+                commodity={commodity} 
+                warehouse={warehouse} 
+                onComplete={handleRefresh}
+              />
             </div>
           </div>
         )}
