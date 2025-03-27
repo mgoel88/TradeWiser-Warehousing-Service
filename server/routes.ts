@@ -941,6 +941,129 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Withdrawal routes
+  apiRouter.post("/receipts/:id/withdraw", async (req: Request, res: Response) => {
+    try {
+      // Check if user is authenticated
+      if (!req.session || !req.session.userId) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+      
+      const receiptId = parseInt(req.params.id);
+      if (isNaN(receiptId)) {
+        return res.status(400).json({ message: "Invalid receipt ID" });
+      }
+      
+      // Get the optional quantity parameter for partial withdrawals
+      const { quantity } = req.body;
+      
+      // Import withdrawal service dynamically to avoid circular dependencies
+      const { withdrawalService } = await import('./services/WithdrawalService');
+      
+      // Initiate the withdrawal process
+      const result = await withdrawalService.initiateWithdrawal(receiptId, req.session.userId, quantity);
+      
+      res.status(200).json({ 
+        message: result.isFullWithdrawal ? 
+          "Full withdrawal initiated" : 
+          `Partial withdrawal of ${quantity} initiated`,
+        process: result.process,
+        receipt: result.receipt
+      });
+    } catch (error) {
+      console.error("Withdrawal initiation error:", error);
+      res.status(error.message.includes("Not authorized") ? 403 : 500).json({ 
+        message: error instanceof Error ? error.message : "Server error during withdrawal" 
+      });
+    }
+  });
+  
+  apiRouter.post("/processes/:id/withdrawal-update", async (req: Request, res: Response) => {
+    try {
+      // Check if user is authenticated
+      if (!req.session || !req.session.userId) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+      
+      const processId = parseInt(req.params.id);
+      if (isNaN(processId)) {
+        return res.status(400).json({ message: "Invalid process ID" });
+      }
+      
+      // Validate the update data
+      const { stage, status, message } = req.body;
+      
+      if (!stage || !status) {
+        return res.status(400).json({ 
+          message: "Missing required fields: stage and status are required" 
+        });
+      }
+      
+      // Import withdrawal service dynamically to avoid circular dependencies
+      const { withdrawalService } = await import('./services/WithdrawalService');
+      
+      // Update the withdrawal process stage
+      const result = await withdrawalService.updateWithdrawalStage(processId, stage, status, message);
+      
+      // Broadcast the process update to all clients
+      if (wss) {
+        broadcastProcessUpdate(req.session.userId, processId, {
+          message: message || `Stage ${stage} set to ${status}`,
+          stage,
+          status,
+          progress: result.progress
+        });
+      }
+      
+      res.status(200).json(result);
+    } catch (error) {
+      console.error("Withdrawal update error:", error);
+      res.status(500).json({ 
+        message: error instanceof Error ? error.message : "Server error during withdrawal update" 
+      });
+    }
+  });
+  
+  apiRouter.post("/processes/:id/complete-withdrawal", async (req: Request, res: Response) => {
+    try {
+      // Check if user is authenticated
+      if (!req.session || !req.session.userId) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+      
+      const processId = parseInt(req.params.id);
+      if (isNaN(processId)) {
+        return res.status(400).json({ message: "Invalid process ID" });
+      }
+      
+      // Import withdrawal service dynamically to avoid circular dependencies
+      const { withdrawalService } = await import('./services/WithdrawalService');
+      
+      // Complete the withdrawal process
+      const result = await withdrawalService.completeWithdrawal(processId);
+      
+      // Broadcast the process update to all clients
+      if (wss) {
+        broadcastProcessUpdate(req.session.userId, processId, {
+          message: "Withdrawal completed successfully",
+          stage: "receipt_update",
+          status: "completed",
+          progress: 100
+        });
+      }
+      
+      res.status(200).json({ 
+        message: "Withdrawal completed successfully", 
+        ...result
+      });
+    } catch (error) {
+      console.error("Withdrawal completion error:", error);
+      res.status(500).json({ 
+        message: error instanceof Error ? error.message : "Server error completing withdrawal" 
+      });
+    }
+  });
+  
   // Loan routes
   apiRouter.get("/loans", async (req: Request, res: Response) => {
     try {

@@ -10,14 +10,16 @@ import {
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Loader2, FileText, Download, ArrowRight, Link2, Shield, BadgeCheck } from "lucide-react";
+import { Loader2, FileText, Download, ArrowRight, Package, Shield, BadgeCheck } from "lucide-react";
 import { format } from "date-fns";
 import QRCode from "qrcode";
 import { jsPDF } from "jspdf";
 import { useToast } from "@/hooks/use-toast";
-import { WarehouseReceipt } from "@shared/schema";
+import { WarehouseReceipt, Process } from "@shared/schema";
 import { verifyBlockchainRecord } from "@/lib/blockchainUtils";
 import OwnershipTransferDialog from "./OwnershipTransferDialog";
+import { WithdrawalDialog } from "./WithdrawalDialog";
+import WithdrawalTracker from "../withdraw/WithdrawalTracker";
 
 export default function ReceiptWidget() {
   const { toast } = useToast();
@@ -25,6 +27,8 @@ export default function ReceiptWidget() {
   const [selectedTab, setSelectedTab] = useState("active");
   const [selectedReceipt, setSelectedReceipt] = useState<WarehouseReceipt | null>(null);
   const [isTransferDialogOpen, setIsTransferDialogOpen] = useState(false);
+  const [isWithdrawalDialogOpen, setIsWithdrawalDialogOpen] = useState(false);
+  const [selectedWithdrawalProcess, setSelectedWithdrawalProcess] = useState<Process | null>(null);
   const [verificationStates, setVerificationStates] = useState<Record<number, 'idle' | 'verifying' | 'verified' | 'failed'>>({});
 
   // Query to fetch receipts
@@ -232,6 +236,46 @@ export default function ReceiptWidget() {
     setIsTransferDialogOpen(true);
   };
 
+  // Handle withdrawal initiation
+  const handleWithdrawal = (receipt: WarehouseReceipt) => {
+    setSelectedReceipt(receipt);
+    setIsWithdrawalDialogOpen(true);
+  };
+
+  // Handle successful withdrawal initiation - process created
+  const handleWithdrawalInitiated = (process: Process) => {
+    // Set the withdrawal process for tracking
+    setSelectedWithdrawalProcess(process);
+    
+    // Close the withdrawal dialog
+    setIsWithdrawalDialogOpen(false);
+    
+    // Show success message
+    toast({
+      title: "Withdrawal Initiated",
+      description: "Your commodity withdrawal process has been started.",
+    });
+    
+    // Refresh receipts data
+    queryClient.invalidateQueries({ queryKey: ['/api/receipts'] });
+    queryClient.invalidateQueries({ queryKey: ['/api/processes'] });
+  };
+  
+  // Handle withdrawal completion
+  const handleWithdrawalCompleted = () => {
+    // Clear the selected withdrawal process
+    setSelectedWithdrawalProcess(null);
+    
+    // Refresh data
+    queryClient.invalidateQueries({ queryKey: ['/api/receipts'] });
+    queryClient.invalidateQueries({ queryKey: ['/api/processes'] });
+    
+    toast({
+      title: "Withdrawal Completed",
+      description: "Your commodity has been successfully withdrawn.",
+    });
+  };
+
   // Handle transfer completion
   const handleTransferComplete = () => {
     // Refresh receipts data
@@ -365,15 +409,27 @@ export default function ReceiptWidget() {
                     )}
                     
                     {receipt.status === "active" && (
-                      <Button
-                        variant="secondary"
-                        size="sm"
-                        className="gap-1"
-                        onClick={() => handleTransferOwnership(receipt)}
-                      >
-                        <ArrowRight className="h-4 w-4" />
-                        Transfer Ownership
-                      </Button>
+                      <>
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          className="gap-1"
+                          onClick={() => handleTransferOwnership(receipt)}
+                        >
+                          <ArrowRight className="h-4 w-4" />
+                          Transfer Ownership
+                        </Button>
+                        
+                        <Button
+                          variant="default"
+                          size="sm"
+                          className="gap-1"
+                          onClick={() => handleWithdrawal(receipt)}
+                        >
+                          <Package className="h-4 w-4" />
+                          Withdraw
+                        </Button>
+                      </>
                     )}
                   </div>
                 </div>
@@ -396,6 +452,38 @@ export default function ReceiptWidget() {
           onClose={() => setIsTransferDialogOpen(false)}
           onTransferComplete={handleTransferComplete}
         />
+      )}
+      
+      {/* Withdrawal Dialog */}
+      {selectedReceipt && (
+        <WithdrawalDialog
+          receipt={selectedReceipt}
+          open={isWithdrawalDialogOpen}
+          onOpenChange={setIsWithdrawalDialogOpen}
+          onWithdrawalInitiated={handleWithdrawalInitiated}
+        />
+      )}
+      
+      {/* Withdrawal Process Tracker */}
+      {selectedWithdrawalProcess && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-background rounded-lg p-5 w-full max-w-3xl max-h-[90vh] overflow-auto">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-semibold">Withdrawal Process</h2>
+              <Button 
+                variant="ghost" 
+                size="sm"
+                onClick={() => setSelectedWithdrawalProcess(null)}
+              >
+                Close
+              </Button>
+            </div>
+            <WithdrawalTracker 
+              process={selectedWithdrawalProcess} 
+              onWithdrawalCompleted={handleWithdrawalCompleted}
+            />
+          </div>
+        </div>
       )}
     </>
   );
