@@ -724,7 +724,7 @@ export default function WarehouseProcessFlow({ process, commodity, warehouse, on
               </>
             )}
           </div>
-        );pts tab.
+        );
               </AlertDescription>
             </Alert>
             
