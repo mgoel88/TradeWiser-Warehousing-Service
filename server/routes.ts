@@ -778,23 +778,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Create complete receipt data with all required fields and default values
       const completeReceiptData = {
-        receiptNumber: req.body.receiptNumber || `WR-${Date.now().toString(16)}`,
-        receiptType: req.body.receiptType || "non_negotiable",
+        receiptNumber: `WR-${Date.now().toString(16)}`,
+        receiptType: "non_negotiable",
         commodityId: req.body.commodityId,
         warehouseId: req.body.warehouseId,
         ownerId: req.session.userId,
-        // Handle numeric fields explicitly
-        quantity: typeof req.body.quantity === 'string' ? parseFloat(req.body.quantity) : req.body.quantity,
-        status: req.body.status || "active",
-        // Handle the expiry date field - ensure it's an ISO string
-        expiryDate: req.body.expiryDate ? new Date(req.body.expiryDate).toISOString() : new Date(Date.now() + 180 * 24 * 60 * 60 * 1000).toISOString(),
-        // Store simple verification data in blockchainHash
-        blockchainHash: req.body.blockchainHash || req.body.verificationCode || `0x${Date.now().toString(16)}`,
-        // Store minimal valuation
-        valuation: typeof req.body.valuation === 'string' ? parseFloat(req.body.valuation) : req.body.valuation,
-        // Required fields from the schema
-        depositorKycId: req.body.depositorKycId || `KYC${req.session.userId}${Date.now().toString(16).slice(-6)}`,
-        warehouseLicenseNo: req.body.warehouseLicenseNo || `WL-${req.body.warehouseId || 1}-${new Date().getFullYear()}`
+        quantity: req.body.quantity,
+        status: "active",
+        expiryDate: new Date(Date.now() + 180 * 24 * 60 * 60 * 1000),
+        blockchainHash: `0x${Date.now().toString(16)}`,
+        valuation: req.body.valuation,
+        depositorKycId: `KYC${req.session.userId}${Date.now().toString(16).slice(-6)}`,
+        warehouseLicenseNo: `WL-${req.body.warehouseId}-${new Date().getFullYear()}`,
+        issuedDate: new Date(),
+        qualityParameters: req.body.qualityParameters || {},
+        commodityName: req.body.commodityName,
+        metadata: {
+          verificationCode: `V${Date.now().toString(16).slice(-8)}`
+        }
       };
             
       // Direct creation avoids Zod validation issues
