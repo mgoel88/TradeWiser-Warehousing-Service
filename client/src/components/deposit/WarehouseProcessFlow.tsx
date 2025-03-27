@@ -667,11 +667,64 @@ export default function WarehouseProcessFlow({ process, commodity, warehouse, on
       case "ewr_generation":
         return (
           <div className="space-y-6">
-            <Alert className="bg-green-50 text-green-800 border-green-200">
-              <CheckCircle2 className="h-4 w-4 text-green-600" />
-              <AlertTitle>Receipt Generated Successfully</AlertTitle>
-              <AlertDescription>
-                Your electronic Warehouse Receipt (eWR) has been generated. You can download it or view it in the Receipts tab.
+            {!receiptGenerated ? (
+              <>
+                <Alert>
+                  <FileCheck className="h-4 w-4" />
+                  <AlertTitle>Ready to Generate eWR</AlertTitle>
+                  <AlertDescription>
+                    All quality checks are complete. Click below to generate your electronic Warehouse Receipt (eWR).
+                  </AlertDescription>
+                </Alert>
+                
+                <div className="flex justify-center mt-6">
+                  <Button 
+                    onClick={handleConfirmProcess}
+                    className="w-full max-w-md"
+                    disabled={userConfirmed}
+                  >
+                    <FileText className="h-4 w-4 mr-2" />
+                    Generate Electronic Warehouse Receipt
+                  </Button>
+                </div>
+              </>
+            ) : (
+              <>
+                <Alert className="bg-green-50 text-green-800 border-green-200">
+                  <CheckCircle2 className="h-4 w-4 text-green-600" />
+                  <AlertTitle>Receipt Generated Successfully</AlertTitle>
+                  <AlertDescription>
+                    Your electronic Warehouse Receipt (eWR) has been generated. You can download it or view it in the Receipts section.
+                  </AlertDescription>
+                </Alert>
+                
+                <div className="flex flex-col space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="bg-background p-4 rounded-lg border">
+                      <div className="text-sm text-muted-foreground">Receipt Number</div>
+                      <div className="font-medium">{receiptData?.receiptNumber}</div>
+                    </div>
+                    <div className="bg-background p-4 rounded-lg border">
+                      <div className="text-sm text-muted-foreground">Valuation</div>
+                      <div className="font-medium">{receiptData?.valuationAmount}</div>
+                    </div>
+                  </div>
+                  
+                  <div className="flex justify-center space-x-4">
+                    <Button variant="outline" onClick={handleDownloadReceipt}>
+                      <Download className="h-4 w-4 mr-2" />
+                      Download Receipt
+                    </Button>
+                    <Button onClick={() => window.location.href = '/receipts'}>
+                      <FileText className="h-4 w-4 mr-2" />
+                      View in Receipts
+                    </Button>
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+        );pts tab.
               </AlertDescription>
             </Alert>
             
