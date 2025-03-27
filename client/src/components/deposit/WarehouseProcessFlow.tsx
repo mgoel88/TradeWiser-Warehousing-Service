@@ -346,6 +346,15 @@ export default function WarehouseProcessFlow({ process, commodity, warehouse, on
       // Generate a verification code for QR codes and public verification
       const verificationCode = generateVerificationCode(process.id);
       
+      // Ensure values are properly formatted for the database
+      const cleanQualityParameters = { ...metrics.finalQuality };
+      
+      // Get valuation number (remove currency symbols, etc.)
+      const valuationNumeric = parseFloat(metrics.totalValuation.replace(/[^\d.-]/g, ''));
+      
+      // Parse commodity quantity to number
+      const quantityNumeric = parseFloat(commodity.quantity.toString());
+      
       // Create warehouse receipt in the database
       const receiptPayload = {
         receiptNumber,
@@ -353,12 +362,13 @@ export default function WarehouseProcessFlow({ process, commodity, warehouse, on
         commodityId: commodity.id,
         ownerId: process.userId,
         warehouseId: warehouse.id,
-        quantity: commodity.quantity,
+        quantity: quantityNumeric,
         status: "active",
         blockchainHash: `0x${Math.random().toString(16).slice(2, 10)}${Date.now().toString(16)}`,
+        // ISO string format for dates
         expiryDate: expiryDate.toISOString(),
-        valuation: parseFloat(metrics.totalValuation.replace(/[^\d.-]/g, '')),
-        qualityParameters: metrics.finalQuality,
+        valuation: valuationNumeric,
+        qualityParameters: cleanQualityParameters,
         // Store commodity name and warehouse information
         commodityName: commodity.name,
         qualityGrade: metrics.gradeAssigned,

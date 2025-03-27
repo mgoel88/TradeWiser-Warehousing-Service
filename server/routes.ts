@@ -675,8 +675,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ message: "Not authenticated" });
       }
       
+      // Process expiryDate - ensure it's a Date object
+      let receiptData = { ...req.body };
+      
+      // If expiryDate is provided as a Date object (with toJSON method), it will be serialized to ISO string
+      // If it's already an ISO string, we need to parse it to Date
+      if (receiptData.expiryDate && typeof receiptData.expiryDate === 'string') {
+        receiptData.expiryDate = new Date(receiptData.expiryDate);
+      }
+      
+      // Ensure quantity is a number
+      if (receiptData.quantity && typeof receiptData.quantity === 'string') {
+        receiptData.quantity = parseFloat(receiptData.quantity);
+      }
+      
+      // Ensure valuation is a number
+      if (receiptData.valuation && typeof receiptData.valuation === 'string') {
+        receiptData.valuation = parseFloat(receiptData.valuation);
+      }
+      
       const validData = insertWarehouseReceiptSchema.parse({
-        ...req.body,
+        ...receiptData,
         ownerId: req.session.userId
       });
       
@@ -688,6 +707,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const validationError = fromZodError(error);
         res.status(400).json({ message: validationError.message });
       } else {
+        console.error("Error creating receipt:", error);
         res.status(500).json({ message: "Server error" });
       }
     }
