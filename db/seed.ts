@@ -194,6 +194,87 @@ async function seedDatabase() {
       }
       
       console.log(`Successfully seeded ${warehouseData.length} warehouses`);
+
+      // Create test warehouse receipts
+      const receiptData = [
+        {
+          receiptNumber: "WR-2024-001",
+          receiptType: "negotiable",
+          commodityId: 1,
+          ownerId: user.id,
+          warehouseId: 1,
+          quantity: "500",
+          status: "active",
+          blockchainHash: "0x123f4567e89b",
+          issuedDate: new Date(),
+          expiryDate: new Date(new Date().setMonth(new Date().getMonth() + 6)),
+          valuation: "1050000",
+          storageFee: "25000",
+          insuranceDetails: {
+            provider: "Agri Insurance Co",
+            policyNumber: "INS-2024-001",
+            coverage: "Full value"
+          },
+          qualityParameters: {
+            moisture: "12%",
+            foreignMatter: "0.5%",
+            brokenGrains: "2%"
+          },
+          liens: {},
+          endorsementChain: [],
+          pledgeDetails: {},
+          regulatoryCompliance: {
+            wdraRegistration: "WDRA-2024-001",
+            lastInspectionDate: "2024-02-15"
+          },
+          disputeResolution: "As per WDRA guidelines",
+          termsAndConditions: "Standard T&C apply",
+          depositorKycId: "KYC-001",
+          warehouseLicenseNo: "WH-LIC-001"
+        },
+        {
+          receiptNumber: "WR-2024-002",
+          receiptType: "non_negotiable",
+          commodityId: 2,
+          ownerId: user.id,
+          warehouseId: 2,
+          quantity: "320",
+          status: "active",
+          blockchainHash: "0x789a1234b56c",
+          issuedDate: new Date(),
+          expiryDate: new Date(new Date().setMonth(new Date().getMonth() + 3)),
+          valuation: "960000",
+          storageFee: "16000",
+          insuranceDetails: {
+            provider: "Rural Insurance Ltd",
+            policyNumber: "INS-2024-002",
+            coverage: "Fire and theft"
+          },
+          qualityParameters: {
+            moisture: "8.5%",
+            foreignMatter: "0.3%",
+            brokenGrains: "1.5%"
+          },
+          liens: {},
+          endorsementChain: [],
+          pledgeDetails: {},
+          regulatoryCompliance: {
+            wdraRegistration: "WDRA-2024-002",
+            lastInspectionDate: "2024-02-20"
+          },
+          disputeResolution: "As per WDRA guidelines",
+          termsAndConditions: "Standard T&C apply",
+          depositorKycId: "KYC-002",
+          warehouseLicenseNo: "WH-LIC-002"
+        }
+      ];
+
+      console.log('Seeding warehouse receipts...');
+      for (const receipt of receiptData) {
+        await db.insert(warehouseReceipts).values(receipt);
+      }
+      
+      console.log(`Successfully seeded ${receiptData.length} warehouse receipts`);
     } else {
       console.log('Database already has users, skipping seed process');
     }
