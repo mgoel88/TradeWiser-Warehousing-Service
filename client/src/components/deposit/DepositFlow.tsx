@@ -128,6 +128,21 @@ export default function DepositFlow({ warehouses, userLocation }: DepositFlowPro
     setCurrentStep(DepositStep.SchedulePickup);
   };
   
+  // Generate time slots from 9 AM to 6 PM with 1-hour intervals
+  const generateTimeSlots = () => {
+    const slots = [];
+    for (let hour = 9; hour <= 18; hour++) {
+      slots.push(`${hour.toString().padStart(2, '0')}:00`);
+    }
+    return slots;
+  };
+
+  // Mock function to check slot availability (replace with actual API call)
+  const isSlotAvailable = (slot: string) => {
+    // For demo purposes, randomly make some slots unavailable
+    return Math.random() > 0.3;
+  };
+
   // Handle moving to next step
   const handleNextStep = async () => {
     if (currentStep === DepositStep.CommodityDetails) {
@@ -673,13 +688,23 @@ export default function DepositFlow({ warehouses, userLocation }: DepositFlowPro
                 {!useWarehouseDelivery && (
                   <>
                     <div>
-                      <label className="text-sm font-medium">Preferred Time</label>
-                      <Input
-                        type="time"
-                        value={pickupTime}
-                        onChange={(e) => setPickupTime(e.target.value)}
-                        className="mt-1.5"
-                      />
+                      <label className="text-sm font-medium">Available Time Slots</label>
+                      <div className="grid grid-cols-3 gap-2 mt-1.5">
+                        {generateTimeSlots().map((slot) => (
+                          <Button
+                            key={slot}
+                            type="button"
+                            variant={pickupTime === slot ? "default" : "outline"}
+                            className={`text-sm h-9 ${
+                              isSlotAvailable(slot) ? "" : "opacity-50 cursor-not-allowed"
+                            }`}
+                            onClick={() => setPickupTime(slot)}
+                            disabled={!isSlotAvailable(slot)}
+                          >
+                            {slot}
+                          </Button>
+                        ))}
+                      </div>
                     </div>
                     
                     <div>
