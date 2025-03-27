@@ -202,8 +202,13 @@ export default function WarehouseProcessFlow({ process, commodity, warehouse, on
       });
     }
 
-    if (processingStage === "ewr_generation") {
-      // Create receipt data
+    if (processingStage === "ewr_generation" && 
+        process.stageProgress && 
+        typeof process.stageProgress === 'object' && 
+        'ewr_generation' in process.stageProgress && 
+        process.stageProgress.ewr_generation === "completed" && 
+        !receiptGenerated) {
+      // Create receipt data for display only if receipt is already generated in the database
       const currentDate = new Date();
       const expiryDate = new Date(currentDate);
       expiryDate.setMonth(expiryDate.getMonth() + 6); // 6 months validity
@@ -223,6 +228,7 @@ export default function WarehouseProcessFlow({ process, commodity, warehouse, on
         valuationAmount: metrics.totalValuation
       });
       
+      // Only set receipt as generated if it's completed in the process data
       setReceiptGenerated(true);
     }
   }, [processingStage, commodity, warehouse, process.id]);
@@ -231,8 +237,17 @@ export default function WarehouseProcessFlow({ process, commodity, warehouse, on
   useEffect(() => {
     if (process.currentStage) {
       setProcessingStage(process.currentStage);
+      
+      // Check if the eWR is already generated and completed in the database
+      if (process.currentStage === "ewr_generation" && 
+          process.stageProgress && 
+          typeof process.stageProgress === 'object' && 
+          'ewr_generation' in process.stageProgress && 
+          process.stageProgress.ewr_generation === "completed") {
+        setReceiptGenerated(true);
+      }
     }
-  }, [process.currentStage]);
+  }, [process.currentStage, process.stageProgress]);
 
   // Handle feedback submission
   const handleFeedbackSubmit = async () => {
@@ -686,18 +701,46 @@ export default function WarehouseProcessFlow({ process, commodity, warehouse, on
                   <FileCheck className="h-4 w-4" />
                   <AlertTitle>Ready to Generate eWR</AlertTitle>
                   <AlertDescription>
-                    All quality checks are complete. Click below to generate your electronic Warehouse Receipt (eWR).
+                    All quality, packaging, and valuation parameters have been finalized. 
+                    Review the details above and click the button below to accept these parameters and 
+                    generate your electronic Warehouse Receipt (eWR).
                   </AlertDescription>
                 </Alert>
+                
+                <div className="bg-primary/5 border border-primary/20 rounded-lg p-4 mb-4">
+                  <h3 className="text-lg font-medium mb-2">Parameters Summary</h3>
+                  <div className="grid grid-cols-2 gap-4 mb-4">
+                    <div>
+                      <p className="text-sm font-medium">Quality Grade</p>
+                      <p className="text-sm">{metrics.gradeAssigned}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium">Final Quantity</p>
+                      <p className="text-sm">{metrics.cleanedWeight} {commodity.measurementUnit}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium">Packaging</p>
+                      <p className="text-sm">{metrics.packagingType}, {metrics.bagCount} bags</p>
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium">Valuation</p>
+                      <p className="text-sm text-primary font-medium">{metrics.totalValuation}</p>
+                    </div>
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    By generating this receipt, you confirm that these parameters are accurate and acceptable.
+                  </p>
+                </div>
                 
                 <div className="flex justify-center mt-6">
                   <Button 
                     onClick={handleConfirmProcess}
-                    className="w-full max-w-md"
+                    className="w-full max-w-md py-6 text-lg"
                     disabled={userConfirmed}
+                    size="lg"
                   >
-                    <FileText className="h-4 w-4 mr-2" />
-                    Generate Electronic Warehouse Receipt
+                    <FileText className="h-5 w-5 mr-2" />
+                    {userConfirmed ? "Generating Receipt..." : "Accept Parameters & Generate eWR"}
                   </Button>
                 </div>
               </>
