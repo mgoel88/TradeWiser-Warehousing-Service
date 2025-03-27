@@ -63,9 +63,14 @@ export const commodities = pgTable('commodities', {
 });
 
 // Warehouse Receipt table
+// Enhanced receipt types
+export const receiptTypeEnum = pgEnum('receipt_type', ['negotiable', 'non_negotiable']);
+export const transferTypeEnum = pgEnum('transfer_type', ['endorsement', 'delivery', 'pledge']);
+
 export const warehouseReceipts = pgTable('warehouse_receipts', {
   id: serial('id').primaryKey(),
   receiptNumber: text('receipt_number').notNull().unique(),
+  receiptType: receiptTypeEnum('receipt_type').notNull().default('non_negotiable'),
   commodityId: integer('commodity_id').references(() => commodities.id),
   ownerId: integer('owner_id').references(() => users.id),
   warehouseId: integer('warehouse_id').references(() => warehouses.id),
@@ -75,7 +80,33 @@ export const warehouseReceipts = pgTable('warehouse_receipts', {
   issuedDate: timestamp('issued_date').defaultNow(),
   expiryDate: timestamp('expiry_date'),
   valuation: numeric('valuation', { precision: 14, scale: 2 }),
+  storageFee: numeric('storage_fee', { precision: 10, scale: 2 }),
+  insuranceDetails: json('insurance_details'),
+  qualityParameters: json('quality_parameters'),
   liens: json('liens'),
+  endorsementChain: json('endorsement_chain'), // Track ownership transfers
+  pledgeDetails: json('pledge_details'), // For tracking pledges/loans
+  // Fields required by Indian standards
+  regulatoryCompliance: json('regulatory_compliance'), // WDRA registration, etc.
+  disputeResolution: text('dispute_resolution'),
+  termsAndConditions: text('terms_and_conditions'),
+  depositorKycId: text('depositor_kyc_id').notNull(),
+  warehouseLicenseNo: text('warehouse_license_no').notNull(),
+  // Smart contract integration
+  smartContractAddress: text('smart_contract_address'),
+  transferHistory: json('transfer_history'),
+});
+
+// Receipt transfers tracking
+export const receiptTransfers = pgTable('receipt_transfers', {
+  id: serial('id').primaryKey(),
+  receiptId: integer('receipt_id').references(() => warehouseReceipts.id),
+  fromUserId: integer('from_user_id').references(() => users.id),
+  toUserId: integer('to_user_id').references(() => users.id),
+  transferType: transferTypeEnum('transfer_type').notNull(),
+  transferDate: timestamp('transfer_date').defaultNow(),
+  transactionHash: text('transaction_hash'),
+  metadata: json('metadata'),
 });
 
 // Loan table
