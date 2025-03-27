@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { WidgetBase } from "./WidgetBase";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
-import { useNavigate } from "wouter";
+import { useLocation } from "wouter";
 import { Leaf, ExternalLink } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 
@@ -15,7 +15,7 @@ interface CommoditiesWidgetProps {
 }
 
 export function CommoditiesWidget({ id, title, config }: CommoditiesWidgetProps) {
-  const navigate = useNavigate();
+  const [, navigate] = useLocation();
   const count = config?.count || 3;
   
   const { data: commodities, isLoading } = useQuery({

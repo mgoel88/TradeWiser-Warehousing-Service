@@ -1,6 +1,6 @@
 import { WidgetBase } from "./WidgetBase";
 import { Button } from "@/components/ui/button";
-import { useNavigate } from "wouter";
+import { useLocation } from "wouter";
 import { 
   Warehouse, 
   CircleDollarSign, 
@@ -18,7 +18,7 @@ interface QuickActionsWidgetProps {
 }
 
 export function QuickActionsWidget({ id, title, config }: QuickActionsWidgetProps) {
-  const navigate = useNavigate();
+  const [, navigate] = useLocation();
 
   const actions = [
     { 

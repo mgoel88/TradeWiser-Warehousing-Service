@@ -1,7 +1,7 @@
 import { WidgetBase } from "./WidgetBase";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
-import { useNavigate } from "wouter";
+import { useLocation } from "wouter";
 import { ArrowUpDown } from "lucide-react";
 
 interface TransactionsWidgetProps {
@@ -14,7 +14,7 @@ interface TransactionsWidgetProps {
 }
 
 export function TransactionsWidget({ id, title, config }: TransactionsWidgetProps) {
-  const navigate = useNavigate();
+  const [, navigate] = useLocation();
   
   // Placeholder implementation
   return (

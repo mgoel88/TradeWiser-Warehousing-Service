@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { WidgetBase } from "./WidgetBase";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
-import { useNavigate } from "wouter";
+import { useLocation } from "wouter";
 import { Warehouse, MapPin, ExternalLink } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 
@@ -17,7 +17,7 @@ interface WarehousesWidgetProps {
 }
 
 export function WarehousesWidget({ id, title, config }: WarehousesWidgetProps) {
-  const navigate = useNavigate();
+  const [, navigate] = useLocation();
   const count = config?.count || 3;
   const channelType = config?.channelType || "all";
   

@@ -4,8 +4,8 @@ import { WidgetBase } from "./WidgetBase";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useNavigate } from "wouter";
-import { ReceiptCheck, ExternalLink } from "lucide-react";
+import { useLocation } from "wouter";
+import { FileCheck as ReceiptCheck, ExternalLink } from "lucide-react";
 
 interface ReceiptsWidgetProps {
   id: string;
@@ -17,7 +17,7 @@ interface ReceiptsWidgetProps {
 }
 
 export function ReceiptsWidget({ id, title, config }: ReceiptsWidgetProps) {
-  const navigate = useNavigate();
+  const [, navigate] = useLocation();
   const [tab, setTab] = useState("all");
   const count = config?.count || 3;
   
