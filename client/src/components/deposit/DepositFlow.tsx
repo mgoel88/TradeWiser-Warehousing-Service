@@ -918,7 +918,6 @@ export default function DepositFlow({ warehouses, userLocation }: DepositFlowPro
                 onClick={() => setLocation("/receipts")}
               >
                 View All Receipts
-              Button>
               </Button>
               <Button 
                 onClick={() => setCurrentStep(DepositStep.CommodityDetails)}
