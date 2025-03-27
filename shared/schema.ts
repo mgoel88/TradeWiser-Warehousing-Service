@@ -123,6 +123,12 @@ export const warehouseReceipts = pgTable('warehouse_receipts', {
   liens: json('liens'),
   endorsementChain: json('endorsement_chain'), // Track ownership transfers
   pledgeDetails: json('pledge_details'), // For tracking pledges/loans
+  // Additional data fields
+  commodityName: text('commodity_name'), // Added for easy retrieval
+  qualityGrade: text('quality_grade'), // Added for easy retrieval
+  warehouseName: text('warehouse_name'), // Added for easy retrieval
+  warehouseAddress: text('warehouse_address'), // Added for easy retrieval
+  metadata: json('metadata'), // For verification codes and other receipt-specific data
   // Fields required by Indian standards
   regulatoryCompliance: json('regulatory_compliance'), // WDRA registration, etc.
   disputeResolution: text('dispute_resolution'),

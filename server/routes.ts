@@ -605,6 +605,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ message: "Server error" });
     }
   });
+  
+  // Verify receipt by verification code - no auth required for public verification
+  apiRouter.get("/receipts/verify/:code", async (req: Request, res: Response) => {
+    try {
+      const verificationCode = req.params.code;
+      
+      // Get all receipts and filter by verification code
+      // In a real blockchain app, we would verify this with the blockchain network
+      const receipts = await storage.listWarehouseReceipts();
+      const receipt = receipts.find(r => {
+        // Check in receipt number for now
+        // In a real implementation, we would check in blockchain
+        return r.receiptNumber.includes(verificationCode);
+      });
+      
+      if (!receipt) {
+        return res.status(404).json({ message: "Receipt verification failed" });
+      }
+      
+      res.status(200).json(receipt);
+    } catch (error) {
+      res.status(500).json({ message: "Server error" });
+    }
+  });
 
   apiRouter.get("/receipts/:id", async (req: Request, res: Response) => {
     try {

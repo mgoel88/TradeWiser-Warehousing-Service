@@ -721,109 +721,105 @@ export default function WarehouseProcessFlow({ process, commodity, warehouse, on
                     </Button>
                   </div>
                 </div>
+                
+                {receiptData && (
+                  <Card className="bg-primary/5 border-primary/20">
+                    <CardHeader className="pb-2">
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <CardTitle>Electronic Warehouse Receipt</CardTitle>
+                          <CardDescription>
+                            Receipt Number: {receiptData.receiptNumber}
+                          </CardDescription>
+                        </div>
+                        <div className="flex gap-2">
+                          <Button variant="outline" size="sm" onClick={handleDownloadReceipt}>
+                            <Download className="h-4 w-4 mr-1" />
+                            Download
+                          </Button>
+                          <Button variant="outline" size="sm">
+                            <Printer className="h-4 w-4 mr-1" />
+                            Print
+                          </Button>
+                        </div>
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-4">
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <p className="text-sm font-medium">Issue Date</p>
+                            <p className="text-sm text-muted-foreground">{receiptData.issueDate}</p>
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium">Expiry Date</p>
+                            <p className="text-sm text-muted-foreground">{receiptData.expiryDate}</p>
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium">Depositor</p>
+                            <p className="text-sm text-muted-foreground">{receiptData.depositorName}</p>
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium">Warehouse</p>
+                            <p className="text-sm text-muted-foreground">{receiptData.warehouseName}</p>
+                          </div>
+                        </div>
+                        
+                        <Separator />
+                        
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <p className="text-sm font-medium">Commodity</p>
+                            <p className="text-sm text-muted-foreground">{receiptData.commodityName}</p>
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium">Quantity</p>
+                            <p className="text-sm text-muted-foreground">{receiptData.quantity}</p>
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium">Quality Grade</p>
+                            <p className="text-sm text-muted-foreground">{receiptData.qualityGrade}</p>
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium">Valuation</p>
+                            <p className="text-sm font-medium text-primary">{receiptData.valuationAmount}</p>
+                          </div>
+                        </div>
+                        
+                        <Separator />
+                        
+                        <div>
+                          <p className="text-sm font-medium">Storage Location</p>
+                          <p className="text-sm text-muted-foreground">{receiptData.warehouseAddress}</p>
+                        </div>
+                        
+                        <div className="bg-background rounded-md p-3 mt-4 border">
+                          <div className="flex items-center">
+                            <Clipboard className="h-4 w-4 mr-2 text-muted-foreground" />
+                            <p className="text-sm font-medium">Receipt Verification</p>
+                          </div>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            This eWR is secured by blockchain technology and can be verified using the following code:
+                          </p>
+                          <div className="bg-muted p-2 rounded mt-1 text-center font-mono text-xs">
+                            WR-{process.id}-{Math.floor(Date.now()/1000).toString(16).toUpperCase()}
+                          </div>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+                
+                <div className="flex justify-center mt-4 space-x-4">
+                  <Button onClick={onComplete}>
+                    View All Receipts
+                  </Button>
+                  <Button variant="outline" onClick={() => setActiveTab("funding")}>
+                    Apply for Financing
+                  </Button>
+                </div>
               </>
             )}
-          </div>
-        );
-              </AlertDescription>
-            </Alert>
-            
-            {receiptData && (
-              <Card className="bg-primary/5 border-primary/20">
-                <CardHeader className="pb-2">
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <CardTitle>Electronic Warehouse Receipt</CardTitle>
-                      <CardDescription>
-                        Receipt Number: {receiptData.receiptNumber}
-                      </CardDescription>
-                    </div>
-                    <div className="flex gap-2">
-                      <Button variant="outline" size="sm" onClick={handleDownloadReceipt}>
-                        <Download className="h-4 w-4 mr-1" />
-                        Download
-                      </Button>
-                      <Button variant="outline" size="sm">
-                        <Printer className="h-4 w-4 mr-1" />
-                        Print
-                      </Button>
-                    </div>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <p className="text-sm font-medium">Issue Date</p>
-                        <p className="text-sm text-muted-foreground">{receiptData.issueDate}</p>
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium">Expiry Date</p>
-                        <p className="text-sm text-muted-foreground">{receiptData.expiryDate}</p>
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium">Depositor</p>
-                        <p className="text-sm text-muted-foreground">{receiptData.depositorName}</p>
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium">Warehouse</p>
-                        <p className="text-sm text-muted-foreground">{receiptData.warehouseName}</p>
-                      </div>
-                    </div>
-                    
-                    <Separator />
-                    
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <p className="text-sm font-medium">Commodity</p>
-                        <p className="text-sm text-muted-foreground">{receiptData.commodityName}</p>
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium">Quantity</p>
-                        <p className="text-sm text-muted-foreground">{receiptData.quantity}</p>
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium">Quality Grade</p>
-                        <p className="text-sm text-muted-foreground">{receiptData.qualityGrade}</p>
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium">Valuation</p>
-                        <p className="text-sm font-medium text-primary">{receiptData.valuationAmount}</p>
-                      </div>
-                    </div>
-                    
-                    <Separator />
-                    
-                    <div>
-                      <p className="text-sm font-medium">Storage Location</p>
-                      <p className="text-sm text-muted-foreground">{receiptData.warehouseAddress}</p>
-                    </div>
-                    
-                    <div className="bg-background rounded-md p-3 mt-4 border">
-                      <div className="flex items-center">
-                        <Clipboard className="h-4 w-4 mr-2 text-muted-foreground" />
-                        <p className="text-sm font-medium">Receipt Verification</p>
-                      </div>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        This eWR is secured by blockchain technology and can be verified using the following code:
-                      </p>
-                      <div className="bg-muted p-2 rounded mt-1 text-center font-mono text-xs">
-                        WR-{process.id}-{Math.floor(Date.now()/1000).toString(16).toUpperCase()}
-                      </div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-            
-            <div className="flex justify-center mt-4 space-x-4">
-              <Button onClick={onComplete}>
-                View All Receipts
-              </Button>
-              <Button variant="outline" onClick={() => setActiveTab("funding")}>
-                Apply for Financing
-              </Button>
-            </div>
           </div>
         );
         

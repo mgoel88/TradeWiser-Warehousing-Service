@@ -14,6 +14,7 @@ import LoansPage from "@/pages/LoansPage";
 import ProfilePage from "@/pages/ProfilePage";
 import DepositPage from "@/pages/DepositPage";
 import CommodityDetailPage from "@/pages/CommodityDetailPage";
+import ReceiptVerificationPage from "@/pages/ReceiptVerificationPage";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -29,6 +30,7 @@ function Router() {
       <Route path="/profile" component={ProfilePage} />
       <Route path="/deposit" component={DepositPage} />
       <Route path="/commodities/:id" component={CommodityDetailPage} />
+      <Route path="/verify-receipt/:verificationCode" component={ReceiptVerificationPage} />
       <Route path="/green-channel" component={WarehousePage} />
       <Route path="/orange-channel" component={WarehousePage} />
       <Route path="/red-channel" component={WarehousePage} />

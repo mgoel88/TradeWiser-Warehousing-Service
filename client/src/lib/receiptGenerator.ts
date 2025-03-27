@@ -1,7 +1,7 @@
 import jsPDF from 'jspdf';
 import QRCode from 'qrcode';
 
-interface ReceiptData {
+export interface ReceiptData {
   receiptNumber: string;
   issueDate: string;
   expiryDate: string;

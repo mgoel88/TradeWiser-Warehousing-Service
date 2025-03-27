@@ -8,7 +8,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { FileText, Download, ExternalLink, Calendar, Clock, CreditCard, ArrowUpRight, FileCheck, Printer, ShieldCheck } from "lucide-react";
 import { WarehouseReceipt, Commodity, Warehouse } from "@shared/schema";
 import { formatDate } from "@/lib/utils";
-import { downloadReceiptPDF } from '@/lib/receiptGenerator';
+import { downloadReceiptPDF, generateReceiptPDF } from '@/lib/receiptGenerator';
 import { apiRequest } from '@/lib/queryClient';
 
 interface WarehouseReceiptCardProps {
