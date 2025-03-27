@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useForm } from "react-hook-form";
+import { TimeSlotPicker } from "@/components/time-slot-picker";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useLocation } from "wouter";
@@ -128,13 +129,12 @@ export default function DepositFlow({ warehouses, userLocation }: DepositFlowPro
     setCurrentStep(DepositStep.SchedulePickup);
   };
   
-  // Generate time slots from 9 AM to 6 PM with 1-hour intervals
-  const generateTimeSlots = () => {
-    const slots = [];
-    for (let hour = 9; hour <= 18; hour++) {
-      slots.push(`${hour.toString().padStart(2, '0')}:00`);
-    }
-    return slots;
+  // Validate pickup date is not in the past
+  const isValidPickupDate = (date: string) => {
+    const selectedDate = new Date(date);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return selectedDate >= today;
   };
 
   // Mock function to check slot availability (replace with actual API call)
@@ -168,7 +168,7 @@ export default function DepositFlow({ warehouses, userLocation }: DepositFlowPro
         }
       } else {
         // For managed pickup, we need date, time and address
-        if (!pickupDate || !pickupTime || !pickupAddress) {
+        if (!pickupDate || !isValidPickupDate(pickupDate) || !pickupTime || !pickupAddress) {
           toast({
             title: "Missing information",
             description: "Please fill in all the required pickup details",
@@ -688,23 +688,12 @@ export default function DepositFlow({ warehouses, userLocation }: DepositFlowPro
                 {!useWarehouseDelivery && (
                   <>
                     <div>
-                      <label className="text-sm font-medium">Available Time Slots</label>
-                      <div className="grid grid-cols-3 gap-2 mt-1.5">
-                        {generateTimeSlots().map((slot) => (
-                          <Button
-                            key={slot}
-                            type="button"
-                            variant={pickupTime === slot ? "default" : "outline"}
-                            className={`text-sm h-9 ${
-                              isSlotAvailable(slot) ? "" : "opacity-50 cursor-not-allowed"
-                            }`}
-                            onClick={() => setPickupTime(slot)}
-                            disabled={!isSlotAvailable(slot)}
-                          >
-                            {slot}
-                          </Button>
-                        ))}
-                      </div>
+                      <label className="text-sm font-medium mb-1.5 block">Available Time Slots</label>
+                      <TimeSlotPicker
+                        selectedDate={pickupDate ? new Date(pickupDate) : new Date()}
+                        value={pickupTime}
+                        onChange={(selectedTime) => setPickupTime(selectedTime)}
+                      />
                     </div>
                     
                     <div>
