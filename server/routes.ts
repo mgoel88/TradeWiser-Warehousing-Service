@@ -777,8 +777,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // Create complete receipt data with all required fields and default values
+      const generateBlockchainHash = () => {
+        const timestamp = Date.now();
+        const randomStr = Math.random().toString(36).substring(7);
+        return `0x${timestamp.toString(16)}${randomStr}`;
+      };
+      
       const completeReceiptData = {
-        receiptNumber: `WR-${Date.now().toString(16)}`,
+        receiptNumber: `WR-${Date.now().toString(16).toUpperCase()}`,
         receiptType: "non_negotiable",
         commodityId: req.body.commodityId,
         warehouseId: req.body.warehouseId,
@@ -786,7 +792,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         quantity: req.body.quantity,
         status: "active",
         expiryDate: new Date(Date.now() + 180 * 24 * 60 * 60 * 1000),
-        blockchainHash: `0x${Date.now().toString(16)}`,
+        blockchainHash: generateBlockchainHash(),
         valuation: req.body.valuation,
         depositorKycId: `KYC${req.session.userId}${Date.now().toString(16).slice(-6)}`,
         warehouseLicenseNo: `WL-${req.body.warehouseId}-${new Date().getFullYear()}`,

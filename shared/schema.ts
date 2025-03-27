@@ -140,6 +140,7 @@ export const warehouseReceipts = pgTable('warehouse_receipts', {
 });
 
 // Receipt transfers tracking
+export const transferTypeEnum = pgEnum('transfer_type', ['ownership', 'collateral', 'pledge', 'release']);
 export const receiptTransfers = pgTable('receipt_transfers', {
   id: serial('id').primaryKey(),
   receiptId: integer('receipt_id').references(() => warehouseReceipts.id),
