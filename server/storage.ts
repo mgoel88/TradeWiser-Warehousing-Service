@@ -10,6 +10,27 @@ import { eq } from "drizzle-orm";
 import { db } from "./db";
 
 // Interface for storage operations
+// Receipt transfer interface for blockchain-secured ownership transfers
+export interface ReceiptTransfer {
+  id: number;
+  receiptId: number;
+  fromUserId: number;
+  toUserId: number;
+  transferType: 'endorsement' | 'delivery' | 'pledge';
+  transferDate: Date;
+  transactionHash: string;
+  metadata?: any;
+}
+
+export interface InsertReceiptTransfer {
+  receiptId: number;
+  fromUserId: number;
+  toUserId: number;
+  transferType: 'endorsement' | 'delivery' | 'pledge';
+  transactionHash: string;
+  metadata?: any;
+}
+
 export interface IStorage {
   // User operations
   getUser(id: number): Promise<User | undefined>;
@@ -41,6 +62,11 @@ export interface IStorage {
   listWarehouseReceiptsByOwner(ownerId: number): Promise<WarehouseReceipt[]>;
   listWarehouseReceiptsByCommodity(commodityId: number): Promise<WarehouseReceipt[]>;
   updateWarehouseReceipt(id: number, receipt: Partial<InsertWarehouseReceipt>): Promise<WarehouseReceipt | undefined>;
+  
+  // Receipt transfer operations (blockchain)
+  createReceiptTransfer(transfer: InsertReceiptTransfer): Promise<ReceiptTransfer>;
+  listReceiptTransfersByReceipt(receiptId: number): Promise<ReceiptTransfer[]>;
+  getReceiptTransferByHash(transactionHash: string): Promise<ReceiptTransfer | undefined>;
   
   // Loan operations
   getLoan(id: number): Promise<Loan | undefined>;
@@ -475,6 +501,36 @@ export class MemStorage implements IStorage {
     return updatedLoan;
   }
   
+  // Receipt transfer operations (blockchain)
+  private receiptTransfers: Map<number, ReceiptTransfer> = new Map();
+  private currentTransferId: number = 1;
+  
+  async createReceiptTransfer(insertTransfer: InsertReceiptTransfer): Promise<ReceiptTransfer> {
+    const id = this.currentTransferId++;
+    const now = new Date();
+    
+    const transfer: ReceiptTransfer = {
+      ...insertTransfer,
+      id,
+      transferDate: now
+    };
+    
+    this.receiptTransfers.set(id, transfer);
+    return transfer;
+  }
+  
+  async listReceiptTransfersByReceipt(receiptId: number): Promise<ReceiptTransfer[]> {
+    return Array.from(this.receiptTransfers.values()).filter(
+      transfer => transfer.receiptId === receiptId
+    );
+  }
+  
+  async getReceiptTransferByHash(transactionHash: string): Promise<ReceiptTransfer | undefined> {
+    return Array.from(this.receiptTransfers.values()).find(
+      transfer => transfer.transactionHash === transactionHash
+    );
+  }
+  
   // Process operations
   async getProcess(id: number): Promise<Process | undefined> {
     return this.processes.get(id);
@@ -727,6 +783,38 @@ export class DatabaseStorage implements IStorage {
       .where(eq(loans.id, id))
       .returning();
     return updatedLoan || undefined;
+  }
+  
+  // Receipt transfer operations (blockchain)
+  // For simplicity, we'll implement in-memory versions of these
+  // In a real app, this would be implemented with proper DB tables
+  private receiptTransfers: Map<number, ReceiptTransfer> = new Map();
+  private currentTransferId: number = 1;
+  
+  async createReceiptTransfer(insertTransfer: InsertReceiptTransfer): Promise<ReceiptTransfer> {
+    const id = this.currentTransferId++;
+    const now = new Date();
+    
+    const transfer: ReceiptTransfer = {
+      ...insertTransfer,
+      id,
+      transferDate: now
+    };
+    
+    this.receiptTransfers.set(id, transfer);
+    return transfer;
+  }
+  
+  async listReceiptTransfersByReceipt(receiptId: number): Promise<ReceiptTransfer[]> {
+    return Array.from(this.receiptTransfers.values()).filter(
+      transfer => transfer.receiptId === receiptId
+    );
+  }
+  
+  async getReceiptTransferByHash(transactionHash: string): Promise<ReceiptTransfer | undefined> {
+    return Array.from(this.receiptTransfers.values()).find(
+      transfer => transfer.transactionHash === transactionHash
+    );
   }
   
   // Process operations

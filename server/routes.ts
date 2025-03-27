@@ -605,6 +605,107 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ message: "Server error" });
     }
   });
+
+  // New endpoints for blockchain-secured receipts
+
+  // Get receipts available to use as collateral
+  apiRouter.get("/receipts/available-collateral", async (req: Request, res: Response) => {
+    try {
+      // Check if user is authenticated
+      if (!req.session || !req.session.userId) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+      
+      // Get all receipts owned by the user that are active (not collateralized)
+      const receipts = await storage.listWarehouseReceiptsByOwner(req.session.userId);
+      const availableReceipts = receipts.filter(receipt => receipt.status === "active");
+      
+      res.status(200).json(availableReceipts);
+    } catch (error) {
+      res.status(500).json({ message: "Server error" });
+    }
+  });
+
+  // Transfer ownership of a receipt with blockchain recording
+  apiRouter.post("/receipts/:id/transfer", async (req: Request, res: Response) => {
+    try {
+      // Check if user is authenticated
+      if (!req.session || !req.session.userId) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+      
+      const receiptId = parseInt(req.params.id);
+      if (isNaN(receiptId)) {
+        return res.status(400).json({ message: "Invalid receipt ID" });
+      }
+      
+      // Validate required fields
+      const { receiverId, transferType, transactionHash, note } = req.body;
+      
+      if (!receiverId || !transferType || !transactionHash) {
+        return res.status(400).json({ 
+          message: "Missing required fields: receiverId, transferType, and transactionHash are required" 
+        });
+      }
+      
+      // Verify the receipt exists and is owned by the current user
+      const receipt = await storage.getWarehouseReceipt(receiptId);
+      
+      if (!receipt) {
+        return res.status(404).json({ message: "Receipt not found" });
+      }
+      
+      if (receipt.ownerId !== req.session.userId) {
+        return res.status(403).json({ message: "Not authorized to transfer this receipt" });
+      }
+      
+      if (receipt.status !== "active") {
+        return res.status(400).json({ 
+          message: `Receipt cannot be transferred in '${receipt.status}' status` 
+        });
+      }
+      
+      // Create transfer record
+      const transferRecord = {
+        receiptId,
+        fromUserId: req.session.userId,
+        toUserId: receiverId,
+        transferType,
+        transactionHash,
+        metadata: note ? JSON.stringify({ note }) : null
+      };
+      
+      // Create the transfer record
+      await storage.createReceiptTransfer(transferRecord);
+      
+      // Update receipt ownership
+      const updatedReceipt = await storage.updateWarehouseReceipt(receiptId, {
+        ownerId: receiverId,
+        // Update transfer history in metadata
+        transferHistory: JSON.stringify({
+          lastTransfer: {
+            date: new Date().toISOString(),
+            fromUserId: req.session.userId,
+            toUserId: receiverId,
+            transferType,
+            transactionHash
+          }
+        })
+      });
+      
+      if (!updatedReceipt) {
+        throw new Error("Failed to update receipt ownership");
+      }
+      
+      res.status(200).json({ 
+        message: "Ownership transferred successfully",
+        receipt: updatedReceipt
+      });
+    } catch (error) {
+      console.error("Error transferring receipt:", error);
+      res.status(500).json({ message: "Server error" });
+    }
+  });
   
   // Verify receipt by verification code - no auth required for public verification
   apiRouter.get("/receipts/verify/:code", async (req: Request, res: Response) => {

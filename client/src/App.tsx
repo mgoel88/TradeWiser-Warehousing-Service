@@ -31,6 +31,7 @@ function Router() {
       <Route path="/deposit" component={DepositPage} />
       <Route path="/commodities/:id" component={CommodityDetailPage} />
       <Route path="/verify-receipt/:verificationCode" component={ReceiptVerificationPage} />
+      <Route path="/receipts/verify/:code" component={ReceiptVerificationPage} />
       <Route path="/green-channel" component={WarehousePage} />
       <Route path="/orange-channel" component={WarehousePage} />
       <Route path="/red-channel" component={WarehousePage} />
