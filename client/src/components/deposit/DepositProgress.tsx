@@ -417,12 +417,17 @@ export default function DepositProgress({ processId }: DepositProgressProps) {
         {/* Warehouse process flow (show only when at warehouse or later stages) */}
         {(['arrived_at_warehouse', 'pre_cleaning', 'quality_assessment', 'ewr_generation'].includes(process.currentStage) && 
           commodity && warehouse) && (
-          <div className="border rounded-md overflow-hidden mt-4">
+          <div className="border rounded-md overflow-hidden mt-4 animate-in fade-in duration-500">
             <div className="bg-primary/10 p-3">
               <h3 className="font-medium flex items-center">
                 <ClipboardCheck className="h-4 w-4 mr-2" />
                 Warehouse Processing
               </h3>
+              {process.currentStage === 'ewr_generation' && process.stageProgress?.ewr_generation === 'completed' && (
+                <Badge variant="outline" className="ml-auto bg-green-100 text-green-800">
+                  Receipt Generated
+                </Badge>
+              )}
             </div>
             <div className="p-3">
               <WarehouseProcessFlow 
@@ -431,6 +436,31 @@ export default function DepositProgress({ processId }: DepositProgressProps) {
                 warehouse={warehouse} 
                 onComplete={handleRefresh}
               />
+              
+              {/* Show receipt generation success message */}
+              {process.currentStage === 'ewr_generation' && process.stageProgress?.ewr_generation === 'completed' && (
+                <div className="mt-6 bg-green-50 border border-green-200 rounded-lg p-4 text-green-800">
+                  <div className="flex items-start">
+                    <CheckCircle2 className="h-5 w-5 mr-2 mt-0.5 text-green-600" />
+                    <div>
+                      <h4 className="font-medium">Electronic Warehouse Receipt Generated</h4>
+                      <p className="text-sm mt-1">
+                        Your commodity has been successfully processed and stored. An electronic warehouse receipt (eWR) 
+                        has been generated and is now available in your Receipts section.
+                      </p>
+                      <div className="flex mt-3 space-x-3">
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => window.location.href = '/receipts'}
+                        >
+                          View Receipt
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         )}

@@ -1,5 +1,5 @@
-// Note: This is a mock PDF generator that would need to be replaced with a real one
-// like jsPDF or another PDF generation library in production
+import jsPDF from 'jspdf';
+import QRCode from 'qrcode';
 
 interface ReceiptData {
   receiptNumber: string;
@@ -16,54 +16,156 @@ interface ReceiptData {
 }
 
 /**
- * In a real application, this would generate a PDF file using a library like jsPDF
- * For now, this is a mock implementation that simulates PDF generation
+ * Generate a verification URL for the receipt
+ */
+export function generateVerificationURL(verificationCode: string): string {
+  // In production, this would be a real verification URL
+  // For now, we'll simulate it with a URL that could be handled by our frontend router
+  const baseUrl = window.location.origin;
+  return `${baseUrl}/verify-receipt/${verificationCode}`;
+}
+
+/**
+ * Generate a QR code data URL for the receipt verification
+ */
+async function generateQRCodeDataURL(verificationCode: string): Promise<string> {
+  try {
+    // Generate a verification URL for the QR code
+    const verificationUrl = generateVerificationURL(verificationCode);
+    
+    // Generate QR code as data URL with the verification URL
+    return await QRCode.toDataURL(verificationUrl, {
+      errorCorrectionLevel: 'H',
+      margin: 1,
+      width: 200,
+      color: {
+        dark: '#000000',
+        light: '#ffffff'
+      }
+    });
+  } catch (error) {
+    console.error('Error generating QR code:', error);
+    return '';
+  }
+}
+
+/**
+ * Generate a professionally formatted PDF warehouse receipt using jsPDF with QR code
  */
 export async function generateReceiptPDF(data: ReceiptData): Promise<Blob> {
-  // This is where you'd generate the actual PDF
-  // For this demo, we'll just return a mock Blob with some text
+  const doc = new jsPDF({
+    orientation: 'portrait',
+    unit: 'mm',
+    format: 'a4'
+  });
   
-  // In a real implementation:
-  // const doc = new jsPDF();
-  // doc.setFont("helvetica");
-  // doc.setFontSize(20);
-  // doc.text("Electronic Warehouse Receipt", 105, 20, { align: "center" });
-  // ... add more content to the PDF
-  // return doc.output('blob');
+  // Generate QR code for verification
+  const qrCodeDataUrl = await generateQRCodeDataURL(data.verificationCode || 'NO_VERIFICATION_CODE');
   
-  // Mock PDF text
-  const pdfText = `
-    ELECTRONIC WAREHOUSE RECEIPT
-    ---------------------------
-    
-    Receipt Number: ${data.receiptNumber}
-    Issue Date: ${data.issueDate}
-    Expiry Date: ${data.expiryDate}
-    
-    Depositor: ${data.depositorName}
-    
-    Commodity: ${data.commodityName}
-    Quantity: ${data.quantity}
-    Quality Grade: ${data.qualityGrade}
-    Valuation: ${data.valuationAmount}
-    
-    Warehouse: ${data.warehouseName}
-    Location: ${data.warehouseAddress}
-    
-    Verification Code: ${data.verificationCode || "N/A"}
-    
-    This Electronic Warehouse Receipt (eWR) is a digital representation
-    of stored commodities and can be used as collateral for loans or
-    traded on commodity exchanges. The eWR is secured by blockchain
-    technology ensuring authenticity and immutability.
-    
-    TradeWiser Platform
-    ------------------
-    Green Channel Receipt - Secured and Verified
-  `;
+  // Set fonts and colors
+  doc.setFont("helvetica", "normal");
+  doc.setTextColor(0, 0, 0);
   
-  // Create a mock PDF Blob
-  return new Blob([pdfText], { type: 'application/pdf' });
+  // Add header
+  doc.setFontSize(22);
+  doc.setFont("helvetica", "bold");
+  doc.text("ELECTRONIC WAREHOUSE RECEIPT", 105, 20, { align: "center" });
+  
+  // Add TradeWiser logo section (text-based logo for now)
+  doc.setFontSize(12);
+  doc.setFont("helvetica", "bold");
+  doc.text("TradeWiser", 20, 40);
+  doc.setFontSize(8);
+  doc.setFont("helvetica", "normal");
+  doc.text("Green Channel Receipt - Secured and Verified", 20, 45);
+  
+  // Add horizontal line
+  doc.setDrawColor(0, 128, 0); // Green color
+  doc.setLineWidth(0.5);
+  doc.line(20, 50, 190, 50);
+  
+  // Receipt information section
+  doc.setFontSize(10);
+  doc.setFont("helvetica", "bold");
+  doc.text("RECEIPT INFORMATION", 20, 60);
+  
+  doc.setFont("helvetica", "normal");
+  doc.text(`Receipt Number: ${data.receiptNumber}`, 20, 70);
+  doc.text(`Issue Date: ${data.issueDate}`, 20, 75);
+  doc.text(`Expiry Date: ${data.expiryDate}`, 20, 80);
+  
+  // Add a decorative receipt status box
+  doc.setFillColor(240, 248, 240); // Light green
+  doc.roundedRect(140, 65, 40, 20, 2, 2, 'F');
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(0, 100, 0);
+  doc.text("ACTIVE", 160, 75, { align: "center" });
+  doc.setTextColor(0, 0, 0);
+  
+  // Depositor information
+  doc.setFontSize(10);
+  doc.setFont("helvetica", "bold");
+  doc.text("DEPOSITOR INFORMATION", 20, 95);
+  
+  doc.setFont("helvetica", "normal");
+  doc.text(`Depositor: ${data.depositorName}`, 20, 105);
+  
+  // Commodity information
+  doc.setFontSize(10);
+  doc.setFont("helvetica", "bold");
+  doc.text("COMMODITY INFORMATION", 20, 120);
+  
+  doc.setFont("helvetica", "normal");
+  doc.text(`Commodity: ${data.commodityName}`, 20, 130);
+  doc.text(`Quantity: ${data.quantity}`, 20, 135);
+  doc.text(`Quality Grade: ${data.qualityGrade}`, 20, 140);
+  doc.text(`Valuation: ${data.valuationAmount}`, 20, 145);
+  
+  // Warehouse information
+  doc.setFontSize(10);
+  doc.setFont("helvetica", "bold");
+  doc.text("WAREHOUSE INFORMATION", 20, 160);
+  
+  doc.setFont("helvetica", "normal");
+  doc.text(`Warehouse: ${data.warehouseName}`, 20, 170);
+  doc.text(`Location: ${data.warehouseAddress}`, 20, 175);
+  
+  // Verification section
+  doc.setFontSize(10);
+  doc.setFont("helvetica", "bold");
+  doc.text("BLOCKCHAIN VERIFICATION", 20, 195);
+  
+  doc.setFont("helvetica", "normal");
+  doc.text(`Verification Code: ${data.verificationCode || "N/A"}`, 20, 205);
+  
+  // Add QR code if we have a data URL
+  if (qrCodeDataUrl) {
+    try {
+      doc.addImage(qrCodeDataUrl, 'PNG', 160, 190, 25, 25);
+    } catch (error) {
+      console.error('Error adding QR code to PDF:', error);
+      // Fallback to rectangle if image fails
+      doc.setFillColor(240, 240, 240);
+      doc.rect(160, 190, 25, 25, 'F');
+      doc.setFontSize(6);
+      doc.setTextColor(100, 100, 100);
+      doc.text("QR Code", 172.5, 202.5, { align: "center" });
+    }
+  }
+  
+  // Add footer with disclaimer
+  doc.setFontSize(8);
+  doc.setTextColor(100, 100, 100);
+  doc.text(`This Electronic Warehouse Receipt (eWR) is a digital representation of stored commodities and can be used as`, 105, 240, { align: "center" });
+  doc.text(`collateral for loans or traded on commodity exchanges. The eWR is secured by blockchain technology ensuring authenticity.`, 105, 245, { align: "center" });
+  
+  // Add decorative element
+  doc.setDrawColor(0, 128, 0);
+  doc.setLineWidth(0.5);
+  doc.line(20, 250, 190, 250);
+  
+  // Return the PDF as a blob
+  return doc.output('blob');
 }
 
 /**

@@ -87,7 +87,7 @@ export default function WarehouseReceiptCard({ receipt, onView, onPledge, classN
         qualityGrade: commodity?.gradeAssigned || "Standard",
         warehouseName: warehouse?.name || "Unknown Warehouse",
         warehouseAddress: warehouse?.address || "Unknown Location",
-        valuationAmount: receipt.valuation ? `₹${receipt.valuation.toLocaleString('en-IN')}` : "₹0",
+        valuationAmount: receipt.valuation ? `₹${receipt.valuation.toString()}` : "₹0",
         verificationCode: verificationCode
       };
       
@@ -133,7 +133,7 @@ export default function WarehouseReceiptCard({ receipt, onView, onPledge, classN
           <div className="grid grid-cols-2 gap-2 text-sm">
             <div>
               <p className="text-xs text-muted-foreground">Valuation</p>
-              <p className="font-medium text-primary">₹{receipt.valuation?.toLocaleString('en-IN') || "0"}</p>
+              <p className="font-medium text-primary">₹{receipt.valuation?.toString() || "0"}</p>
             </div>
             <div>
               <p className="text-xs text-muted-foreground">Issued</p>
@@ -193,7 +193,7 @@ export default function WarehouseReceiptCard({ receipt, onView, onPledge, classN
                 </div>
                 <div>
                   <p className="font-medium">Valuation</p>
-                  <p className="text-primary font-medium">₹{receipt.valuation?.toLocaleString('en-IN') || "0"}</p>
+                  <p className="text-primary font-medium">₹{receipt.valuation?.toString() || "0"}</p>
                 </div>
                 <div>
                   <p className="font-medium">Type</p>
@@ -255,11 +255,57 @@ export default function WarehouseReceiptCard({ receipt, onView, onPledge, classN
                 <Download className="h-4 w-4 mr-1" />
                 Download
               </Button>
-              <Button variant="outline" size="sm">
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={async (e) => {
+                  e.stopPropagation();
+                  try {
+                    // Generate the PDF first
+                    const receiptData = {
+                      receiptNumber: receipt.receiptNumber,
+                      issueDate: formattedDate,
+                      expiryDate: formattedExpiryDate,
+                      depositorName: "Rajiv Farmer", // This should come from user data
+                      commodityName: commodity?.name || "Unknown Commodity",
+                      quantity: receipt.quantity?.toString() || "0" + " " + (commodity?.measurementUnit || "MT"),
+                      qualityGrade: commodity?.gradeAssigned || "Standard",
+                      warehouseName: warehouse?.name || "Unknown Warehouse",
+                      warehouseAddress: warehouse?.address || "Unknown Location",
+                      valuationAmount: receipt.valuation ? `₹${receipt.valuation.toString()}` : "₹0",
+                      verificationCode: verificationCode
+                    };
+                    
+                    // Generate PDF and create object URL
+                    const pdfBlob = await generateReceiptPDF(receiptData);
+                    const url = URL.createObjectURL(pdfBlob);
+                    
+                    // Open in new window and print
+                    const printWindow = window.open(url, '_blank');
+                    if (printWindow) {
+                      printWindow.onload = () => {
+                        printWindow.print();
+                        setTimeout(() => URL.revokeObjectURL(url), 1000);
+                      };
+                    }
+                  } catch (error) {
+                    console.error("Error printing receipt:", error);
+                  }
+                }}
+              >
                 <Printer className="h-4 w-4 mr-1" />
                 Print
               </Button>
-              <Button variant="outline" size="sm">
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (verificationCode) {
+                    window.open(`/verify-receipt/${verificationCode}`, '_blank');
+                  }
+                }}
+              >
                 <ExternalLink className="h-4 w-4 mr-1" />
                 Verify
               </Button>

@@ -91,7 +91,7 @@ export default function WarehouseProcessFlow({ process, commodity, warehouse, on
   const [userConfirmed, setUserConfirmed] = useState(false);
   const [receiptGenerated, setReceiptGenerated] = useState(false);
   const [receiptData, setReceiptData] = useState<ReceiptData | null>(null);
-  const [processingStage, setProcessingStage] = useState<string>(process.currentStage);
+  const [processingStage, setProcessingStage] = useState<string>(process.currentStage || "arrived_at_warehouse");
   const [isSendingFeedback, setIsSendingFeedback] = useState(false);
   const [showReprocessRequest, setShowReprocessRequest] = useState(false);
 
@@ -317,42 +317,128 @@ export default function WarehouseProcessFlow({ process, commodity, warehouse, on
   // Handle user confirmation of process
   const handleConfirmProcess = async () => {
     try {
-      // API call to confirm process
-      const response = await apiRequest(
-        "POST",
-        `/api/processes/${process.id}/confirm`,
-        { status: "confirmed" }
+      setUserConfirmed(true);
+      
+      // Create receipt number
+      const receiptNumber = `WR${String(Date.now()).substring(7)}-${process.id}`;
+      
+      // Calculate expiry date (6 months from now)
+      const now = new Date();
+      const expiryDate = new Date(now);
+      expiryDate.setMonth(expiryDate.getMonth() + 6);
+      
+      // Create warehouse receipt in the database
+      const receiptPayload = {
+        receiptNumber,
+        receiptType: "negotiable", 
+        commodityId: commodity.id,
+        ownerId: process.userId,
+        warehouseId: warehouse.id,
+        quantity: commodity.quantity,
+        status: "active",
+        blockchainHash: `0x${Math.random().toString(16).slice(2, 10)}${Date.now().toString(16)}`,
+        expiryDate: expiryDate.toISOString(),
+        valuation: parseFloat(metrics.totalValuation.replace(/[^\d.-]/g, '')),
+        qualityParameters: metrics.finalQuality,
+        depositorKycId: "KYC" + process.userId + Date.now().toString(16).slice(-6),
+        warehouseLicenseNo: `WL-${warehouse.id}-${new Date().getFullYear()}`
+      };
+      
+      // Call API to create warehouse receipt
+      const receiptResponse = await apiRequest('POST', '/api/receipts', receiptPayload);
+      
+      if (!receiptResponse.ok) {
+        throw new Error('Failed to generate warehouse receipt');
+      }
+      
+      const receiptResult = await receiptResponse.json();
+      
+      // Then update the process to mark receipt as generated
+      const processResponse = await apiRequest(
+        "PATCH",
+        `/api/processes/${process.id}`,
+        { 
+          status: "completed",
+          currentStage: "ewr_generation",
+          stageProgress: {
+            arrived_at_warehouse: "completed",
+            pre_cleaning: "completed",
+            quality_assessment: "completed",
+            packaging: "completed",
+            ewr_generation: "completed"
+          },
+          completedTime: new Date().toISOString(),
+          updateType: "receipt"
+        }
       );
 
-      if (response.ok) {
-        setUserConfirmed(true);
-        toast({
-          title: "Process Confirmed",
-          description: "You have confirmed the warehouse processing. Your receipt will be generated shortly.",
-        });
-      } else {
-        throw new Error("Failed to confirm process");
+      if (!processResponse.ok) {
+        throw new Error('Failed to update process status');
+      }
+      
+      // Set receipt data for display
+      const newReceiptData = {
+        receiptNumber,
+        issueDate: formatDate(new Date()),
+        expiryDate: formatDate(expiryDate),
+        depositorName: "Rajiv Farmer", // This should come from user data
+        commodityName: commodity.name,
+        quantity: `${commodity.quantity} ${commodity.measurementUnit}`,
+        qualityGrade: metrics.gradeAssigned,
+        warehouseName: warehouse.name,
+        warehouseAddress: warehouse.address,
+        valuationAmount: metrics.totalValuation
+      };
+      
+      setReceiptData(newReceiptData);
+      setReceiptGenerated(true);
+      
+      toast({
+        title: "Receipt Generated",
+        description: "Your electronic warehouse receipt has been generated successfully.",
+      });
+      
+      // Call the onComplete callback to refresh parent component
+      if (onComplete) {
+        onComplete();
       }
     } catch (error) {
       console.error("Error confirming process:", error);
+      setUserConfirmed(false);
       toast({
-        title: "Confirmation Failed",
-        description: "Unable to confirm the process. Please try again.",
+        title: "Receipt Generation Failed",
+        description: "Unable to generate the warehouse receipt. Please try again.",
         variant: "destructive",
       });
     }
   };
 
   // Handle receipt download
-  const handleDownloadReceipt = () => {
+  const handleDownloadReceipt = async () => {
     if (!receiptData) return;
     
-    // In a real implementation, this would generate a PDF
-    // For now, simulate a download
-    toast({
-      title: "Receipt Downloaded",
-      description: `Warehouse Receipt ${receiptData.receiptNumber} has been downloaded.`,
-    });
+    try {
+      // Import the receipt generator functionality
+      const { downloadReceiptPDF } = await import('@/lib/receiptGenerator');
+      
+      // Generate and download the receipt PDF
+      await downloadReceiptPDF({
+        ...receiptData,
+        verificationCode: `WR-${process.id}-${Math.floor(Date.now()/1000).toString(16).toUpperCase()}`
+      });
+      
+      toast({
+        title: "Receipt Downloaded",
+        description: `Warehouse Receipt ${receiptData.receiptNumber} has been downloaded successfully.`,
+      });
+    } catch (error) {
+      console.error("Error downloading receipt:", error);
+      toast({
+        title: "Download Failed",
+        description: "There was an error downloading the receipt. Please try again.",
+        variant: "destructive",
+      });
+    }
   };
 
   // Get current stage index
@@ -1114,7 +1200,15 @@ export default function WarehouseProcessFlow({ process, commodity, warehouse, on
 }
 
 // Helper component for metrics display
-function MetricCard({ icon, title, value, description, highlight = false }) {
+interface MetricCardProps {
+  icon: React.ReactNode;
+  title: string;
+  value: string;
+  description: string;
+  highlight?: boolean;
+}
+
+function MetricCard({ icon, title, value, description, highlight = false }: MetricCardProps) {
   return (
     <Card className={highlight ? "bg-primary/5 border-primary/20" : "bg-muted"}>
       <CardContent className="p-4">
@@ -1132,7 +1226,14 @@ function MetricCard({ icon, title, value, description, highlight = false }) {
 }
 
 // Helper component for quality comparison display
-function QualityComparisonCard({ parameter, initialValue, finalValue, improvement }) {
+interface QualityComparisonCardProps {
+  parameter: string;
+  initialValue: string;
+  finalValue: string;
+  improvement: string;
+}
+
+function QualityComparisonCard({ parameter, initialValue, finalValue, improvement }: QualityComparisonCardProps) {
   return (
     <Card className="bg-muted">
       <CardContent className="p-4">
@@ -1157,7 +1258,13 @@ function QualityComparisonCard({ parameter, initialValue, finalValue, improvemen
 }
 
 // Helper component for quality parameter display
-function QualityParameterCard({ parameter, value, standard }) {
+interface QualityParameterCardProps {
+  parameter: string;
+  value: string;
+  standard: string;
+}
+
+function QualityParameterCard({ parameter, value, standard }: QualityParameterCardProps) {
   // Determine if the parameter meets the standard
   const isWithinStandard = () => {
     const numValue = parseFloat(value);
