@@ -76,7 +76,7 @@ export default function DepositFlow({ warehouses, userLocation }: DepositFlowPro
     foreignMatter: "",
     brokenGrains: ""
   });
-  
+
   // Initialize form
   const form = useForm<DepositCommodityFormValues>({
     resolver: zodResolver(depositCommoditySchema),
@@ -95,24 +95,24 @@ export default function DepositFlow({ warehouses, userLocation }: DepositFlowPro
   // Sort warehouses by distance if user location is available
   const sortedWarehouses = warehouses.slice().sort((a, b) => {
     if (!userLocation) return 0;
-    
+
     const distanceA = calculateDistance(
       userLocation[0],
       userLocation[1],
       parseFloat(a.latitude),
       parseFloat(a.longitude)
     );
-    
+
     const distanceB = calculateDistance(
       userLocation[0],
       userLocation[1],
       parseFloat(b.latitude),
       parseFloat(b.longitude)
     );
-    
+
     return distanceA - distanceB;
   });
-  
+
   // Filter warehouses based on search query
   const filteredWarehouses = searchQuery 
     ? sortedWarehouses.filter(warehouse => 
@@ -128,7 +128,7 @@ export default function DepositFlow({ warehouses, userLocation }: DepositFlowPro
     form.setValue("warehouseId", warehouse.id);
     setCurrentStep(DepositStep.SchedulePickup);
   };
-  
+
   // Validate pickup date is not in the past
   const isValidPickupDate = (date: string) => {
     const selectedDate = new Date(date);
@@ -181,7 +181,7 @@ export default function DepositFlow({ warehouses, userLocation }: DepositFlowPro
       setCurrentStep(DepositStep.ReviewSubmit);
     }
   };
-  
+
   // Handle going back to previous step
   const handlePreviousStep = () => {
     if (currentStep === DepositStep.SelectWarehouse) {
@@ -197,7 +197,7 @@ export default function DepositFlow({ warehouses, userLocation }: DepositFlowPro
       setCurrentStep(DepositStep.Confirmation);
     }
   };
-  
+
   // Handle form submission
   const onSubmit = async (data: DepositCommodityFormValues) => {
     try {
@@ -206,7 +206,7 @@ export default function DepositFlow({ warehouses, userLocation }: DepositFlowPro
         title: "Processing",
         description: "Initiating your deposit request...",
       });
-      
+
       if (!selectedWarehouse) {
         toast({
           title: "Error",
@@ -215,7 +215,7 @@ export default function DepositFlow({ warehouses, userLocation }: DepositFlowPro
         });
         return;
       }
-      
+
       if (!user || !user.id) {
         toast({
           title: "Authentication required",
@@ -224,7 +224,7 @@ export default function DepositFlow({ warehouses, userLocation }: DepositFlowPro
         });
         return;
       }
-      
+
       // Parse quantity as a number for validation but keep as string for API
       let quantityValue: number;
       if (typeof data.quantity === 'string') {
@@ -232,7 +232,7 @@ export default function DepositFlow({ warehouses, userLocation }: DepositFlowPro
       } else {
         quantityValue = data.quantity;
       }
-        
+
       if (isNaN(quantityValue)) {
         toast({
           title: "Invalid quantity",
@@ -241,10 +241,10 @@ export default function DepositFlow({ warehouses, userLocation }: DepositFlowPro
         });
         return;
       }
-      
+
       // Always convert quantity to string for the API
       const quantityString = quantityValue.toString();
-      
+
       // Include quality parameters from the state
       const formattedData = {
         ...data,
@@ -262,21 +262,21 @@ export default function DepositFlow({ warehouses, userLocation }: DepositFlowPro
           useWarehouseDelivery,
         }
       };
-      
+
       console.log("Submitting commodity data:", formattedData);
-      
+
       // Call API to create a new commodity
       const response = await apiRequest(
         "POST",
         "/api/commodities",
         formattedData
       );
-      
+
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
         throw new Error(errorData.message || "Failed to create commodity");
       }
-      
+
       const commodity = await response.json();
       console.log("Commodity created:", commodity);
 
@@ -298,29 +298,29 @@ export default function DepositFlow({ warehouses, userLocation }: DepositFlowPro
           // Send the date in ISO format for consistent handling
           estimatedCompletionTime: new Date(new Date().setHours(new Date().getHours() + 48)).toISOString() // 48 hours estimate
         };
-        
+
         console.log("Creating process:", processData);
-        
+
         const processResponse = await apiRequest(
           "POST",
           "/api/processes",
           processData
         );
-        
+
         if (!processResponse.ok) {
           const errorData = await processResponse.json().catch(() => ({}));
           throw new Error(errorData.message || "Failed to create process");
         }
-        
+
         const processResult = await processResponse.json();
         console.log("Process created:", processResult);
-        
+
         if (processResult && processResult.id) {
           setProcessId(processResult.id);
-          
+
           // Move to confirmation step
           setCurrentStep(DepositStep.Confirmation);
-          
+
           toast({
             title: "Deposit initiated successfully",
             description: "Your commodity deposit process has been started",
@@ -354,7 +354,7 @@ export default function DepositFlow({ warehouses, userLocation }: DepositFlowPro
         return "bg-gray-500";
     }
   };
-  
+
   // Helper to format the address
   const formatAddress = (warehouse: Warehouse) => {
     return `${warehouse.address}, ${warehouse.city}, ${warehouse.state} - ${warehouse.pincode}`;
@@ -370,7 +370,7 @@ export default function DepositFlow({ warehouses, userLocation }: DepositFlowPro
         <Step icon={<Check />} label="Confirmation" />
         <Step icon={<Activity />} label="Track Deposit" />
       </Steps>
-      
+
       <div className="mt-8">
         {currentStep === DepositStep.SelectWarehouse && (
           <Card className="w-full">
@@ -386,7 +386,7 @@ export default function DepositFlow({ warehouses, userLocation }: DepositFlowPro
                   </CardDescription>
                 </div>
               </div>
-              
+
               <div className="relative mt-4">
                 <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
                 <Input
@@ -397,7 +397,7 @@ export default function DepositFlow({ warehouses, userLocation }: DepositFlowPro
                 />
               </div>
             </CardHeader>
-            
+
             <CardContent>
               <ScrollArea className="h-[400px] pr-4">
                 <div className="grid gap-4">
@@ -414,7 +414,7 @@ export default function DepositFlow({ warehouses, userLocation }: DepositFlowPro
                         );
                         distanceText = `${distance.toFixed(1)} km away`;
                       }
-                      
+
                       return (
                         <Card
                           key={warehouse.id}
@@ -459,7 +459,7 @@ export default function DepositFlow({ warehouses, userLocation }: DepositFlowPro
             </CardContent>
           </Card>
         )}
-        
+
         {currentStep === DepositStep.CommodityDetails && (
           <Card>
             <CardHeader>
@@ -475,7 +475,7 @@ export default function DepositFlow({ warehouses, userLocation }: DepositFlowPro
                 </div>
               </div>
             </CardHeader>
-            
+
             <CardContent>
               <Form {...form}>
                 <div className="grid gap-4 py-4">
@@ -492,7 +492,7 @@ export default function DepositFlow({ warehouses, userLocation }: DepositFlowPro
                       </FormItem>
                     )}
                   />
-                  
+
                   <FormField
                     control={form.control}
                     name="type"
@@ -522,7 +522,7 @@ export default function DepositFlow({ warehouses, userLocation }: DepositFlowPro
                       </FormItem>
                     )}
                   />
-                  
+
                   <div className="grid grid-cols-2 gap-4">
                     <FormField
                       control={form.control}
@@ -543,7 +543,7 @@ export default function DepositFlow({ warehouses, userLocation }: DepositFlowPro
                         </FormItem>
                       )}
                     />
-                    
+
                     <FormField
                       control={form.control}
                       name="measurementUnit"
@@ -570,7 +570,7 @@ export default function DepositFlow({ warehouses, userLocation }: DepositFlowPro
                       )}
                     />
                   </div>
-                  
+
                   <div>
                     <h3 className="mb-2 font-medium">Quality Parameters (if known)</h3>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -606,7 +606,7 @@ export default function DepositFlow({ warehouses, userLocation }: DepositFlowPro
                       These values are optional. Quality assessment will be done at the warehouse.
                     </FormDescription>
                   </div>
-                  
+
                   <FormField
                     control={form.control}
                     name="notes"
@@ -627,7 +627,7 @@ export default function DepositFlow({ warehouses, userLocation }: DepositFlowPro
                 </div>
               </Form>
             </CardContent>
-            
+
             <CardFooter className="flex justify-end">
               <Button onClick={handleNextStep}>
                 Continue to Select Warehouse
@@ -635,7 +635,7 @@ export default function DepositFlow({ warehouses, userLocation }: DepositFlowPro
             </CardFooter>
           </Card>
         )}
-        
+
         {currentStep === DepositStep.SchedulePickup && (
           <Card>
             <CardHeader>
@@ -651,7 +651,7 @@ export default function DepositFlow({ warehouses, userLocation }: DepositFlowPro
                 </div>
               </div>
             </CardHeader>
-            
+
             <CardContent>
               <div className="mb-6">
                 <h3 className="text-lg font-medium mb-2">Delivery Method</h3>
@@ -672,7 +672,7 @@ export default function DepositFlow({ warehouses, userLocation }: DepositFlowPro
                   </Button>
                 </div>
               </div>
-              
+
               <div className="grid gap-4">
                 <div>
                   <label className="text-sm font-medium">Preferred Date</label>
@@ -684,7 +684,7 @@ export default function DepositFlow({ warehouses, userLocation }: DepositFlowPro
                     className="mt-1.5"
                   />
                 </div>
-                
+
                 {!useWarehouseDelivery && (
                   <>
                     <div>
@@ -695,9 +695,9 @@ export default function DepositFlow({ warehouses, userLocation }: DepositFlowPro
                         onChange={(selectedTime) => setPickupTime(selectedTime)}
                       />
                     </div>
-                    
+
                     <div>
-                      <label className="text-sm font-medium mb-1.5 block">Pickup Location</label>
+                      <label className="text-sm font-medium">Pickup Address *</label>
                       <LocationPicker 
                         onLocationSelect={(address, coordinates) => {
                           setPickupAddress(address);
@@ -705,10 +705,13 @@ export default function DepositFlow({ warehouses, userLocation }: DepositFlowPro
                         }}
                         initialAddress={pickupAddress}
                       />
+                      {!useWarehouseDelivery && !pickupAddress && (
+                        <p className="text-sm text-red-500 mt-1">Pickup address is required</p>
+                      )}
                     </div>
                   </>
                 )}
-                
+
                 {useWarehouseDelivery && (
                   <div className="bg-muted p-4 rounded-md mt-2">
                     <h4 className="font-medium mb-2">Warehouse Delivery Information</h4>
@@ -722,7 +725,7 @@ export default function DepositFlow({ warehouses, userLocation }: DepositFlowPro
                 )}
               </div>
             </CardContent>
-            
+
             <CardFooter className="flex justify-end">
               <Button onClick={handleNextStep}>
                 Continue to Review
@@ -730,7 +733,7 @@ export default function DepositFlow({ warehouses, userLocation }: DepositFlowPro
             </CardFooter>
           </Card>
         )}
-        
+
         {currentStep === DepositStep.ReviewSubmit && (
           <Card>
             <CardHeader>
@@ -746,7 +749,7 @@ export default function DepositFlow({ warehouses, userLocation }: DepositFlowPro
                 </div>
               </div>
             </CardHeader>
-            
+
             <CardContent>
               <div className="grid gap-6">
                 <div>
@@ -761,7 +764,7 @@ export default function DepositFlow({ warehouses, userLocation }: DepositFlowPro
                     </CardContent>
                   </Card>
                 </div>
-                
+
                 <div>
                   <h3 className="text-lg font-medium mb-3">Commodity Information</h3>
                   <div className="grid grid-cols-2 gap-3">
@@ -787,7 +790,7 @@ export default function DepositFlow({ warehouses, userLocation }: DepositFlowPro
                     </div>
                   </div>
                 </div>
-                
+
                 <div>
                   <h3 className="text-lg font-medium mb-3">Delivery Details</h3>
                   <div className="grid grid-cols-2 gap-3">
@@ -815,7 +818,7 @@ export default function DepositFlow({ warehouses, userLocation }: DepositFlowPro
                     )}
                   </div>
                 </div>
-                
+
                 <div className="bg-yellow-50 border border-yellow-200 rounded-md p-4">
                   <h4 className="text-sm font-medium text-yellow-800 mb-1">
                     Important Notes
@@ -829,7 +832,7 @@ export default function DepositFlow({ warehouses, userLocation }: DepositFlowPro
                 </div>
               </div>
             </CardContent>
-            
+
             <CardFooter className="flex justify-between">
               <Button variant="outline" onClick={handlePreviousStep}>
                 Go Back
@@ -840,7 +843,7 @@ export default function DepositFlow({ warehouses, userLocation }: DepositFlowPro
             </CardFooter>
           </Card>
         )}
-        
+
         {currentStep === DepositStep.Confirmation && (
           <Card className="w-full max-w-xl mx-auto text-center">
             <CardHeader>
@@ -852,7 +855,7 @@ export default function DepositFlow({ warehouses, userLocation }: DepositFlowPro
                 Your commodity deposit process has been successfully initiated
               </CardDescription>
             </CardHeader>
-            
+
             <CardContent>
               <div className="space-y-4">
                 <div className="bg-muted p-4 rounded-md">
@@ -864,13 +867,13 @@ export default function DepositFlow({ warehouses, userLocation }: DepositFlowPro
                     <li>An electronic Warehouse Receipt (eWR) will be generated</li>
                   </ul>
                 </div>
-                
+
                 <p className="text-sm text-muted-foreground">
                   You can track the status of your deposit in the "Processes" section
                 </p>
               </div>
             </CardContent>
-            
+
             <CardFooter className="flex flex-col space-y-2">
               <Button 
                 className="w-full" 
@@ -888,7 +891,7 @@ export default function DepositFlow({ warehouses, userLocation }: DepositFlowPro
             </CardFooter>
           </Card>
         )}
-        
+
         {currentStep === DepositStep.TrackDeposit && processId && (
           <Card className="w-full">
             <CardHeader>
@@ -904,17 +907,18 @@ export default function DepositFlow({ warehouses, userLocation }: DepositFlowPro
                 </div>
               </div>
             </CardHeader>
-            
+
             <CardContent>
               <DepositProgress processId={processId} />
             </CardContent>
-            
+
             <CardFooter className="flex justify-end space-x-2">
               <Button 
                 variant="outline" 
                 onClick={() => setLocation("/receipts")}
               >
                 View All Receipts
+              Button>
               </Button>
               <Button 
                 onClick={() => setCurrentStep(DepositStep.CommodityDetails)}
