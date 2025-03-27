@@ -363,11 +363,11 @@ export default function WarehouseProcessFlow({ process, commodity, warehouse, on
         status: "active",
         // Simple blockchain hash with no special characters 
         blockchainHash: Math.random().toString(16).substring(2) + Date.now().toString(16),
-        // Add verification code as metadata JSON
-        metadata: JSON.stringify({ 
+        // Add verification code as metadata - should be a JSON object, not a string
+        metadata: { 
           verificationCode: verificationCode,
           process: process.id
-        })
+        }
       };
       
       // Call API to create warehouse receipt
