@@ -8,6 +8,7 @@ import MainLayout from '@/components/layout/MainLayout';
 import { ExternalLink, AlertCircle, ArrowRight, Upload, FileSearch, ScanSearch } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import UploadReceiptDialog from '@/components/receipts/UploadReceiptDialog';
+import WarehouseReceiptCard from '@/components/receipts/WarehouseReceiptCard';
 
 export default function OrangeChannelPage() {
   const [, navigate] = useLocation();
@@ -23,7 +24,7 @@ export default function OrangeChannelPage() {
   });
 
   // Filter to only show Orange Channel receipts
-  const orangeReceipts = receipts.filter((receipt: any) => {
+  const orangeReceipts = (receipts as any[]).filter((receipt: any) => {
     if (receipt.metadata && typeof receipt.metadata === 'object') {
       return receipt.channelType === 'orange' || 
              (receipt.metadata as any).channelType === 'orange' ||
@@ -219,40 +220,13 @@ export default function OrangeChannelPage() {
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {orangeReceipts.length > 0 ? (
                   orangeReceipts.map((receipt: any) => (
-                    <Card key={receipt.id} className="border-l-4 border-orange-500">
-                      <CardHeader className="pb-2">
-                        <CardTitle>{receipt.receiptNumber}</CardTitle>
-                        <CardDescription>
-                          {receipt.externalSource || "External Warehouse"}
-                        </CardDescription>
-                      </CardHeader>
-                      <CardContent>
-                        <div className="text-sm space-y-2">
-                          <div className="flex justify-between">
-                            <span className="text-muted-foreground">Commodity:</span>
-                            <span className="font-medium">{receipt.commodityName}</span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span className="text-muted-foreground">Quantity:</span>
-                            <span className="font-medium">{receipt.quantity} {receipt.measurementUnit || "MT"}</span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span className="text-muted-foreground">Status:</span>
-                            <span className="font-medium capitalize">{receipt.status}</span>
-                          </div>
-                        </div>
-                      </CardContent>
-                      <CardFooter>
-                        <Button 
-                          variant="outline" 
-                          size="sm" 
-                          className="w-full border-orange-200 hover:bg-orange-50"
-                          onClick={() => navigate(`/receipts/${receipt.id}`)}
-                        >
-                          View Receipt
-                        </Button>
-                      </CardFooter>
-                    </Card>
+                    <div key={receipt.id}>
+                      <WarehouseReceiptCard
+                        receipt={receipt}
+                        orangeChannelVariant={true}
+                        onView={(receipt: any) => navigate(`/receipts/${receipt.id}`)}
+                      />
+                    </div>
                   ))
                 ) : (
                   <div className="col-span-3 p-6 text-center border rounded-lg">

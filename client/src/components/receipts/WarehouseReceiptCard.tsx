@@ -159,7 +159,13 @@ export default function WarehouseReceiptCard({ receipt, onView, onPledge, classN
     <>
       <Card 
         className={`relative overflow-hidden transition-all hover:shadow-md cursor-pointer ${className} rounded-xl`}
-        onClick={() => setIsDetailOpen(true)}
+        onClick={() => {
+          if (onView) {
+            onView(receipt);
+          } else {
+            setIsDetailOpen(true);
+          }
+        }}
         style={{ 
           background: cardBackground,
           maxWidth: '340px' 

@@ -238,6 +238,7 @@ export default function RedChannelPage() {
                           key={receipt.id}
                           receipt={receipt}
                           redChannelVariant={true}
+                          onView={(receipt: any) => navigate(`/receipts/${receipt.id}`)}
                         />
                       ))}
                     </div>
