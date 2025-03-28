@@ -14,6 +14,7 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { SackHistory } from '@/components/commodities/SackHistory';
+import { SackVisualization } from '@/components/commodities/SackVisualization';
 import { useToast } from '@/hooks/use-toast';
 import { 
   AlertTriangle,
@@ -110,6 +111,19 @@ export default function SackDetailPage() {
     queryFn: () => 
       fetch(`/api/commodity-sacks/${sackId}/quality-history`)
         .then(res => res.json()),
+    enabled: !!sackId,
+  });
+  
+  // Fetch partial withdrawals for this sack
+  const { 
+    data: partialWithdrawals, 
+    isLoading: isLoadingWithdrawals 
+  } = useQuery({
+    queryKey: ['/api/commodity-sacks', sackId, 'partial-withdrawals'],
+    queryFn: () => 
+      fetch(`/api/commodity-sacks/${sackId}/partial-withdrawals`)
+        .then(res => res.json())
+        .catch(() => []), // Fallback to empty array if endpoint not implemented yet
     enabled: !!sackId,
   });
 
@@ -507,13 +521,31 @@ export default function SackDetailPage() {
         </Card>
       </div>
 
-      <div className="my-8">
-        <SackHistory 
-          sackId={sack.id}
-          movementHistory={movements || []}
-          qualityHistory={qualityAssessments || []}
-          isLoading={isLoadingMovements || isLoadingQuality}
-        />
+      <div className="mt-8 mb-6">
+        <Tabs defaultValue="visualization">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="visualization">Visual Tracking</TabsTrigger>
+            <TabsTrigger value="details">Detailed History</TabsTrigger>
+          </TabsList>
+          
+          <TabsContent value="visualization" className="mt-4">
+            <SackVisualization 
+              sacks={[sack]} 
+              movements={movements || []}
+              partialWithdrawals={partialWithdrawals || []}
+              isLoading={isLoadingMovements || isLoadingWithdrawals}
+            />
+          </TabsContent>
+          
+          <TabsContent value="details" className="mt-4">
+            <SackHistory 
+              sackId={sack.id}
+              movementHistory={movements || []}
+              qualityHistory={qualityAssessments || []}
+              isLoading={isLoadingMovements || isLoadingQuality}
+            />
+          </TabsContent>
+        </Tabs>
       </div>
       
       <div className="flex justify-between mt-8">

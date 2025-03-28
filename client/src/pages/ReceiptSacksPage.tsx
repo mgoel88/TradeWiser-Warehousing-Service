@@ -24,14 +24,26 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { 
+  Select, 
+  SelectContent, 
+  SelectItem, 
+  SelectTrigger, 
+  SelectValue 
+} from "@/components/ui/select";
 import { SackTable } from '@/components/commodities/SackTable';
 import { SackGenerationForm } from '@/components/commodities/SackGenerationForm';
+import { PartialWithdrawalVisualization } from '@/components/commodities/PartialWithdrawalVisualization';
 import { 
   ArrowLeft, 
   Link as LinkIcon, 
   Loader2, 
   Package, 
-  QrCode 
+  QrCode,
+  Scissors
 } from 'lucide-react';
 
 export default function ReceiptSacksPage() {
@@ -258,6 +270,72 @@ export default function ReceiptSacksPage() {
                 </AlertDialogFooter>
               </AlertDialogContent>
             </AlertDialog>
+
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button 
+                  className="w-full justify-start" 
+                  variant="outline" 
+                  disabled={!sacks || sacks.length === 0}
+                >
+                  <Scissors className="mr-2 h-4 w-4" />
+                  Partial Withdrawal
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Partial Sack Withdrawal</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Create a partial withdrawal from an existing sack.
+                    This will generate a new sack record with the withdrawn quantity.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <div className="py-4">
+                  <p className="text-sm text-muted-foreground mb-4">
+                    Select a sack and specify the quantity to withdraw.
+                    Both the original and new sack will be tracked on the blockchain.
+                  </p>
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="sack-select">Select Sack</Label>
+                      <Select disabled={!sacks || sacks.length === 0}>
+                        <SelectTrigger id="sack-select">
+                          <SelectValue placeholder="Select a sack" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {sacks && sacks.map(s => (
+                            <SelectItem key={s.id} value={s.id.toString()}>
+                              Sack #{s.sackId} - {s.weight} {s.measurementUnit}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <Label htmlFor="withdraw-quantity">Withdrawal Quantity (kg)</Label>
+                      <Input id="withdraw-quantity" type="number" placeholder="25" />
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <Label htmlFor="reason">Reason for Withdrawal</Label>
+                      <Textarea id="reason" placeholder="Reason for partial withdrawal" />
+                    </div>
+                  </div>
+                </div>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction onClick={() => {
+                    toast({
+                      title: "Feature Coming Soon",
+                      description: "Partial withdrawal will be available in the next update.",
+                    });
+                  }}>
+                    Process Withdrawal
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
             
             <Button className="w-full justify-start" variant="outline" disabled={!sacks || sacks.length === 0}>
               <QrCode className="mr-2 h-4 w-4" />
@@ -275,6 +353,56 @@ export default function ReceiptSacksPage() {
           onSackUpdated={refetchSacks}
         />
       </div>
+      
+      {/* Demo visualization of partial withdrawal - will be hidden in production until actual partial withdrawals exist */}
+      {sacks && sacks.length > 0 && (
+        <div className="my-12">
+          <h2 className="text-xl font-semibold mb-6">Sample Partial Withdrawal Visualization</h2>
+          <p className="text-sm text-muted-foreground mb-6">
+            This demonstrates how partial withdrawals will be visualized with blockchain tracking. The animation shows how the system will track splits of physical sacks.
+          </p>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <PartialWithdrawalVisualization 
+              withdrawalData={{
+                id: 1,
+                originalSackId: sacks[0].id,
+                newSackId: 999,
+                withdrawnWeight: 15,
+                remainingWeight: 35,
+                timestamp: new Date().toISOString(),
+                reason: "Sample withdrawal for quality testing",
+                blockchainHash: "0x872de28b880dca45e9a0dedff473c44cd7e50c40bb7c9c3b2921ee22e69cc21e"
+              }}
+              onViewSack={(id) => {
+                if (id === 999) {
+                  toast({
+                    title: "Demo Only",
+                    description: "This is just a visualization demo, no actual withdrawal exists yet."
+                  });
+                } else {
+                  window.location.href = `/commodity-sacks/${id}/details`;
+                }
+              }}
+            />
+            
+            <div className="bg-muted p-6 rounded-lg flex flex-col justify-center">
+              <h3 className="text-lg font-semibold mb-4">Blockchain Traceability</h3>
+              <p className="mb-4">
+                Each partial withdrawal is recorded on the blockchain, creating a secure, immutable record of:
+              </p>
+              <ul className="list-disc list-inside space-y-2 mb-6">
+                <li>Original sack identity and weight</li>
+                <li>New sack created from the partial withdrawal</li>
+                <li>Timestamp and authorized user who performed the withdrawal</li>
+                <li>Complete chain of custody for regulatory compliance</li>
+              </ul>
+              <p className="text-sm text-muted-foreground italic">
+                Note: This visualization is a technology demo. Actual partial withdrawals will be tracked and verified on the blockchain in real-time.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
