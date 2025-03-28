@@ -29,6 +29,7 @@ import { Loader2, Upload, FileText, Camera, FileUp, ExternalLink, AlertCircle } 
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
+import { DocumentProcessingDialog } from "./DocumentProcessingDialog";
 
 interface UploadReceiptDialogProps {
   isOpen: boolean;
@@ -43,6 +44,7 @@ export default function UploadReceiptDialog({ isOpen, onClose }: UploadReceiptDi
   const [file, setFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [sourceType, setSourceType] = useState<string>("wdra");
+  const [showProcessingDialog, setShowProcessingDialog] = useState(false);
   const [manualInputs, setManualInputs] = useState({
     receiptNumber: "",
     warehouseName: "",
@@ -86,6 +88,56 @@ export default function UploadReceiptDialog({ isOpen, onClose }: UploadReceiptDi
 
   // Handle form submission
   const handleSubmit = async () => {
+    try {
+      // For file upload, show processing dialog
+      if ((uploadMethod === "file" || uploadMethod === "photo") && file) {
+        setShowProcessingDialog(true);
+        // Hide the upload dialog
+        onClose();
+        return;
+      }
+      // For manual entry, show processing dialog
+      else if (uploadMethod === "manual") {
+        // Validate required fields
+        if (!manualInputs.receiptNumber || !manualInputs.warehouseName || 
+            !manualInputs.commodityName || !manualInputs.quantity) {
+          toast({
+            title: "Missing Information",
+            description: "Please fill in all required fields",
+            variant: "destructive",
+          });
+          return;
+        }
+        
+        setShowProcessingDialog(true);
+        // Hide the upload dialog
+        onClose();
+        return;
+      }
+      
+      // If there's no file selected
+      if ((uploadMethod === "file" || uploadMethod === "photo") && !file) {
+        toast({
+          title: "Missing File",
+          description: uploadMethod === "file" 
+            ? "Please select a receipt file to upload" 
+            : "Please take or select a photo of the receipt",
+          variant: "destructive",
+        });
+        return;
+      }
+    } catch (error) {
+      console.error("Error in form submission:", error);
+      toast({
+        title: "Upload Failed",
+        description: error instanceof Error ? error.message : "Failed to process the form. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Legacy direct submission method (used as fallback)
+  const handleDirectSubmit = async () => {
     try {
       setIsSubmitting(true);
 
@@ -213,20 +265,40 @@ export default function UploadReceiptDialog({ isOpen, onClose }: UploadReceiptDi
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>Upload External Warehouse Receipt</DialogTitle>
-          <DialogDescription>
-            Upload receipts from other warehouses to integrate with TradeWiser
-          </DialogDescription>
-        </DialogHeader>
+    <>
+      {/* Document Processing Dialog */}
+      {showProcessingDialog && (
+        <DocumentProcessingDialog
+          isOpen={showProcessingDialog}
+          onClose={() => {
+            setShowProcessingDialog(false);
+            queryClient.invalidateQueries({ queryKey: ['/api/receipts'] });
+          }}
+          uploadData={file ? {
+            file,
+            fileName: file.name,
+            fileType: file.type,
+            fileUrl: previewUrl || undefined
+          } : undefined}
+          channelType="orange"
+        />
+      )}
+      
+      {/* Main Upload Dialog */}
+      <Dialog open={isOpen} onOpenChange={handleClose}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Upload External Warehouse Receipt</DialogTitle>
+            <DialogDescription>
+              Upload receipts from other warehouses to integrate with TradeWiser
+            </DialogDescription>
+          </DialogHeader>
 
-        <Tabs 
-          value={uploadMethod} 
-          onValueChange={(value) => setUploadMethod(value as "file" | "photo" | "manual")}
-          className="w-full mt-2"
-        >
+          <Tabs 
+            value={uploadMethod} 
+            onValueChange={(value) => setUploadMethod(value as "file" | "photo" | "manual")}
+            className="w-full mt-2"
+          >
           <TabsList className="grid grid-cols-3">
             <TabsTrigger value="file">File Upload</TabsTrigger>
             <TabsTrigger value="photo">Photo Scan</TabsTrigger>
@@ -441,5 +513,6 @@ export default function UploadReceiptDialog({ isOpen, onClose }: UploadReceiptDi
         </DialogFooter>
       </DialogContent>
     </Dialog>
+    </>
   );
 }

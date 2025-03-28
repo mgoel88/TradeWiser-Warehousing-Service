@@ -1044,6 +1044,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { 
         receiptNumber, 
         warehouseName, 
+        warehouseAddress,
         warehouseLocation, 
         commodityName, 
         quantity, 
@@ -1052,14 +1053,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
         expiryDate, 
         externalId, 
         externalSource, 
-        channelType 
+        channelType,
+        location, // For Red Channel (self-storage location)
+        measurementUnit,
+        valuation,
+        description,
+        metadata
       } = req.body;
       
-      // Validate required fields
-      if (!receiptNumber || !warehouseName || !commodityName || !quantity) {
-        return res.status(400).json({ 
-          message: "Missing required fields: receipt number, warehouse name, commodity name, and quantity are required" 
-        });
+      // Special handling for Red Channel (self-certified)
+      const isRedChannel = channelType === 'red' || (metadata && metadata.isSelfCertified);
+      
+      // Different validation based on channel type
+      if (isRedChannel) {
+        // For Red Channel: only need receiptNumber, commodityName, quantity, and location
+        if (!receiptNumber || !commodityName || !quantity || !location) {
+          return res.status(400).json({ 
+            message: "Missing required fields: receiptNumber, commodityName, quantity, and location are required for self-certification" 
+          });
+        }
+      } else {
+        // For Orange Channel: need receiptNumber, warehouseName, commodityName, quantity
+        if (!receiptNumber || !commodityName || !quantity) {
+          return res.status(400).json({ 
+            message: "Missing required fields: receiptNumber, commodityName, and quantity are required" 
+          });
+        }
       }
       
       // Check if receipt with same external ID exists
@@ -1088,31 +1107,53 @@ export async function registerRoutes(app: Express): Promise<Server> {
         req.session.userId
       );
       
-      // Create the receipt
+      // Determine storage location based on channel type
+      const storageLocation = isRedChannel ? location : warehouseLocation;
+      
+      // Prepare metadata based on channel type
+      const receiptMetadata = isRedChannel
+        ? {
+            isSelfCertified: true,
+            certificationDate: new Date().toISOString(),
+            storageLocation: location,
+            channelType: 'red',
+            description: description || '',
+            ...(metadata || {})
+          }
+        : {
+            isExternal: true,
+            channelType: channelType || 'orange',
+            sourceType: externalSource || 'manual',
+            processingDate: new Date().toISOString(),
+            manuallyCreated: true,
+            ...(metadata || {})
+          };
+          
+      // Create the receipt with appropriate channel-specific data
       const receipt = await storage.createWarehouseReceipt({
         receiptNumber: formattedReceiptNumber,
-        warehouseName,
-        warehouseAddress: warehouseLocation,
+        warehouseName: isRedChannel ? 'Self-Certified Storage' : (warehouseName || 'External Warehouse'),
+        warehouseAddress: isRedChannel ? location : (warehouseAddress || warehouseLocation || 'External Location'),
         commodityName,
         quantity: quantity.toString(),
-        qualityGrade,
+        qualityGrade: qualityGrade || 'Standard',
+        measurementUnit: measurementUnit || 'MT',
         status: "active",
         ownerId: req.session.userId,
         externalId: externalId || formattedReceiptNumber,
-        externalSource: externalSource || 'manual',
+        externalSource: isRedChannel ? 'self-certified' : (externalSource || 'manual'),
         smartContractId,
+        valuation: valuation || null,
         attachmentUrl: null,
-        metadata: {
-          isExternal: true,
-          channelType: channelType || 'orange',
-          sourceType: externalSource || 'manual',
-          processingDate: new Date().toISOString(),
-          manuallyCreated: true
-        }
+        metadata: receiptMetadata
       });
       
+      const successMessage = isRedChannel 
+        ? "Self-certified receipt created successfully" 
+        : "External receipt created successfully";
+        
       res.status(201).json({
-        message: "External receipt created successfully",
+        message: successMessage,
         receipt
       });
     } catch (error) {
