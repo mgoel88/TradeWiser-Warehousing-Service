@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { FileText, Download, ExternalLink, Calendar, Clock, CreditCard, ArrowUpRight, FileCheck, Printer, ShieldCheck, Eye } from "lucide-react";
+import { FileText, Download, ExternalLink, Calendar, Clock, CreditCard, ArrowUpRight, FileCheck, Printer, ShieldCheck, Shield, Eye } from "lucide-react";
 import { WarehouseReceipt, Commodity, Warehouse } from "@shared/schema";
 import { formatDate } from "@/lib/utils";
 import { generateReceiptPDF, generatePlainTextReceipt } from '@/lib/receiptGenerator';
@@ -16,9 +16,11 @@ interface WarehouseReceiptCardProps {
   onView?: (receipt: WarehouseReceipt) => void;
   onPledge?: (receipt: WarehouseReceipt) => void;
   className?: string;
+  redChannelVariant?: boolean;
+  orangeChannelVariant?: boolean;
 }
 
-export default function WarehouseReceiptCard({ receipt, onView, onPledge, className = '' }: WarehouseReceiptCardProps) {
+export default function WarehouseReceiptCard({ receipt, onView, onPledge, className = '', redChannelVariant = false, orangeChannelVariant = false }: WarehouseReceiptCardProps) {
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   
   // Fetch commodity data for the receipt
@@ -89,7 +91,7 @@ export default function WarehouseReceiptCard({ receipt, onView, onPledge, classN
         warehouseAddress: warehouse?.address || "Unknown Location",
         valuationAmount: receipt.valuation ? `₹${receipt.valuation.toString()}` : "₹0",
         verificationCode: verificationCode,
-        smartContractId: receipt.smartContractId
+        smartContractId: receipt.smartContractId || ""
       };
       
       // Generate the PDF
@@ -113,6 +115,8 @@ export default function WarehouseReceiptCard({ receipt, onView, onPledge, classN
   
   // Determine if this is an Orange Channel (third-party) receipt
   const isOrangeChannel = React.useMemo(() => {
+    if (orangeChannelVariant) return true;
+    
     if (receipt.metadata && typeof receipt.metadata === 'object') {
       const metadata = receipt.metadata as Record<string, any>;
       return metadata.channelType === 'orange' || metadata.isExternal === true;
@@ -120,7 +124,19 @@ export default function WarehouseReceiptCard({ receipt, onView, onPledge, classN
     
     // Also check if it has an externalSource as fallback
     return !!receipt.externalSource;
-  }, [receipt]);
+  }, [receipt, orangeChannelVariant]);
+  
+  // Determine if this is a Red Channel (self-certified) receipt
+  const isRedChannel = React.useMemo(() => {
+    if (redChannelVariant) return true;
+    
+    if (receipt.metadata && typeof receipt.metadata === 'object') {
+      const metadata = receipt.metadata as Record<string, any>;
+      return metadata.channelType === 'red' || metadata.isSelfCertified === true;
+    }
+    
+    return false;
+  }, [receipt, redChannelVariant]);
   
   // Determine card background based on channel type
   const cardBackground = React.useMemo(() => {
@@ -128,9 +144,15 @@ export default function WarehouseReceiptCard({ receipt, onView, onPledge, classN
       // Orange Channel receipt - use orange gradient
       return `linear-gradient(135deg, #ff8c00, #e25822)`;
     }
+    
+    if (isRedChannel) {
+      // Red Channel receipt - use red gradient
+      return `linear-gradient(135deg, #d32f2f, #b71c1c)`;
+    }
+    
     // Default Green Channel receipt - use dark gradient
     return `linear-gradient(135deg, #1a1a1a, #333)`;
-  }, [isOrangeChannel]);
+  }, [isOrangeChannel, isRedChannel]);
   
   // Styled card view like a real credit card
   return (
@@ -216,6 +238,11 @@ export default function WarehouseReceiptCard({ receipt, onView, onPledge, classN
                   <ExternalLink className="h-4 w-4 mr-1 text-orange-500" />
                   External Warehouse Receipt (Orange Channel)
                 </span>
+              ) : isRedChannel ? (
+                <span className="flex items-center">
+                  <Shield className="h-4 w-4 mr-1 text-red-500" />
+                  Self-Certified Commodity Receipt (Red Channel)
+                </span>
               ) : (
                 <span>Electronic Warehouse Receipt (eWR) details and actions</span>
               )}
@@ -256,7 +283,10 @@ export default function WarehouseReceiptCard({ receipt, onView, onPledge, classN
                 </div>
                 <div>
                   <p className="font-medium">Type</p>
-                  <p className="text-muted-foreground">{receipt.receiptType || "Standard"}</p>
+                  <p className="text-muted-foreground">
+                    {(receipt.metadata && typeof receipt.metadata === 'object' && (receipt.metadata as any).receiptType) || 
+                    (isRedChannel ? "Self-Certified" : isOrangeChannel ? "External" : "Standard")}
+                  </p>
                 </div>
               </div>
             </div>
@@ -374,6 +404,37 @@ export default function WarehouseReceiptCard({ receipt, onView, onPledge, classN
               </div>
             )}
             
+            {/* Red Channel Info - Only shown for Red Channel (self-certified) receipts */}
+            {isRedChannel && (
+              <div className="bg-red-50 p-3 rounded-md mt-4 border border-red-200">
+                <div className="flex items-center mb-1">
+                  <Shield className="h-4 w-4 mr-2 text-red-600" />
+                  <h3 className="text-sm font-medium text-red-700">Self-Certified Commodity</h3>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
+                  <div>
+                    <p className="text-xs text-muted-foreground">Certification Type</p>
+                    <p className="text-sm text-red-700">
+                      {receipt.metadata && typeof receipt.metadata === 'object' 
+                        ? (receipt.metadata as any).certificationType || 'Self-Declaration' 
+                        : 'Self-Declaration'}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Storage Type</p>
+                    <p className="text-sm text-red-700">
+                      {receipt.metadata && typeof receipt.metadata === 'object' 
+                        ? (receipt.metadata as any).storageType || 'Personal Storage' 
+                        : 'Personal Storage'}
+                    </p>
+                  </div>
+                </div>
+                <p className="text-xs text-red-600/80 mt-2">
+                  This is a self-certified commodity receipt registered through the Red Channel. The commodity information and valuation are based on self-declaration.
+                </p>
+              </div>
+            )}
+            
             {/* Smart Contract Info */}
             <div className="bg-muted p-3 rounded-md mt-4">
               <div className="flex items-center mb-1">
@@ -384,7 +445,7 @@ export default function WarehouseReceiptCard({ receipt, onView, onPledge, classN
                 <div>
                   <p className="text-xs text-muted-foreground">Smart Contract ID</p>
                   <p className="font-mono text-xs bg-background p-1 rounded mt-1">
-                    {receipt.smartContractId || `SC-${receipt.id}-${Date.now().toString(16).slice(-6)}`}
+                    {receipt.smartContractId || `SC-${receipt.id || '0'}-${Date.now().toString(16).slice(-6)}`}
                   </p>
                 </div>
                 <div>
@@ -424,7 +485,7 @@ export default function WarehouseReceiptCard({ receipt, onView, onPledge, classN
                       warehouseAddress: warehouse?.address || "Unknown Location",
                       valuationAmount: receipt.valuation ? `₹${receipt.valuation.toString()}` : "₹0",
                       verificationCode: verificationCode,
-                      smartContractId: receipt.smartContractId || ""
+                      smartContractId: receipt.smartContractId || undefined
                     };
                     
                     const textReceipt = generatePlainTextReceipt(receiptData);
@@ -459,7 +520,7 @@ export default function WarehouseReceiptCard({ receipt, onView, onPledge, classN
                       warehouseAddress: warehouse?.address || "Unknown Location",
                       valuationAmount: receipt.valuation ? `₹${receipt.valuation.toString()}` : "₹0",
                       verificationCode: verificationCode,
-                      smartContractId: receipt.smartContractId
+                      smartContractId: receipt.smartContractId || undefined
                     };
                     
                     // Generate PDF and create object URL
