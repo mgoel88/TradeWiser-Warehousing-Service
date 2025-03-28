@@ -31,6 +31,13 @@ export default function LoansPage() {
     queryClient.invalidateQueries({ queryKey: ['/api/loans'] });
   };
   
+  // Handle apply for loan button click
+  const handleApplyForLoan = () => {
+    setShowNewLoanForm(true);
+    // Scroll to top for better visibility of the form
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+  
   // Filter loans by status
   const getFilteredLoans = () => {
     if (!loans) return [];
@@ -75,17 +82,18 @@ export default function LoansPage() {
               if (showNewLoanForm) {
                 handleCloseLoanForm();
               } else {
-                setShowNewLoanForm(true);
+                handleApplyForLoan();
               }
             }}
             className="gap-2"
+            variant={showNewLoanForm ? "outline" : "default"}
           >
             {showNewLoanForm ? (
-              "Cancel New Loan"
+              "Cancel Application"
             ) : (
               <>
                 <PlusCircle className="h-4 w-4" />
-                Apply for New Loan
+                Apply for Loan
               </>
             )}
           </Button>

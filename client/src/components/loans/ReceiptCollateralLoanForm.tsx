@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiRequest } from '@/lib/queryClient';
 import { useLocation } from 'wouter';
 import { motion } from 'framer-motion';
-import { CheckSquare2, DollarSign, AlertCircle, CreditCard } from 'lucide-react';
+import { CheckSquare2, DollarSign, AlertCircle, CreditCard, BadgeIndianRupee } from 'lucide-react';
 import { Slider } from '@/components/ui/slider';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -11,6 +11,8 @@ import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 
 interface Receipt {
   id: number;
@@ -92,7 +94,9 @@ export function ReceiptCollateralLoanForm({ onSuccess }: ReceiptCollateralLoanFo
       
       toast({
         title: "Loan created successfully",
-        description: `Your overdraft facility for ₹${data.maxLendingValue.toLocaleString()} is now available`,
+        description: data && data.maxLendingValue ? 
+          `Your overdraft facility for ₹${Number(data.maxLendingValue).toLocaleString()} is now available` :
+          "Your loan application has been submitted successfully",
       });
       
       // Call the onSuccess callback if provided
@@ -162,86 +166,100 @@ export function ReceiptCollateralLoanForm({ onSuccess }: ReceiptCollateralLoanFo
 
   return (
     <form onSubmit={handleSubmit}>
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2">
-          <Card className="w-full">
-            <CardHeader>
-              <CardTitle>Select Collateral</CardTitle>
-              <CardDescription>
-                Choose the warehouse receipts you want to use as collateral
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
+      <Card className="w-full max-w-4xl mx-auto">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <BadgeIndianRupee className="h-5 w-5 text-primary" />
+            Apply for a Loan
+          </CardTitle>
+          <CardDescription>
+            Use your warehouse receipts as collateral to get a flexible credit line
+          </CardDescription>
+        </CardHeader>
+        
+        <CardContent>
+          <div className="grid gap-6 md:grid-cols-2">
+            {/* Step 1: Select collateral */}
+            <div className="md:col-span-2">
+              <h3 className="text-lg font-medium mb-2">Step 1: Select Your Collateral</h3>
+              <p className="text-sm text-muted-foreground mb-4">
+                Choose one or more receipts to use as collateral for your loan
+              </p>
+              
+              <div className="space-y-3 max-h-[300px] overflow-y-auto rounded-md border p-4">
                 {availableCollateral.map((receipt: Receipt) => (
                   <motion.div
                     key={receipt.id}
                     whileHover={{ scale: 1.01 }}
-                    className={`border rounded-lg p-4 cursor-pointer ${
+                    className={`border rounded-lg p-3 cursor-pointer transition-colors ${
                       selectedReceipts[receipt.id] ? 'border-primary bg-primary/5' : 'border-border'
                     }`}
                     onClick={() => toggleReceiptSelection(receipt.id)}
                   >
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <h3 className="font-medium text-base">{receipt.receiptNumber}</h3>
-                        <p className="text-sm text-muted-foreground">
-                          {receipt.quantity} of {receipt.commodityName}
-                        </p>
-                        <p className="text-xs text-muted-foreground mt-1">
-                          Stored at: {receipt.warehouseName}
-                        </p>
+                    <div className="flex justify-between items-center">
+                      <div className="flex items-center gap-3">
+                        <Checkbox 
+                          checked={!!selectedReceipts[receipt.id]} 
+                          onCheckedChange={() => toggleReceiptSelection(receipt.id)}
+                        />
+                        <div>
+                          <h4 className="font-medium">{receipt.receiptNumber}</h4>
+                          <p className="text-sm text-muted-foreground">
+                            {receipt.quantity} of {receipt.commodityName}
+                          </p>
+                        </div>
                       </div>
                       <div className="text-right">
-                        <div className="font-medium">₹{receipt.marketValue.toLocaleString()}</div>
-                        <div className="text-sm text-primary">
-                          Loan value: ₹{receipt.maxLendingValue.toLocaleString()}
+                        <div className="font-medium">
+                          ₹{typeof receipt.maxLendingValue === 'number' ? 
+                            receipt.maxLendingValue.toLocaleString() : 'N/A'}
                         </div>
-                        {selectedReceipts[receipt.id] && (
-                          <CheckSquare2 className="h-5 w-5 text-primary ml-auto mt-2" />
-                        )}
+                        <div className="text-xs text-muted-foreground">Available credit</div>
                       </div>
                     </div>
                   </motion.div>
                 ))}
               </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        <div>
-          <Card className="w-full sticky top-4">
-            <CardHeader>
-              <CardTitle>Loan Summary</CardTitle>
-              <CardDescription>Overdraft credit facility details</CardDescription>
-            </CardHeader>
-            <CardContent>
+            </div>
+            
+            {/* Step 2: Configure loan */}
+            <div className="md:col-span-2 pt-4">
+              <h3 className="text-lg font-medium mb-2">Step 2: Set Loan Amount</h3>
+              <p className="text-sm text-muted-foreground mb-4">
+                Decide how much of your available credit line you want to use now
+              </p>
+              
+              <div className="bg-muted/30 p-4 rounded-lg mb-6">
+                <div className="grid grid-cols-2 gap-4 mb-4">
+                  <div>
+                    <h4 className="text-sm font-medium mb-1">Total Collateral Value</h4>
+                    <p className="text-xl font-semibold">₹{totalCollateralValue.toLocaleString()}</p>
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-medium mb-1">Available Credit Line</h4>
+                    <p className="text-xl font-semibold text-primary">₹{totalMaxLending.toLocaleString()}</p>
+                  </div>
+                </div>
+                
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Collateral Ratio:</span>
+                    <span>80%</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Interest Rate:</span>
+                    <span>12.5% p.a.</span>
+                  </div>
+                </div>
+              </div>
+              
               <div className="space-y-4">
-                <div className="flex justify-between">
-                  <span className="text-sm">Collateral Value:</span>
-                  <span className="font-medium">₹{totalCollateralValue.toLocaleString()}</span>
-                </div>
-                <div className="flex justify-between text-primary">
-                  <span className="text-sm">Available Credit Limit:</span>
-                  <span className="font-medium">₹{totalMaxLending.toLocaleString()}</span>
-                </div>
-                <div className="flex justify-between text-muted-foreground">
-                  <span className="text-sm">Collateral Ratio:</span>
-                  <span>80%</span>
-                </div>
-                <div className="flex justify-between text-muted-foreground">
-                  <span className="text-sm">Interest Rate:</span>
-                  <span>12.5% p.a.</span>
-                </div>
-
-                <Separator className="my-4" />
-
                 <div>
                   <Label htmlFor="drawdown" className="mb-2 block">
                     Initial Drawdown Amount:
                   </Label>
-                  <div className="flex items-center gap-2 mb-2">
-                    <CreditCard className="w-4 h-4 text-muted-foreground" />
+                  <div className="flex items-center gap-2 mb-4">
+                    <DollarSign className="w-5 h-5 text-muted-foreground" />
                     <Input
                       id="drawdown"
                       type="number"
@@ -249,10 +267,12 @@ export function ReceiptCollateralLoanForm({ onSuccess }: ReceiptCollateralLoanFo
                       max={totalMaxLending}
                       value={initialDrawdown}
                       onChange={(e) => setInitialDrawdown(Number(e.target.value))}
-                      className="w-full"
+                      className="w-full text-lg"
+                      placeholder="Enter amount to withdraw now"
                       disabled={selectedReceiptIds.length === 0}
                     />
                   </div>
+                  
                   <Slider
                     value={[initialDrawdown]}
                     max={totalMaxLending}
@@ -261,46 +281,57 @@ export function ReceiptCollateralLoanForm({ onSuccess }: ReceiptCollateralLoanFo
                     disabled={selectedReceiptIds.length === 0}
                     className="my-4"
                   />
+                  
                   <div className="flex justify-between text-xs text-muted-foreground">
                     <span>₹0</span>
                     <span>₹{totalMaxLending.toLocaleString()}</span>
                   </div>
                 </div>
-
-                <div className="mt-6 p-3 rounded-lg bg-muted/50">
-                  <div className="flex justify-between font-medium">
-                    <span>Initial Drawdown:</span>
-                    <span>₹{initialDrawdown.toLocaleString()}</span>
-                  </div>
-                  <div className="flex justify-between mt-1 text-muted-foreground text-sm">
-                    <span>Remaining Credit:</span>
-                    <span>₹{(totalMaxLending - initialDrawdown).toLocaleString()}</span>
-                  </div>
-                </div>
+                
+                <Alert variant="outline" className="mt-4">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertTitle>Flexible Credit Line</AlertTitle>
+                  <AlertDescription>
+                    You only pay interest on the amount you withdraw. The remaining credit is available anytime.
+                  </AlertDescription>
+                </Alert>
               </div>
-            </CardContent>
-            <CardFooter>
-              <Button
-                className="w-full"
-                type="submit"
-                disabled={selectedReceiptIds.length === 0 || isSubmitting}
-              >
-                {isSubmitting ? (
-                  <>
-                    <div className="animate-spin mr-2 h-4 w-4 border-2 border-current border-t-transparent rounded-full" />
-                    Processing...
-                  </>
-                ) : (
-                  <>
-                    <DollarSign className="mr-2 h-4 w-4" />
-                    Create Overdraft Facility
-                  </>
-                )}
-              </Button>
-            </CardFooter>
-          </Card>
-        </div>
-      </div>
+            </div>
+          </div>
+        </CardContent>
+        
+        <CardFooter className="flex flex-col gap-4 sm:flex-row sm:justify-between">
+          <div className="p-3 rounded-lg bg-muted/50 w-full sm:w-auto">
+            <div className="flex justify-between font-medium">
+              <span className="mr-4">Initial Drawdown:</span>
+              <span>₹{initialDrawdown.toLocaleString()}</span>
+            </div>
+            <div className="flex justify-between mt-1 text-muted-foreground text-sm">
+              <span className="mr-4">Available Credit:</span>
+              <span>₹{(totalMaxLending - initialDrawdown).toLocaleString()}</span>
+            </div>
+          </div>
+          
+          <Button
+            className="w-full sm:w-auto"
+            type="submit"
+            disabled={selectedReceiptIds.length === 0 || isSubmitting}
+            size="lg"
+          >
+            {isSubmitting ? (
+              <>
+                <div className="animate-spin mr-2 h-4 w-4 border-2 border-current border-t-transparent rounded-full" />
+                Processing...
+              </>
+            ) : (
+              <>
+                <DollarSign className="mr-2 h-4 w-4" />
+                Apply for Loan
+              </>
+            )}
+          </Button>
+        </CardFooter>
+      </Card>
     </form>
   );
 }
