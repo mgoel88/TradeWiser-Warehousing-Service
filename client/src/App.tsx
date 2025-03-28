@@ -20,6 +20,8 @@ import PaymentsPage from "@/pages/PaymentsPage";
 import GreenChannelPage from "@/pages/GreenChannelPage";
 import OrangeChannelPage from "@/pages/OrangeChannelPage";
 import RedChannelPage from "@/pages/RedChannelPage";
+import ReceiptSacksPage from "@/pages/ReceiptSacksPage";
+import SackDetailPage from "@/pages/SackDetailPage";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -41,6 +43,9 @@ function Router() {
       <Route path="/green-channel" component={GreenChannelPage} />
       <Route path="/orange-channel" component={OrangeChannelPage} />
       <Route path="/red-channel" component={RedChannelPage} />
+      {/* New sack management routes */}
+      <Route path="/receipt/:id/sacks" component={ReceiptSacksPage} />
+      <Route path="/commodity-sacks/:id/details" component={SackDetailPage} />
       <Route component={NotFound} />
     </Switch>
   );

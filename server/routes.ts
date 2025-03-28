@@ -2051,5 +2051,376 @@ export async function registerRoutes(app: Express): Promise<Server> {
   (global as any).broadcastProcessUpdate = broadcastProcessUpdate;
   (global as any).broadcastEntityUpdate = broadcastEntityUpdate;
 
+  // Commodity Sack routes for granular blockchain tracking
+  apiRouter.get("/commodity-sacks", async (req: Request, res: Response) => {
+    try {
+      // Check if user is authenticated
+      if (!req.session || !req.session.userId) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+      
+      // Filter parameters
+      const receiptId = req.query.receiptId ? parseInt(req.query.receiptId as string) : undefined;
+      const warehouseId = req.query.warehouseId ? parseInt(req.query.warehouseId as string) : undefined;
+      
+      let sacks;
+      if (receiptId) {
+        sacks = await storage.listCommoditySacksByReceipt(receiptId);
+      } else if (warehouseId) {
+        sacks = await storage.listCommoditySacksByWarehouse(warehouseId);
+      } else {
+        // Default to returning user's own sacks
+        sacks = await storage.listCommoditySacksByOwner(req.session.userId);
+      }
+      
+      res.json(sacks);
+    } catch (error: any) {
+      console.error("Error fetching commodity sacks:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+  
+  apiRouter.get("/commodity-sacks/:id", async (req: Request, res: Response) => {
+    try {
+      // Check if user is authenticated
+      if (!req.session || !req.session.userId) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+      
+      const sackId = parseInt(req.params.id);
+      const sack = await storage.getCommoditySack(sackId);
+      
+      if (!sack) {
+        res.status(404).json({ error: "Commodity sack not found" });
+        return;
+      }
+      
+      res.json(sack);
+    } catch (error: any) {
+      console.error("Error fetching commodity sack:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+  
+  apiRouter.get("/commodity-sacks/scan/:sackId", async (req: Request, res: Response) => {
+    try {
+      // Check if user is authenticated
+      if (!req.session || !req.session.userId) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+      
+      const sackIdString = req.params.sackId;
+      const sack = await storage.getCommoditySackBySackId(sackIdString);
+      
+      if (!sack) {
+        res.status(404).json({ error: "Commodity sack not found with given sack ID" });
+        return;
+      }
+      
+      res.json(sack);
+    } catch (error: any) {
+      console.error("Error fetching commodity sack by sack ID:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+  
+  apiRouter.post("/commodity-sacks", async (req: Request, res: Response) => {
+    try {
+      // Check if user is authenticated
+      if (!req.session || !req.session.userId) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+      
+      const userId = req.session.userId;
+      const result = insertCommoditySackSchema.safeParse(req.body);
+      
+      if (!result.success) {
+        res.status(400).json({ error: result.error.flatten() });
+        return;
+      }
+      
+      // Make sure the owner is set to the current user
+      const sackData = {
+        ...result.data,
+        ownerId: result.data.ownerId || userId
+      };
+      
+      const sack = await storage.createCommoditySack(sackData);
+      res.status(201).json(sack);
+    } catch (error: any) {
+      console.error("Error creating commodity sack:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+  
+  apiRouter.post("/commodity-sacks/batch", async (req: Request, res: Response) => {
+    try {
+      // Check if user is authenticated
+      if (!req.session || !req.session.userId) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+      
+      const userId = req.session.userId;
+      const { receiptId, count, weightPerSack = 50, ...commonData } = req.body;
+      
+      if (!receiptId || !count || count <= 0 || count > 1000) {
+        res.status(400).json({ error: "Invalid request. Count must be between 1 and 1000" });
+        return;
+      }
+      
+      // Get the receipt to associate sacks with
+      const receipt = await storage.getWarehouseReceipt(receiptId);
+      if (!receipt) {
+        res.status(404).json({ error: "Warehouse receipt not found" });
+        return;
+      }
+      
+      // Check if user owns the receipt
+      if (receipt.ownerId !== userId) {
+        res.status(403).json({ error: "You can only create sacks for receipts you own" });
+        return;
+      }
+      
+      // Create batch of sacks
+      const sacks: InsertCommoditySack[] = [];
+      for (let i = 0; i < count; i++) {
+        // Generate unique sack ID with format: SC-{receiptId}-{timestamp}-{index}
+        const timestamp = Date.now().toString(36);
+        const sackId = `SC-${receiptId}-${timestamp}-${i+1}`;
+        
+        sacks.push({
+          sackId,
+          receiptId,
+          commodityId: receipt.commodityId,
+          weight: weightPerSack,
+          measurementUnit: 'kg',
+          ownerId: userId,
+          warehouseId: receipt.warehouseId,
+          barcodeData: sackId,
+          status: 'active',
+          ...(commonData || {})
+        });
+      }
+      
+      const createdSacks = await storage.createManyCommoditySacks(sacks);
+      res.status(201).json({ 
+        message: `Created ${createdSacks.length} commodity sacks`,
+        count: createdSacks.length,
+        sacks: createdSacks
+      });
+    } catch (error: any) {
+      console.error("Error creating batch of commodity sacks:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+  
+  apiRouter.post("/commodity-sacks/:id/transfer", async (req: Request, res: Response) => {
+    try {
+      // Check if user is authenticated
+      if (!req.session || !req.session.userId) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+      
+      const userId = req.session.userId;
+      const sackId = parseInt(req.params.id);
+      const { toUserId, toWarehouseId, transferNotes } = req.body;
+      
+      if (!toUserId && !toWarehouseId) {
+        res.status(400).json({ error: "Either toUserId or toWarehouseId must be provided" });
+        return;
+      }
+      
+      // Get the sack
+      const sack = await storage.getCommoditySack(sackId);
+      if (!sack) {
+        res.status(404).json({ error: "Commodity sack not found" });
+        return;
+      }
+      
+      // Check if user owns the sack
+      if (sack.ownerId !== userId) {
+        res.status(403).json({ error: "You can only transfer sacks you own" });
+        return;
+      }
+      
+      // Prepare transfer data
+      const movementType = toUserId ? 'ownership_transfer' : 'warehouse_transfer';
+      const movement: InsertSackMovement = {
+        sackId,
+        fromLocationId: sack.warehouseId,
+        toLocationId: toWarehouseId || sack.warehouseId,
+        fromOwnerId: userId,
+        toOwnerId: toUserId || userId,
+        movementType,
+        metadata: { notes: transferNotes }
+      };
+      
+      // Create blockchain transaction for the transfer
+      const { generateBlockchainTransaction } = await import("./services/BlockchainService");
+      const transactionData = {
+        sackId: sack.sackId,
+        fromUserId: userId,
+        toUserId: toUserId || userId,
+        fromWarehouseId: sack.warehouseId,
+        toWarehouseId: toWarehouseId || sack.warehouseId,
+        timestamp: new Date().toISOString(),
+        type: movementType
+      };
+      
+      const transactionHash = await generateBlockchainTransaction(transactionData);
+      movement.transactionHash = transactionHash;
+      
+      // Record the movement
+      const createdMovement = await storage.createSackMovement(movement);
+      
+      // Update the sack with new owner or warehouse
+      const updateData: Partial<InsertCommoditySack> = { 
+        lastUpdated: new Date(),
+        blockchainHash: transactionHash 
+      };
+      
+      if (toUserId) {
+        updateData.ownerId = toUserId;
+      }
+      
+      if (toWarehouseId) {
+        updateData.warehouseId = toWarehouseId;
+      }
+      
+      const updatedSack = await storage.updateCommoditySack(sackId, updateData);
+      
+      // Broadcast the update via WebSocket
+      const broadcastUpdate = (global as any).broadcastEntityUpdate;
+      if (typeof broadcastUpdate === 'function') {
+        broadcastUpdate('commodity_sack', updatedSack);
+      }
+      
+      res.json({
+        movement: createdMovement,
+        sack: updatedSack,
+        transactionHash
+      });
+    } catch (error: any) {
+      console.error("Error transferring commodity sack:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+  
+  apiRouter.post("/commodity-sacks/:id/quality-assessment", async (req: Request, res: Response) => {
+    try {
+      // Check if user is authenticated
+      if (!req.session || !req.session.userId) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+      
+      const userId = req.session.userId;
+      const sackId = parseInt(req.params.id);
+      const { qualityParameters, gradeAssigned, notes, attachmentUrls } = req.body;
+      
+      if (!qualityParameters) {
+        res.status(400).json({ error: "Quality parameters are required" });
+        return;
+      }
+      
+      // Get the sack
+      const sack = await storage.getCommoditySack(sackId);
+      if (!sack) {
+        res.status(404).json({ error: "Commodity sack not found" });
+        return;
+      }
+      
+      // Prepare assessment data
+      const assessment: InsertSackQualityAssessment = {
+        sackId,
+        inspectorId: userId,
+        qualityParameters,
+        gradeAssigned,
+        notes,
+        attachmentUrls: attachmentUrls || []
+      };
+      
+      // Create blockchain entry for the quality assessment
+      const { generateBlockchainTransaction } = await import("./services/BlockchainService");
+      const transactionData = {
+        sackId: sack.sackId,
+        inspectorId: userId,
+        qualityParameters,
+        gradeAssigned,
+        timestamp: new Date().toISOString(),
+        type: 'quality_assessment'
+      };
+      
+      const transactionHash = await generateBlockchainTransaction(transactionData);
+      assessment.blockchainHash = transactionHash;
+      
+      // Record the assessment
+      const createdAssessment = await storage.createSackQualityAssessment(assessment);
+      
+      // Update the sack with new quality info
+      const updateData: Partial<InsertCommoditySack> = { 
+        qualityParameters,
+        gradeAssigned,
+        lastInspectionDate: new Date(),
+        lastUpdated: new Date(),
+        blockchainHash: transactionHash 
+      };
+      
+      const updatedSack = await storage.updateCommoditySack(sackId, updateData);
+      
+      // Broadcast the update via WebSocket
+      const broadcastUpdate = (global as any).broadcastEntityUpdate;
+      if (typeof broadcastUpdate === 'function') {
+        broadcastUpdate('commodity_sack', updatedSack);
+      }
+      
+      res.json({
+        assessment: createdAssessment,
+        sack: updatedSack,
+        transactionHash
+      });
+    } catch (error: any) {
+      console.error("Error creating quality assessment:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+  
+  apiRouter.get("/commodity-sacks/:id/movements", async (req: Request, res: Response) => {
+    try {
+      // Check if user is authenticated
+      if (!req.session || !req.session.userId) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+      
+      const sackId = parseInt(req.params.id);
+      
+      // Get movement history
+      const movements = await storage.getSackMovementHistory(sackId);
+      
+      res.json(movements);
+    } catch (error: any) {
+      console.error("Error fetching sack movements:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+  
+  apiRouter.get("/commodity-sacks/:id/quality-history", async (req: Request, res: Response) => {
+    try {
+      // Check if user is authenticated
+      if (!req.session || !req.session.userId) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+      
+      const sackId = parseInt(req.params.id);
+      
+      // Get quality assessment history
+      const assessments = await storage.listSackQualityAssessments(sackId);
+      
+      res.json(assessments);
+    } catch (error: any) {
+      console.error("Error fetching quality history:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   return httpServer;
 }

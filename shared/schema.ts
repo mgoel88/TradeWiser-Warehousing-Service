@@ -47,6 +47,7 @@ export const receiptStatusEnum = pgEnum('receipt_status', ['active', 'processing
 export const loanStatusEnum = pgEnum('loan_status', ['pending', 'active', 'repaid', 'defaulted']);
 export const processStatusEnum = pgEnum('process_status', ['pending', 'in_progress', 'completed', 'failed']);
 export const transferTypeEnum = pgEnum('transfer_type', ['ownership', 'collateral', 'pledge', 'release']);
+export const sackStatusEnum = pgEnum('sack_status', ['active', 'processing', 'withdrawn', 'transferred', 'damaged']);
 
 // User table
 export const users = pgTable('users', {
@@ -169,6 +170,71 @@ export const processes = pgTable('processes', {
   completedTime: timestamp('completed_time'),
 });
 
+// Individual Commodity Sacks for granular tracking
+export const commoditySacks = pgTable('commodity_sacks', {
+  id: serial('id').primaryKey(),
+  // Unique identifiers
+  sackId: text('sack_id').notNull().unique(), // Unique identifier for the sack (e.g., SC-SAK-12345678)
+  receiptId: integer('receipt_id').references(() => warehouseReceipts.id), // Parent receipt ID
+  qrCodeUrl: text('qr_code_url'), // URL to generated QR code for physical tracking
+  barcodeData: text('barcode_data'), // Data embedded in the barcode/QR code
+  
+  // Basic details
+  commodityId: integer('commodity_id').references(() => commodities.id),
+  weight: numeric('weight', { precision: 6, scale: 2 }).notNull().default('50'), // Default 50kg
+  measurementUnit: text('measurement_unit').notNull().default('kg'),
+  
+  // Ownership and location information
+  ownerId: integer('owner_id').references(() => users.id),
+  warehouseId: integer('warehouse_id').references(() => warehouses.id),
+  locationInWarehouse: text('location_in_warehouse'), // Specific location code within warehouse
+  
+  // Status tracking
+  status: sackStatusEnum('status').notNull().default('processing'),
+  createdAt: timestamp('created_at').defaultNow(),
+  lastUpdated: timestamp('last_updated').defaultNow(),
+  
+  // Quality & inspection details
+  qualityParameters: json('quality_parameters'),
+  gradeAssigned: text('grade_assigned'),
+  lastInspectionDate: timestamp('last_inspection_date'),
+  
+  // Blockchain tracking
+  blockchainHash: text('blockchain_hash'), // Hash of the most recent blockchain transaction
+  smartContractId: text('smart_contract_id'), // Individual smart contract ID for this sack
+  
+  // Privacy and additional data
+  isOwnerHidden: boolean('is_owner_hidden').default(false), // Flag to hide owner details
+  metadata: json('metadata'), // Additional flexible metadata
+});
+
+// Sack Movements to track individual sack history
+export const sackMovements = pgTable('sack_movements', {
+  id: serial('id').primaryKey(),
+  sackId: integer('sack_id').references(() => commoditySacks.id),
+  fromLocationId: integer('from_location_id').references(() => warehouses.id),
+  toLocationId: integer('to_location_id').references(() => warehouses.id),
+  fromOwnerId: integer('from_owner_id').references(() => users.id),
+  toOwnerId: integer('to_owner_id').references(() => users.id),
+  movementType: text('movement_type').notNull(), // 'transfer', 'withdrawal', 'loan_collateral', etc.
+  movementDate: timestamp('movement_date').defaultNow(),
+  transactionHash: text('transaction_hash'), // Blockchain transaction hash
+  metadata: json('metadata'),
+});
+
+// Sack Quality Assessments to track quality checks over time
+export const sackQualityAssessments = pgTable('sack_quality_assessments', {
+  id: serial('id').primaryKey(),
+  sackId: integer('sack_id').references(() => commoditySacks.id),
+  inspectionDate: timestamp('inspection_date').defaultNow(),
+  inspectorId: integer('inspector_id').references(() => users.id),
+  qualityParameters: json('quality_parameters').notNull(),
+  gradeAssigned: text('grade_assigned'),
+  notes: text('notes'),
+  attachmentUrls: json('attachment_urls'), // URLs to any pictures or documents
+  blockchainHash: text('blockchain_hash'), // Verification hash
+});
+
 // Zod schemas for insertion
 export const insertUserSchema = createInsertSchema(users).omit({ id: true, createdAt: true });
 export const insertWarehouseSchema = createInsertSchema(warehouses).omit({ id: true, createdAt: true });
@@ -176,9 +242,16 @@ export const insertCommoditySchema = createInsertSchema(commodities).omit({ id: 
 export const insertWarehouseReceiptSchema = createInsertSchema(warehouseReceipts).omit({ id: true, issuedDate: true });
 export const insertReceiptTransferSchema = createInsertSchema(receiptTransfers).omit({ id: true, transferDate: true });
 export const insertLoanSchema = createInsertSchema(loans).omit({ id: true, startDate: true });
-// Create process schema with proper date handling (without transformation)
 export const insertProcessSchema = createInsertSchema(processes)
   .omit({ id: true, startTime: true, completedTime: true });
+
+// Schemas for the new sack-level tracking tables
+export const insertCommoditySackSchema = createInsertSchema(commoditySacks)
+  .omit({ id: true, createdAt: true, lastUpdated: true });
+export const insertSackMovementSchema = createInsertSchema(sackMovements)
+  .omit({ id: true, movementDate: true });
+export const insertSackQualityAssessmentSchema = createInsertSchema(sackQualityAssessments)
+  .omit({ id: true, inspectionDate: true });
 
 // Types
 export type InsertUser = z.infer<typeof insertUserSchema>;
@@ -201,3 +274,13 @@ export type Loan = typeof loans.$inferSelect;
 
 export type InsertProcess = z.infer<typeof insertProcessSchema>;
 export type Process = typeof processes.$inferSelect;
+
+// Types for sack-level tracking
+export type InsertCommoditySack = z.infer<typeof insertCommoditySackSchema>;
+export type CommoditySack = typeof commoditySacks.$inferSelect;
+
+export type InsertSackMovement = z.infer<typeof insertSackMovementSchema>;
+export type SackMovement = typeof sackMovements.$inferSelect;
+
+export type InsertSackQualityAssessment = z.infer<typeof insertSackQualityAssessmentSchema>;
+export type SackQualityAssessment = typeof sackQualityAssessments.$inferSelect;

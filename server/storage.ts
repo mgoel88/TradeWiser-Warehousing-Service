@@ -4,9 +4,13 @@ import {
   commodities, Commodity, InsertCommodity,
   warehouseReceipts, WarehouseReceipt, InsertWarehouseReceipt,
   loans, Loan, InsertLoan,
-  processes, Process, InsertProcess
+  processes, Process, InsertProcess,
+  // New sack-level tracking imports
+  commoditySacks, CommoditySack, InsertCommoditySack,
+  sackMovements, SackMovement, InsertSackMovement,
+  sackQualityAssessments, SackQualityAssessment, InsertSackQualityAssessment
 } from "@shared/schema";
-import { eq, and } from "drizzle-orm";
+import { eq, and, or, desc } from "drizzle-orm";
 import { db } from "./db";
 
 // Interface for storage operations
@@ -84,10 +88,33 @@ export interface IStorage {
   listProcessesByUser(userId: number): Promise<Process[]>;
   listProcessesByCommodity(commodityId: number): Promise<Process[]>;
   updateProcess(id: number, process: Partial<InsertProcess>): Promise<Process | undefined>;
+  
+  // Commodity Sack operations for granular tracking
+  getCommoditySack(id: number): Promise<CommoditySack | undefined>;
+  getCommoditySackBySackId(sackId: string): Promise<CommoditySack | undefined>;
+  createCommoditySack(sack: InsertCommoditySack): Promise<CommoditySack>;
+  createManyCommoditySacks(sacks: InsertCommoditySack[]): Promise<CommoditySack[]>;
+  listCommoditySacks(): Promise<CommoditySack[]>;
+  listCommoditySacksByReceipt(receiptId: number): Promise<CommoditySack[]>;
+  listCommoditySacksByOwner(ownerId: number, includeHidden?: boolean): Promise<CommoditySack[]>;
+  listCommoditySacksByWarehouse(warehouseId: number): Promise<CommoditySack[]>;
+  updateCommoditySack(id: number, sack: Partial<InsertCommoditySack>): Promise<CommoditySack | undefined>;
+  
+  // Sack Movement operations
+  createSackMovement(movement: InsertSackMovement): Promise<SackMovement>;
+  getSackMovementHistory(sackId: number): Promise<SackMovement[]>;
+  listRecentSackMovements(limit?: number): Promise<SackMovement[]>;
+  getSackMovementByTransactionHash(transactionHash: string): Promise<SackMovement | undefined>;
+  
+  // Sack Quality Assessment operations
+  createSackQualityAssessment(assessment: InsertSackQualityAssessment): Promise<SackQualityAssessment>;
+  listSackQualityAssessments(sackId: number): Promise<SackQualityAssessment[]>;
+  getLatestSackQualityAssessment(sackId: number): Promise<SackQualityAssessment | undefined>;
 }
 
 // In-memory storage implementation
 export class MemStorage implements IStorage {
+  // Existing entity maps
   private users: Map<number, User>;
   private warehouses: Map<number, Warehouse>;
   private commodities: Map<number, Commodity>;
@@ -95,6 +122,12 @@ export class MemStorage implements IStorage {
   private loans: Map<number, Loan>;
   private processes: Map<number, Process>;
   
+  // New sack-level tracking maps
+  private commoditySacks: Map<number, CommoditySack>;
+  private sackMovements: Map<number, SackMovement>;
+  private sackQualityAssessments: Map<number, SackQualityAssessment>;
+  
+  // ID counters for existing entities
   private currentUserId: number;
   private currentWarehouseId: number;
   private currentCommodityId: number;
@@ -102,7 +135,13 @@ export class MemStorage implements IStorage {
   private currentLoanId: number;
   private currentProcessId: number;
   
+  // ID counters for new entities
+  private currentSackId: number;
+  private currentSackMovementId: number;
+  private currentQualityAssessmentId: number;
+  
   constructor() {
+    // Initialize existing entity maps
     this.users = new Map();
     this.warehouses = new Map();
     this.commodities = new Map();
@@ -110,12 +149,23 @@ export class MemStorage implements IStorage {
     this.loans = new Map();
     this.processes = new Map();
     
+    // Initialize new entity maps
+    this.commoditySacks = new Map();
+    this.sackMovements = new Map();
+    this.sackQualityAssessments = new Map();
+    
+    // Set starting IDs for existing entities
     this.currentUserId = 1;
     this.currentWarehouseId = 1;
     this.currentCommodityId = 1;
     this.currentReceiptId = 1;
     this.currentLoanId = 1;
     this.currentProcessId = 1;
+    
+    // Set starting IDs for new entities
+    this.currentSackId = 1;
+    this.currentSackMovementId = 1;
+    this.currentQualityAssessmentId = 1;
     
     // Initialize with sample data
     this.initializeData();
@@ -592,6 +642,130 @@ export class MemStorage implements IStorage {
     this.processes.set(id, updatedProcess);
     return updatedProcess;
   }
+
+  // Commodity Sack operations for granular tracking
+  async getCommoditySack(id: number): Promise<CommoditySack | undefined> {
+    return this.commoditySacks.get(id);
+  }
+  
+  async getCommoditySackBySackId(sackId: string): Promise<CommoditySack | undefined> {
+    return Array.from(this.commoditySacks.values()).find(
+      sack => sack.sackId === sackId
+    );
+  }
+  
+  async createCommoditySack(insertSack: InsertCommoditySack): Promise<CommoditySack> {
+    const id = this.currentSackId++;
+    const now = new Date();
+    const sack: CommoditySack = {
+      ...insertSack,
+      id,
+      createdAt: now,
+      lastUpdated: now
+    };
+    this.commoditySacks.set(id, sack);
+    return sack;
+  }
+  
+  async createManyCommoditySacks(sacks: InsertCommoditySack[]): Promise<CommoditySack[]> {
+    const createdSacks: CommoditySack[] = [];
+    for (const sack of sacks) {
+      const createdSack = await this.createCommoditySack(sack);
+      createdSacks.push(createdSack);
+    }
+    return createdSacks;
+  }
+  
+  async listCommoditySacks(): Promise<CommoditySack[]> {
+    return Array.from(this.commoditySacks.values());
+  }
+  
+  async listCommoditySacksByReceipt(receiptId: number): Promise<CommoditySack[]> {
+    return Array.from(this.commoditySacks.values()).filter(
+      sack => sack.receiptId === receiptId
+    );
+  }
+  
+  async listCommoditySacksByOwner(ownerId: number, includeHidden: boolean = false): Promise<CommoditySack[]> {
+    return Array.from(this.commoditySacks.values()).filter(
+      sack => sack.ownerId === ownerId && (includeHidden || !sack.isOwnerHidden)
+    );
+  }
+  
+  async listCommoditySacksByWarehouse(warehouseId: number): Promise<CommoditySack[]> {
+    return Array.from(this.commoditySacks.values()).filter(
+      sack => sack.warehouseId === warehouseId
+    );
+  }
+  
+  async updateCommoditySack(id: number, sackData: Partial<InsertCommoditySack>): Promise<CommoditySack | undefined> {
+    const sack = await this.getCommoditySack(id);
+    if (!sack) return undefined;
+    
+    const now = new Date();
+    const updatedSack: CommoditySack = {
+      ...sack,
+      ...sackData,
+      lastUpdated: now
+    };
+    this.commoditySacks.set(id, updatedSack);
+    return updatedSack;
+  }
+  
+  // Sack Movement operations
+  async createSackMovement(movement: InsertSackMovement): Promise<SackMovement> {
+    const id = this.currentSackMovementId++;
+    const now = new Date();
+    const sackMovement: SackMovement = {
+      ...movement,
+      id,
+      movementDate: now
+    };
+    this.sackMovements.set(id, sackMovement);
+    return sackMovement;
+  }
+  
+  async getSackMovementHistory(sackId: number): Promise<SackMovement[]> {
+    return Array.from(this.sackMovements.values())
+      .filter(movement => movement.sackId === sackId)
+      .sort((a, b) => b.movementDate.getTime() - a.movementDate.getTime()); // Sort by date descending
+  }
+  
+  async listRecentSackMovements(limit: number = 10): Promise<SackMovement[]> {
+    return Array.from(this.sackMovements.values())
+      .sort((a, b) => b.movementDate.getTime() - a.movementDate.getTime())
+      .slice(0, limit);
+  }
+  
+  async getSackMovementByTransactionHash(transactionHash: string): Promise<SackMovement | undefined> {
+    return Array.from(this.sackMovements.values()).find(
+      movement => movement.transactionHash === transactionHash
+    );
+  }
+  
+  // Sack Quality Assessment operations
+  async createSackQualityAssessment(assessment: InsertSackQualityAssessment): Promise<SackQualityAssessment> {
+    const id = this.currentQualityAssessmentId++;
+    const now = new Date();
+    const qualityAssessment: SackQualityAssessment = {
+      ...assessment,
+      id,
+      inspectionDate: now
+    };
+    this.sackQualityAssessments.set(id, qualityAssessment);
+    return qualityAssessment;
+  }
+  
+  async listSackQualityAssessments(sackId: number): Promise<SackQualityAssessment[]> {
+    return Array.from(this.sackQualityAssessments.values())
+      .filter(assessment => assessment.sackId === sackId)
+      .sort((a, b) => b.inspectionDate.getTime() - a.inspectionDate.getTime()); // Sort by date descending
+  }
+  
+  async getLatestSackQualityAssessment(sackId: number): Promise<SackQualityAssessment | undefined> {
+    const assessments = await this.listSackQualityAssessments(sackId);
+    return assessments.length > 0 ? assessments[0] : undefined;
+  }
 }
 
 export class DatabaseStorage implements IStorage {
@@ -887,6 +1061,137 @@ export class DatabaseStorage implements IStorage {
       .where(eq(processes.id, id))
       .returning();
     return updatedProcess || undefined;
+  }
+
+  // Commodity Sack operations for granular tracking
+  async getCommoditySack(id: number): Promise<CommoditySack | undefined> {
+    const [sack] = await db.select().from(commoditySacks).where(eq(commoditySacks.id, id));
+    return sack || undefined;
+  }
+  
+  async getCommoditySackBySackId(sackId: string): Promise<CommoditySack | undefined> {
+    const [sack] = await db.select().from(commoditySacks).where(eq(commoditySacks.sackId, sackId));
+    return sack || undefined;
+  }
+  
+  async createCommoditySack(insertSack: InsertCommoditySack): Promise<CommoditySack> {
+    const now = new Date();
+    const sackWithDates = {
+      ...insertSack,
+      createdAt: now,
+      lastUpdated: now
+    };
+    const [sack] = await db.insert(commoditySacks).values(sackWithDates).returning();
+    return sack;
+  }
+  
+  async createManyCommoditySacks(sacks: InsertCommoditySack[]): Promise<CommoditySack[]> {
+    const now = new Date();
+    const sacksWithDates = sacks.map(sack => ({
+      ...sack,
+      createdAt: now,
+      lastUpdated: now
+    }));
+    return await db.insert(commoditySacks).values(sacksWithDates).returning();
+  }
+  
+  async listCommoditySacks(): Promise<CommoditySack[]> {
+    return await db.select().from(commoditySacks);
+  }
+  
+  async listCommoditySacksByReceipt(receiptId: number): Promise<CommoditySack[]> {
+    return await db.select().from(commoditySacks).where(eq(commoditySacks.receiptId, receiptId));
+  }
+  
+  async listCommoditySacksByOwner(ownerId: number, includeHidden: boolean = false): Promise<CommoditySack[]> {
+    if (includeHidden) {
+      return await db.select().from(commoditySacks).where(eq(commoditySacks.ownerId, ownerId));
+    } else {
+      return await db.select().from(commoditySacks).where(
+        and(
+          eq(commoditySacks.ownerId, ownerId),
+          eq(commoditySacks.isOwnerHidden, false)
+        )
+      );
+    }
+  }
+  
+  async listCommoditySacksByWarehouse(warehouseId: number): Promise<CommoditySack[]> {
+    return await db.select().from(commoditySacks).where(eq(commoditySacks.warehouseId, warehouseId));
+  }
+  
+  async updateCommoditySack(id: number, sackData: Partial<InsertCommoditySack>): Promise<CommoditySack | undefined> {
+    const dataToUpdate = { ...sackData, lastUpdated: new Date() };
+    const [updatedSack] = await db
+      .update(commoditySacks)
+      .set(dataToUpdate)
+      .where(eq(commoditySacks.id, id))
+      .returning();
+    return updatedSack || undefined;
+  }
+  
+  // Sack Movement operations
+  async createSackMovement(movement: InsertSackMovement): Promise<SackMovement> {
+    const now = new Date();
+    const movementWithDate = {
+      ...movement,
+      movementDate: now
+    };
+    const [sackMovement] = await db.insert(sackMovements).values(movementWithDate).returning();
+    return sackMovement;
+  }
+  
+  async getSackMovementHistory(sackId: number): Promise<SackMovement[]> {
+    return await db
+      .select()
+      .from(sackMovements)
+      .where(eq(sackMovements.sackId, sackId))
+      .orderBy(desc(sackMovements.movementDate));
+  }
+  
+  async listRecentSackMovements(limit: number = 10): Promise<SackMovement[]> {
+    return await db
+      .select()
+      .from(sackMovements)
+      .orderBy(desc(sackMovements.movementDate))
+      .limit(limit);
+  }
+  
+  async getSackMovementByTransactionHash(transactionHash: string): Promise<SackMovement | undefined> {
+    const [movement] = await db
+      .select()
+      .from(sackMovements)
+      .where(eq(sackMovements.transactionHash, transactionHash));
+    return movement || undefined;
+  }
+  
+  // Sack Quality Assessment operations
+  async createSackQualityAssessment(assessment: InsertSackQualityAssessment): Promise<SackQualityAssessment> {
+    const now = new Date();
+    const assessmentWithDate = {
+      ...assessment,
+      inspectionDate: now
+    };
+    const [qualityAssessment] = await db.insert(sackQualityAssessments).values(assessmentWithDate).returning();
+    return qualityAssessment;
+  }
+  
+  async listSackQualityAssessments(sackId: number): Promise<SackQualityAssessment[]> {
+    return await db
+      .select()
+      .from(sackQualityAssessments)
+      .where(eq(sackQualityAssessments.sackId, sackId))
+      .orderBy(desc(sackQualityAssessments.inspectionDate));
+  }
+  
+  async getLatestSackQualityAssessment(sackId: number): Promise<SackQualityAssessment | undefined> {
+    const [assessment] = await db
+      .select()
+      .from(sackQualityAssessments)
+      .where(eq(sackQualityAssessments.sackId, sackId))
+      .orderBy(desc(sackQualityAssessments.inspectionDate))
+      .limit(1);
+    return assessment || undefined;
   }
 }
 
