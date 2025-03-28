@@ -1327,6 +1327,56 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ message: "Server error" });
     }
   });
+  
+  apiRouter.get("/receipts/available-collateral", async (req: Request, res: Response) => {
+    try {
+      // Check if user is authenticated
+      if (!req.session || !req.session.userId) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+      
+      // Get all active receipts owned by the user
+      const receipts = await storage.listUserReceipts(req.session.userId);
+      
+      // Filter for active receipts that aren't already used as collateral
+      const availableCollateral = receipts.filter(receipt => {
+        return (
+          receipt.status === 'active' && 
+          (!receipt.liens || Object.keys(receipt.liens || {}).length === 0)
+        );
+      });
+      
+      // Calculate current market values and lending limits
+      const collateralWithValues = await Promise.all(
+        availableCollateral.map(async (receipt) => {
+          // Commodity market price could come from an external API
+          // For demo, we'll use the valuation stored or compute a fixed value
+          const marketValue = receipt.valuation || 
+            parseFloat(receipt.quantity) * (receipt.commodityName === 'wheat' ? 2200 : 
+              receipt.commodityName === 'rice' ? 3500 : 
+              receipt.commodityName === 'maize' ? 1800 : 2500);
+              
+          // Calculate the max lending value (80% of market value)
+          const maxLendingValue = marketValue * 0.8;
+          
+          return {
+            ...receipt,
+            marketValue,
+            maxLendingValue,
+            commodityType: receipt.commodityName || 'Unknown',
+            warehouseName: receipt.warehouseName || `Warehouse #${receipt.warehouseId}`,
+            collateralValuePercentage: 80,
+            loanToValueRatio: 0.8
+          };
+        })
+      );
+      
+      res.status(200).json(collateralWithValues);
+    } catch (error) {
+      console.error("Error fetching available collateral:", error);
+      res.status(500).json({ message: "Failed to fetch available collateral" });
+    }
+  });
 
   apiRouter.get("/loans/:id", async (req: Request, res: Response) => {
     try {
@@ -1379,6 +1429,135 @@ export async function registerRoutes(app: Express): Promise<Server> {
         res.status(400).json({ message: validationError.message });
       } else {
         res.status(500).json({ message: "Server error" });
+      }
+    }
+  });
+  
+  // Create an overdraft-style loan facility
+  apiRouter.post("/loans/overdraft", async (req: Request, res: Response) => {
+    try {
+      // Check if user is authenticated
+      if (!req.session || !req.session.userId) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+      
+      const { receiptIds, withdrawAmount } = req.body;
+      
+      if (!receiptIds || !Array.isArray(receiptIds) || receiptIds.length === 0) {
+        return res.status(400).json({ message: "At least one receipt ID is required for collateral" });
+      }
+      
+      // Get all the receipts to calculate the collateral value
+      const receiptPromises = receiptIds.map(id => storage.getWarehouseReceipt(parseInt(id)));
+      const receipts = await Promise.all(receiptPromises);
+      
+      // Filter out any non-existent receipts and verify ownership
+      const validReceipts = receipts.filter(receipt => 
+        receipt && receipt.ownerId === req.session.userId && receipt.status === 'active'
+      );
+      
+      if (validReceipts.length === 0) {
+        return res.status(400).json({ message: "No valid receipts found for collateral" });
+      }
+      
+      // Calculate total collateral value
+      const totalCollateralValue = validReceipts.reduce((sum, receipt) => {
+        // Use valuation or calculate based on quantity and commodity type
+        const value = receipt.valuation || 
+          parseFloat(receipt.quantity) * (receipt.commodityName === 'wheat' ? 2200 : 
+            receipt.commodityName === 'rice' ? 3500 : 
+            receipt.commodityName === 'maize' ? 1800 : 2500);
+        return sum + value;
+      }, 0);
+      
+      // Calculate maximum lending value (80% of collateral)
+      const maxLendingValue = totalCollateralValue * 0.8;
+      
+      // Validate withdrawal amount if specified
+      let initialDrawdown = 0;
+      if (withdrawAmount) {
+        initialDrawdown = parseFloat(withdrawAmount);
+        if (isNaN(initialDrawdown) || initialDrawdown <= 0) {
+          return res.status(400).json({ message: "Invalid withdrawal amount" });
+        }
+        
+        if (initialDrawdown > maxLendingValue) {
+          return res.status(400).json({ 
+            message: `Withdrawal amount exceeds maximum lending value of ${maxLendingValue}` 
+          });
+        }
+      }
+      
+      // Current date for loan start
+      const startDate = new Date();
+      
+      // Set loan end date to 6 months from now
+      const endDate = new Date();
+      endDate.setMonth(endDate.getMonth() + 6);
+      
+      // Create the loan with overdraft facility
+      const loanData = {
+        userId: req.session.userId,
+        amount: maxLendingValue.toString(), // Maximum overdraft limit
+        outstandingAmount: initialDrawdown.toString(), // Initial drawdown amount
+        interestRate: "12.5", // Fixed interest rate
+        startDate: startDate,
+        endDate: endDate,
+        status: 'active' as const,
+        collateralReceiptIds: receiptIds,
+        repaymentSchedule: {
+          type: "overdraft",
+          interestCalculation: "daily",
+          facilityType: "revolving",
+          interestOnlyOnUtilized: true
+        }
+      };
+      
+      // Create loan in storage
+      const loan = await storage.createLoan(loanData);
+      
+      // Update the receipts to mark them as collateralized
+      for (const receipt of validReceipts) {
+        const liens = receipt.liens || {};
+        liens[`loan_${loan.id}`] = {
+          loanId: loan.id,
+          timestamp: new Date().toISOString(),
+          amount: maxLendingValue,
+          type: "overdraft_collateral"
+        };
+        
+        await storage.updateWarehouseReceipt(receipt.id, {
+          status: 'collateralized',
+          liens
+        });
+      }
+      
+      // Generate blockchain record for the loan collateral if needed
+      // (this would typically be handled by BlockchainService)
+      
+      // Response includes blockchain verification data for visualization
+      res.status(201).json({
+        loan,
+        collateralValue: totalCollateralValue,
+        maxLendingValue,
+        initialDrawdown,
+        availableCredit: maxLendingValue - initialDrawdown,
+        receiptsUsed: validReceipts.length,
+        blockchainVerification: {
+          timestamp: new Date().toISOString(),
+          hash: `0x${Math.random().toString(16).substring(2, 34)}${Date.now().toString(16)}`,
+          confirmed: true
+        }
+      });
+    } catch (error) {
+      console.error("Error creating overdraft loan:", error);
+      if (error instanceof z.ZodError) {
+        const validationError = fromZodError(error);
+        res.status(400).json({ message: validationError.message });
+      } else {
+        res.status(500).json({ 
+          message: error instanceof Error ? error.message : "Server error" 
+        });
       }
     }
   });

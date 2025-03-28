@@ -1,9 +1,9 @@
 import { useState } from "react";
 import MainLayout from "@/components/layout/MainLayout";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import ReceiptCollateralLoanForm from "@/components/loans/ReceiptCollateralLoanForm";
+import { ReceiptCollateralLoanForm } from "@/components/loans/ReceiptCollateralLoanForm";
 import LoanRepaymentButton from "@/components/loans/LoanRepaymentButton";
 import { PlusCircle, CreditCard, CircleDollarSign, Clock, Check, AlertCircle, BadgeIndianRupee } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -13,6 +13,7 @@ import { Loan } from "@shared/schema";
 
 export default function LoansPage() {
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   const [selectedTab, setSelectedTab] = useState("active");
   const [showNewLoanForm, setShowNewLoanForm] = useState(false);
   
@@ -23,13 +24,11 @@ export default function LoansPage() {
     staleTime: 30000
   });
   
-  // Handle loan creation
-  const handleLoanCreated = (loan: Loan) => {
+  // Close loan form handler
+  const handleCloseLoanForm = () => {
     setShowNewLoanForm(false);
-    toast({
-      title: "Loan Application Submitted",
-      description: `Your loan application for ₹${Number(loan.amount).toLocaleString()} has been submitted successfully.`,
-    });
+    // Refresh the loans data
+    queryClient.invalidateQueries({ queryKey: ['/api/loans'] });
   };
   
   // Filter loans by status
@@ -72,7 +71,13 @@ export default function LoansPage() {
         <div className="flex justify-between items-center mb-6">
           <h1 className="text-3xl font-bold">Loans & Financing</h1>
           <Button 
-            onClick={() => setShowNewLoanForm(!showNewLoanForm)}
+            onClick={() => {
+              if (showNewLoanForm) {
+                handleCloseLoanForm();
+              } else {
+                setShowNewLoanForm(true);
+              }
+            }}
             className="gap-2"
           >
             {showNewLoanForm ? (
@@ -88,7 +93,7 @@ export default function LoansPage() {
         
         {showNewLoanForm ? (
           <div className="mb-8">
-            <ReceiptCollateralLoanForm onLoanCreated={handleLoanCreated} />
+            <ReceiptCollateralLoanForm onSuccess={handleCloseLoanForm} />
           </div>
         ) : (
           <>

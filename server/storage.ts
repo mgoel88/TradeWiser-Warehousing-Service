@@ -67,6 +67,7 @@ export interface IStorage {
   listWarehouseReceiptsByOwner(ownerId: number): Promise<WarehouseReceipt[]>;
   listWarehouseReceiptsByCommodity(commodityId: number): Promise<WarehouseReceipt[]>;
   listWarehouseReceiptsByExternalSource(source: string): Promise<WarehouseReceipt[]>;
+  listUserReceipts(userId: number): Promise<WarehouseReceipt[]>;
   updateWarehouseReceipt(id: number, receipt: Partial<InsertWarehouseReceipt>): Promise<WarehouseReceipt | undefined>;
   
   // Receipt transfer operations (blockchain)
@@ -524,6 +525,13 @@ export class MemStorage implements IStorage {
     );
   }
   
+  // User receipts (for loan collateral)
+  async listUserReceipts(userId: number): Promise<WarehouseReceipt[]> {
+    return Array.from(this.warehouseReceipts.values()).filter(
+      receipt => receipt.ownerId === userId
+    );
+  }
+  
   async updateWarehouseReceipt(id: number, receiptData: Partial<InsertWarehouseReceipt>): Promise<WarehouseReceipt | undefined> {
     const receipt = await this.getWarehouseReceipt(id);
     if (!receipt) return undefined;
@@ -942,6 +950,11 @@ export class DatabaseStorage implements IStorage {
   
   async listWarehouseReceiptsByExternalSource(source: string): Promise<WarehouseReceipt[]> {
     return await db.select().from(warehouseReceipts).where(eq(warehouseReceipts.externalSource, source));
+  }
+  
+  // User receipts (for loan collateral)
+  async listUserReceipts(userId: number): Promise<WarehouseReceipt[]> {
+    return await db.select().from(warehouseReceipts).where(eq(warehouseReceipts.ownerId, userId));
   }
 
   async updateWarehouseReceipt(id: number, receiptData: Partial<InsertWarehouseReceipt>): Promise<WarehouseReceipt | undefined> {
