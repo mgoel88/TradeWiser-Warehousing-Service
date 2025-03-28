@@ -5,7 +5,11 @@ import multer from 'multer';
 import * as fs from 'fs';
 import * as path from 'path';
 import { storage } from "./storage";
-import { insertUserSchema, insertWarehouseSchema, insertCommoditySchema, insertWarehouseReceiptSchema, insertLoanSchema, insertProcessSchema } from "@shared/schema";
+import { 
+  insertUserSchema, insertWarehouseSchema, insertCommoditySchema, insertWarehouseReceiptSchema, 
+  insertLoanSchema, insertProcessSchema, insertCommoditySackSchema, insertSackMovementSchema, 
+  insertSackQualityAssessmentSchema, InsertCommoditySack, InsertSackMovement, InsertSackQualityAssessment
+} from "@shared/schema";
 import { z } from "zod";
 import { fromZodError } from "zod-validation-error";
 import 'express-session';
