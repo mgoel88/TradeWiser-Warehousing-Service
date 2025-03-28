@@ -1,3 +1,15 @@
+/**
+ * UploadReceiptDialog Component
+ * 
+ * Provides an interface for users to import external warehouse receipts through the Orange Channel.
+ * Supports multiple input methods including file upload, photo capture, and manual entry.
+ * 
+ * Features:
+ * - Clear visual indicators for Orange Channel receipts
+ * - Support for various external warehouse sources (WDRA, CMA, FCI, etc.)
+ * - Document processing feedback with meaningful toast notifications
+ * - Real-time validation for required fields
+ */
 import React, { useState } from "react";
 import {
   Dialog,
@@ -13,7 +25,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2, Upload, FileText, Camera, FileUp, ExternalLink } from "lucide-react";
+import { Loader2, Upload, FileText, Camera, FileUp, ExternalLink, AlertCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
@@ -94,6 +106,13 @@ export default function UploadReceiptDialog({ isOpen, onClose }: UploadReceiptDi
         formData.append("file", file);
         formData.append("sourceType", sourceType);
 
+        // Show an initial progress toast
+        toast({
+          title: "Processing External Receipt",
+          description: `Analyzing and processing ${sourceType} receipt through Orange Channel...`,
+          duration: 10000, // longer duration as OCR might take time
+        });
+        
         const response = await fetch("/api/receipts/upload", {
           method: "POST",
           body: formData,
@@ -106,10 +125,20 @@ export default function UploadReceiptDialog({ isOpen, onClose }: UploadReceiptDi
 
         const result = await response.json();
         
-        toast({
-          title: "Receipt Uploaded",
-          description: "The external warehouse receipt has been successfully processed.",
-        });
+        // Check if any receipts were successfully processed
+        if (result.receipts && result.receipts.length > 0) {
+          toast({
+            title: "External Receipt Processed",
+            description: `Successfully imported ${sourceType} receipt through Orange Channel ETL. The receipt will display with special indicators.`,
+          });
+        } else {
+          // Success but no receipts created
+          toast({
+            title: "Processing Complete",
+            description: result.message || "The document was processed but no valid receipt data was found.",
+            variant: "destructive",
+          });
+        }
 
         // Refresh data
         queryClient.invalidateQueries({ queryKey: ['/api/receipts'] });
@@ -142,8 +171,8 @@ export default function UploadReceiptDialog({ isOpen, onClose }: UploadReceiptDi
         const result = await response.json();
         
         toast({
-          title: "Receipt Created",
-          description: "The external warehouse receipt has been successfully added.",
+          title: "External Receipt Created",
+          description: `Successfully recorded ${sourceType} receipt through Orange Channel. It will display with special indicators.`,
         });
 
         // Refresh data
@@ -205,19 +234,33 @@ export default function UploadReceiptDialog({ isOpen, onClose }: UploadReceiptDi
           </TabsList>
 
           <div className="mt-4">
-            <Label>Receipt Source</Label>
-            <Select value={sourceType} onValueChange={setSourceType}>
-              <SelectTrigger>
-                <SelectValue placeholder="Select source type" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="wdra">WDRA Regulated</SelectItem>
-                <SelectItem value="cma">CMA Accredited</SelectItem>
-                <SelectItem value="fci">FCI Storage</SelectItem>
-                <SelectItem value="nafed">NAFED</SelectItem>
-                <SelectItem value="other">Other</SelectItem>
-              </SelectContent>
-            </Select>
+            <div className="space-y-2">
+              <Label className="text-base font-semibold text-primary">External Warehouse Source (Important)</Label>
+              <p className="text-xs text-muted-foreground mb-2">
+                Select the source organization that issued this warehouse receipt. This determines how it appears in the system.
+              </p>
+              <div className="relative">
+                <div className="absolute inset-0 bg-gradient-to-r from-orange-100 to-orange-200 opacity-30 rounded-md blur-sm -m-1"></div>
+                <Select value={sourceType} onValueChange={setSourceType}>
+                  <SelectTrigger className="border-2 border-orange-300 relative bg-white">
+                    <SelectValue placeholder="Select source type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="wdra">WDRA Regulated</SelectItem>
+                    <SelectItem value="cma">CMA Accredited</SelectItem>
+                    <SelectItem value="fci">FCI Storage</SelectItem>
+                    <SelectItem value="nafed">NAFED</SelectItem>
+                    <SelectItem value="other">Other External Source</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="bg-orange-50 border-l-4 border-orange-500 p-2 rounded mt-2">
+                <p className="text-xs text-orange-700 flex items-center">
+                  <AlertCircle className="h-3 w-3 mr-1 text-orange-500" />
+                  <span className="font-medium">Important:</span> Orange Channel receipts will be visually marked in your dashboard
+                </p>
+              </div>
+            </div>
           </div>
 
           <TabsContent value="file" className="space-y-4 mt-4">
