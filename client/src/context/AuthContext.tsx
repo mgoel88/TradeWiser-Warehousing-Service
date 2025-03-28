@@ -6,6 +6,7 @@ import { User } from "@shared/schema";
 interface AuthContextType {
   user: User | null;
   isLoading: boolean;
+  isAuthenticated: boolean;
   login: (username: string, password: string) => Promise<boolean>;
   register: (userData: any) => Promise<boolean>;
   logout: () => Promise<void>;
@@ -14,6 +15,7 @@ interface AuthContextType {
 export const AuthContext = createContext<AuthContextType>({
   user: null,
   isLoading: true,
+  isAuthenticated: false,
   login: async () => false,
   register: async () => false,
   logout: async () => {},
@@ -115,8 +117,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
+  // Determine if a user is authenticated
+  const isAuthenticated = !!user;
+
   return (
-    <AuthContext.Provider value={{ user, isLoading, login, register, logout }}>
+    <AuthContext.Provider value={{ user, isLoading, isAuthenticated, login, register, logout }}>
       {children}
     </AuthContext.Provider>
   );

@@ -1154,11 +1154,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     } catch (error) {
       console.error("Withdrawal initiation error:", error);
-      res.status(error.message.includes("Not authorized") ? 403 : 500).json({ 
-        message: error instanceof Error ? error.message : "Server error during withdrawal" 
-      });
+      const errorMessage = error instanceof Error ? error.message : "Server error during withdrawal";
+      const statusCode = errorMessage.includes("Not authorized") ? 403 : 500;
+      res.status(statusCode).json({ message: errorMessage });
     }
   });
+  
+  /**
+   * Helper function to calculate progress based on the stage
+   * @param stage The current process stage
+   * @returns A number between 0-100 representing the progress percentage
+   */
+  function calculateProgressFromStage(stage: string): number {
+    // Define the withdrawal stages and their progress values
+    const stageProgressMap: Record<string, number> = {
+      "verification": 10,
+      "preparation": 25,
+      "document_check": 40,
+      "physical_release": 60,
+      "quantity_confirmation": 80,
+      "receipt_update": 95
+    };
+    
+    return stageProgressMap[stage] || 50; // Default to 50% if stage not found
+  }
   
   apiRouter.post("/processes/:id/withdrawal-update", async (req: Request, res: Response) => {
     try {
@@ -1189,11 +1208,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Broadcast the process update to all clients
       if (wss) {
+        // Extract progress from result if available
+        // The updateWithdrawalStage method returns { process, progress, message }
+        // where progress is a number between 0-100
+        const progressValue = result && typeof result.progress === 'number' 
+          ? result.progress 
+          : calculateProgressFromStage(stage);
+        
         broadcastProcessUpdate(req.session.userId, processId, {
           message: message || `Stage ${stage} set to ${status}`,
           stage,
           status,
-          progress: result.progress
+          progress: progressValue
         });
       }
       
@@ -1805,38 +1831,50 @@ export async function registerRoutes(app: Express): Promise<Server> {
     path: '/ws'
   });
   
-  // Map to store active connections by user ID and process ID
+  // Map to store active connections by user ID, entity type, and entity ID
   const connections = new Map<string, WebSocket[]>();
   
   wss.on('connection', (ws: WebSocket) => {
     console.log('WebSocket client connected');
-    let userId: string | null = null;
-    let processId: string | null = null;
+    // Track subscriptions for this connection
+    const subscriptions: {userId: string, entityType: string, entityId: string}[] = [];
     
     ws.on('message', (message: string) => {
       try {
         const data = JSON.parse(message);
-        // User subscribes to updates for a specific process
-        if (data.type === 'subscribe' && data.userId && data.processId) {
-          userId = data.userId.toString();
-          processId = data.processId.toString();
+        
+        // Handle subscription requests
+        if (data.type === 'subscribe' && data.userId) {
+          const userId = data.userId.toString();
           
-          // Store connection keyed by userId:processId
-          const key = `${userId}:${processId}`;
-          if (!connections.has(key)) {
-            connections.set(key, []);
+          // Handle process-specific subscriptions for backward compatibility
+          if (data.processId) {
+            const processId = data.processId.toString();
+            const entityType = 'process';
+            addSubscription(ws, userId, entityType, processId, subscriptions);
           }
-          connections.get(key)?.push(ws);
+          // Handle new entity-based subscriptions
+          else if (data.entityType && data.entityId) {
+            const entityType = data.entityType.toString();
+            const entityId = data.entityId.toString();
+            addSubscription(ws, userId, entityType, entityId, subscriptions);
+          }
+        }
+        // Handle unsubscribe requests
+        else if (data.type === 'unsubscribe' && data.userId) {
+          const userId = data.userId.toString();
           
-          // Send confirmation
-          ws.send(JSON.stringify({
-            type: 'subscribed',
-            processId,
-            userId,
-            timestamp: new Date().toISOString()
-          }));
-          
-          console.log(`User ${userId} subscribed to process ${processId}`);
+          if (data.entityType && data.entityId) {
+            const entityType = data.entityType.toString(); 
+            const entityId = data.entityId.toString();
+            removeSubscription(ws, userId, entityType, entityId, subscriptions);
+          }
+          // Handle process-specific unsubscribe for backward compatibility
+          else if (data.processId) {
+            const processId = data.processId.toString();
+            const entityType = 'process';
+            removeSubscription(ws, userId, entityType, processId, subscriptions);
+          }
         }
       } catch (err) {
         console.error('Error processing WebSocket message:', err);
@@ -1844,10 +1882,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
     
     ws.on('close', () => {
-      if (userId && processId) {
-        const key = `${userId}:${processId}`;
+      // Clean up all subscriptions for this connection
+      subscriptions.forEach(sub => {
+        const key = `${sub.userId}:${sub.entityType}:${sub.entityId}`;
         const clients = connections.get(key) || [];
         const index = clients.indexOf(ws);
+        
         if (index !== -1) {
           clients.splice(index, 1);
           if (clients.length === 0) {
@@ -1856,21 +1896,97 @@ export async function registerRoutes(app: Express): Promise<Server> {
             connections.set(key, clients);
           }
         }
-        console.log(`User ${userId} unsubscribed from process ${processId}`);
-      }
+        
+        console.log(`User ${sub.userId} unsubscribed from ${sub.entityType} ${sub.entityId}`);
+      });
+      
       console.log('WebSocket client disconnected');
     });
+    
+    // Helper function to add a subscription
+    function addSubscription(
+      ws: WebSocket,
+      userId: string,
+      entityType: string,
+      entityId: string,
+      subscriptions: {userId: string, entityType: string, entityId: string}[]
+    ) {
+      // Store connection keyed by userId:entityType:entityId
+      const key = `${userId}:${entityType}:${entityId}`;
+      
+      if (!connections.has(key)) {
+        connections.set(key, []);
+      }
+      
+      if (!connections.get(key)?.includes(ws)) {
+        connections.get(key)?.push(ws);
+      }
+      
+      // Add to this connection's subscriptions
+      const existingSubscription = subscriptions.find(
+        s => s.userId === userId && s.entityType === entityType && s.entityId === entityId
+      );
+      
+      if (!existingSubscription) {
+        subscriptions.push({ userId, entityType, entityId });
+      }
+      
+      // Send confirmation
+      ws.send(JSON.stringify({
+        type: 'subscribed',
+        entityType,
+        entityId,
+        userId,
+        timestamp: new Date().toISOString()
+      }));
+      
+      console.log(`User ${userId} subscribed to ${entityType} ${entityId}`);
+    }
+    
+    // Helper function to remove a subscription
+    function removeSubscription(
+      ws: WebSocket,
+      userId: string,
+      entityType: string,
+      entityId: string,
+      subscriptions: {userId: string, entityType: string, entityId: string}[]
+    ) {
+      const key = `${userId}:${entityType}:${entityId}`;
+      const clients = connections.get(key) || [];
+      const index = clients.indexOf(ws);
+      
+      if (index !== -1) {
+        clients.splice(index, 1);
+        if (clients.length === 0) {
+          connections.delete(key);
+        } else {
+          connections.set(key, clients);
+        }
+      }
+      
+      // Remove from this connection's subscriptions
+      const subIndex = subscriptions.findIndex(
+        s => s.userId === userId && s.entityType === entityType && s.entityId === entityId
+      );
+      
+      if (subIndex !== -1) {
+        subscriptions.splice(subIndex, 1);
+      }
+      
+      console.log(`User ${userId} unsubscribed from ${entityType} ${entityId}`);
+    }
   });
   
-  // Helper function to broadcast updates to WebSocket clients
-  function broadcastProcessUpdate(userId: number, processId: number, data: any) {
-    const key = `${userId}:${processId}`;
+  // Helper function to broadcast entity updates to WebSocket clients
+  function broadcastEntityUpdate(userId: number, entityType: string, entityId: number, data: any) {
+    const key = `${userId}:${entityType}:${entityId}`;
     const clients = connections.get(key) || [];
     
     if (clients.length > 0) {
       const message = JSON.stringify({
-        type: 'process_update',
-        processId,
+        type: `${entityType}_update`,
+        entityType,
+        entityId,
         ...data,
         timestamp: new Date().toISOString()
       });
@@ -1881,12 +1997,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       });
       
-      console.log(`Sent update to ${clients.length} clients for process ${processId}`);
+      console.log(`Sent ${entityType} update to ${clients.length} clients for ${entityType} ${entityId}`);
     }
   }
   
-  // Make broadcastProcessUpdate available on the global scope
+  // For backward compatibility
+  function broadcastProcessUpdate(userId: number, processId: number, data: any) {
+    return broadcastEntityUpdate(userId, 'process', processId, data);
+  }
+  
+  // Make broadcast functions available on the global scope
   (global as any).broadcastProcessUpdate = broadcastProcessUpdate;
+  (global as any).broadcastEntityUpdate = broadcastEntityUpdate;
 
   return httpServer;
 }
