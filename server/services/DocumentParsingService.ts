@@ -263,7 +263,7 @@ class DocumentParsingService {
   /**
    * Process an uploaded file based on its type
    */
-  async processUploadedFile(filePath: string, fileType: string, userId: number): Promise<{
+  async processUploadedFile(filePath: string, fileType: string, userId: number, sourceType: string = 'other'): Promise<{
     receipts: Partial<WarehouseReceipt>[];
     message: string;
   }> {
@@ -326,6 +326,21 @@ class DocumentParsingService {
           receipt.smartContractId = smartContractId;
           receipt.attachmentUrl = attachmentUrl;
           
+          // Mark this as an Orange Channel receipt (external)
+          receipt.externalSource = sourceType;
+          
+          // Set metadata with ETL processing details
+          receipt.metadata = {
+            isExternal: true,
+            channelType: 'orange',
+            processingMethod: 'etl',
+            sourceType: sourceType,
+            processingDate: new Date().toISOString(),
+            parseMethod: fileType.includes('image/') ? 'ocr' : 
+                       fileType.includes('pdf') ? 'pdf-extraction' : 
+                       fileType.includes('csv') ? 'csv-parser' : 'excel-parser'
+          };
+          
           // Default status to active
           receipt.status = 'active';
           
@@ -338,6 +353,7 @@ class DocumentParsingService {
             savedReceipts.push(updated);
           } else if (receipt.receiptNumber) {
             // Only save if it has a receipt number
+            console.log('Creating Orange Channel receipt:', JSON.stringify(receipt, null, 2));
             const created = await storage.createWarehouseReceipt(receipt as any);
             savedReceipts.push(created);
           }

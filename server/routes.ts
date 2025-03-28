@@ -1014,7 +1014,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const result = await documentParsingService.processUploadedFile(
         savedFile.filePath, 
         savedFile.fileType, 
-        req.session.userId
+        req.session.userId,
+        sourceType
       );
       
       // Clean up the file after processing
@@ -1100,8 +1101,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         externalId: externalId || formattedReceiptNumber,
         externalSource: externalSource || 'manual',
         smartContractId,
-        issuedDate: new Date(), // Handle date separately in storage layer
-        expiryDate: expiryDate ? new Date(expiryDate) : undefined
+        attachmentUrl: null,
+        metadata: {
+          isExternal: true,
+          channelType: channelType || 'orange',
+          sourceType: externalSource || 'manual',
+          processingDate: new Date().toISOString(),
+          manuallyCreated: true
+        }
       });
       
       res.status(201).json({

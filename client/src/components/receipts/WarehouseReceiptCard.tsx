@@ -111,6 +111,27 @@ export default function WarehouseReceiptCard({ receipt, onView, onPledge, classN
     }
   };
   
+  // Determine if this is an Orange Channel (third-party) receipt
+  const isOrangeChannel = React.useMemo(() => {
+    if (receipt.metadata && typeof receipt.metadata === 'object') {
+      const metadata = receipt.metadata as Record<string, any>;
+      return metadata.channelType === 'orange' || metadata.isExternal === true;
+    }
+    
+    // Also check if it has an externalSource as fallback
+    return !!receipt.externalSource;
+  }, [receipt]);
+  
+  // Determine card background based on channel type
+  const cardBackground = React.useMemo(() => {
+    if (isOrangeChannel) {
+      // Orange Channel receipt - use orange gradient
+      return `linear-gradient(135deg, #ff8c00, #e25822)`;
+    }
+    // Default Green Channel receipt - use dark gradient
+    return `linear-gradient(135deg, #1a1a1a, #333)`;
+  }, [isOrangeChannel]);
+  
   // Styled card view like a real credit card
   return (
     <>
@@ -118,7 +139,7 @@ export default function WarehouseReceiptCard({ receipt, onView, onPledge, classN
         className={`relative overflow-hidden transition-all hover:shadow-md cursor-pointer ${className} rounded-xl`}
         onClick={() => setIsDetailOpen(true)}
         style={{ 
-          background: `linear-gradient(135deg, #1a1a1a, #333)`,
+          background: cardBackground,
           maxWidth: '340px' 
         }}
       >
@@ -190,7 +211,14 @@ export default function WarehouseReceiptCard({ receipt, onView, onPledge, classN
               Warehouse Receipt
             </DialogTitle>
             <DialogDescription>
-              Electronic Warehouse Receipt (eWR) details and actions
+              {isOrangeChannel ? (
+                <span className="flex items-center">
+                  <ExternalLink className="h-4 w-4 mr-1 text-orange-500" />
+                  External Warehouse Receipt (Orange Channel)
+                </span>
+              ) : (
+                <span>Electronic Warehouse Receipt (eWR) details and actions</span>
+              )}
             </DialogDescription>
           </DialogHeader>
           
@@ -312,6 +340,37 @@ export default function WarehouseReceiptCard({ receipt, onView, onPledge, classN
                     </div>
                   )}
                 </div>
+              </div>
+            )}
+            
+            {/* External Source Info - Only shown for Orange Channel receipts */}
+            {isOrangeChannel && (
+              <div className="bg-orange-50 p-3 rounded-md mt-4 border border-orange-200">
+                <div className="flex items-center mb-1">
+                  <ExternalLink className="h-4 w-4 mr-2 text-orange-500" />
+                  <h3 className="text-sm font-medium text-orange-700">External Receipt Source</h3>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
+                  <div>
+                    <p className="text-xs text-muted-foreground">Source</p>
+                    <p className="text-sm text-orange-700">
+                      {receipt.externalSource || (receipt.metadata && typeof receipt.metadata === 'object' 
+                        ? (receipt.metadata as any).sourceType || 'External Source' 
+                        : 'External Source')}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Processing Method</p>
+                    <p className="text-sm text-orange-700">
+                      {receipt.metadata && typeof receipt.metadata === 'object' 
+                        ? (receipt.metadata as any).processingMethod || 'ETL Import' 
+                        : 'ETL Import'}
+                    </p>
+                  </div>
+                </div>
+                <p className="text-xs text-orange-600/80 mt-2">
+                  This is an imported third-party warehouse receipt processed through the Orange Channel ETL tool.
+                </p>
               </div>
             )}
             
