@@ -1,6 +1,7 @@
 import { Link, useLocation } from 'wouter';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
+import { Warehouse, FileText, Package, BadgeDollarSign, CreditCard, FileCheck, ExternalLink, User, Settings, LogOut } from 'lucide-react';
 
 export default function Sidebar() {
   const [location] = useLocation();
@@ -20,124 +21,127 @@ export default function Sidebar() {
       </div>
       
       <nav className="flex-grow p-4 overflow-y-auto">
-        <p className="text-xs font-medium uppercase text-gray-500 mb-2">Main</p>
-        <ul>
-          <li className="mb-1">
+        <p className="text-xs font-medium uppercase text-gray-500 mb-2">Platforms</p>
+        <ul className="mb-4">
+          <li className="mb-2">
             <Link href="/dashboard" className={cn(
               "flex items-center p-2 rounded-md",
               location === "/dashboard" 
                 ? "bg-primary-50 text-primary-600 font-medium" 
                 : "text-gray-700 hover:bg-gray-100"
             )}>
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6z" />
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6z" />
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2z" />
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
-              </svg>
+              <div className="h-5 w-5 mr-3 flex items-center justify-center">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
+                </svg>
+              </div>
               Dashboard
             </Link>
           </li>
+          
           <li className="mb-1">
-            <Link href="/warehouses" className={cn(
-              "flex items-center p-2 rounded-md",
-              location === "/warehouses" 
+            <div className="ml-2 mb-1">
+              <h3 className="font-medium text-sm text-primary-600 flex items-center">
+                <span className="w-2 h-5 bg-primary-500 rounded mr-2"></span>
+                Green Channel
+              </h3>
+              <p className="text-[10px] text-muted-foreground ml-4 mb-1">TradeWiser Warehouses</p>
+            </div>
+            <Link href="/green-channel" className={cn(
+              "flex items-center p-2 pl-7 rounded-md text-sm",
+              location === "/green-channel" 
                 ? "bg-primary-50 text-primary-600 font-medium" 
                 : "text-gray-700 hover:bg-gray-100"
             )}>
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-              </svg>
-              Warehouses
+              <Warehouse className="h-4 w-4 mr-2" />
+              Browse Warehouses
+            </Link>
+            <Link href="/deposit" className={cn(
+              "flex items-center p-2 pl-7 rounded-md text-sm",
+              location === "/deposit" 
+                ? "bg-primary-50 text-primary-600 font-medium" 
+                : "text-gray-700 hover:bg-gray-100"
+            )}>
+              <Package className="h-4 w-4 mr-2" />
+              Deposit Commodity
             </Link>
           </li>
+          
           <li className="mb-1">
+            <div className="ml-2 mb-1 mt-3">
+              <h3 className="font-medium text-sm text-orange-600 flex items-center">
+                <span className="w-2 h-5 bg-orange-500 rounded mr-2"></span>
+                Orange Channel
+              </h3>
+              <p className="text-[10px] text-muted-foreground ml-4 mb-1">External Warehouses</p>
+            </div>
+            <Link href="/orange-channel" className={cn(
+              "flex items-center p-2 pl-7 rounded-md text-sm",
+              location === "/orange-channel" 
+                ? "bg-primary-50 text-primary-600 font-medium" 
+                : "text-gray-700 hover:bg-gray-100"
+            )}>
+              <ExternalLink className="h-4 w-4 mr-2" />
+              Upload Receipts
+            </Link>
+          </li>
+          
+          <li className="mb-1">
+            <div className="ml-2 mb-1 mt-3">
+              <h3 className="font-medium text-sm text-red-600 flex items-center">
+                <span className="w-2 h-5 bg-red-500 rounded mr-2"></span>
+                Red Channel
+              </h3>
+              <p className="text-[10px] text-muted-foreground ml-4 mb-1">Self-Certified Storage</p>
+            </div>
+            <Link href="/red-channel" className={cn(
+              "flex items-center p-2 pl-7 rounded-md text-sm",
+              location === "/red-channel" 
+                ? "bg-primary-50 text-primary-600 font-medium" 
+                : "text-gray-700 hover:bg-gray-100"
+            )}>
+              <FileCheck className="h-4 w-4 mr-2" />
+              Self-Certification
+            </Link>
+          </li>
+        </ul>
+        
+        <p className="text-xs font-medium uppercase text-gray-500 mb-2">My Assets</p>
+        <ul>
+          <li className="mb-2">
             <Link href="/receipts" className={cn(
               "flex items-center p-2 rounded-md",
               location === "/receipts" 
                 ? "bg-primary-50 text-primary-600 font-medium" 
                 : "text-gray-700 hover:bg-gray-100"
             )}>
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-              </svg>
-              Receipts
+              <FileText className="h-5 w-5 mr-3" />
+              Warehouse Receipts
             </Link>
           </li>
-          <li className="mb-1">
-            <Link href="/deposit" className={cn(
-              "flex items-center p-2 rounded-md",
-              location === "/deposit" 
-                ? "bg-primary-50 text-primary-600 font-medium" 
-                : "text-gray-700 hover:bg-gray-100"
-            )}>
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
-              </svg>
-              Deposit Commodity
-            </Link>
-          </li>
-          <li className="mb-1">
+          <li className="mb-2">
             <Link href="/loans" className={cn(
               "flex items-center p-2 rounded-md",
               location === "/loans" 
                 ? "bg-primary-50 text-primary-600 font-medium" 
                 : "text-gray-700 hover:bg-gray-100"
             )}>
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
+              <BadgeDollarSign className="h-5 w-5 mr-3" />
               Loans
             </Link>
           </li>
-          <li className="mb-1">
+          <li className="mb-2">
             <Link href="/payments" className={cn(
               "flex items-center p-2 rounded-md",
               location === "/payments" 
                 ? "bg-primary-50 text-primary-600 font-medium" 
                 : "text-gray-700 hover:bg-gray-100"
             )}>
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2z" />
-              </svg>
+              <CreditCard className="h-5 w-5 mr-3" />
               Payments
-            </Link>
-          </li>
-        </ul>
-        
-        <p className="mt-6 text-xs font-medium uppercase text-gray-500 mb-2">Channels</p>
-        <ul>
-          <li className="mb-1">
-            <Link href="/green-channel" className={cn(
-              "flex items-center p-2 rounded-md",
-              location === "/green-channel" 
-                ? "bg-primary-50 text-primary-600 font-medium" 
-                : "text-gray-700 hover:bg-gray-100"
-            )}>
-              <span className="w-2 h-5 bg-primary-500 rounded mr-3"></span>
-              Green Channel
-            </Link>
-          </li>
-          <li className="mb-1">
-            <Link href="/orange-channel" className={cn(
-              "flex items-center p-2 rounded-md",
-              location === "/orange-channel" 
-                ? "bg-primary-50 text-primary-600 font-medium" 
-                : "text-gray-700 hover:bg-gray-100"
-            )}>
-              <span className="w-2 h-5 bg-secondary-500 rounded mr-3"></span>
-              Orange Channel
-            </Link>
-          </li>
-          <li className="mb-1">
-            <Link href="/red-channel" className={cn(
-              "flex items-center p-2 rounded-md",
-              location === "/red-channel" 
-                ? "bg-primary-50 text-primary-600 font-medium" 
-                : "text-gray-700 hover:bg-gray-100"
-            )}>
-              <span className="w-2 h-5 bg-red-500 rounded mr-3"></span>
-              Red Channel
             </Link>
           </li>
         </ul>
@@ -151,9 +155,7 @@ export default function Sidebar() {
                 ? "bg-primary-50 text-primary-600 font-medium" 
                 : "text-gray-700 hover:bg-gray-100"
             )}>
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-              </svg>
+              <User className="h-5 w-5 mr-3" />
               Profile
             </Link>
           </li>
@@ -164,18 +166,13 @@ export default function Sidebar() {
                 ? "bg-primary-50 text-primary-600 font-medium" 
                 : "text-gray-700 hover:bg-gray-100"
             )}>
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-              </svg>
+              <Settings className="h-5 w-5 mr-3" />
               Settings
             </Link>
           </li>
           <li className="mb-1">
             <Link href="/logout" className="flex items-center p-2 rounded-md text-gray-700 hover:bg-gray-100">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-              </svg>
+              <LogOut className="h-5 w-5 mr-3" />
               Logout
             </Link>
           </li>

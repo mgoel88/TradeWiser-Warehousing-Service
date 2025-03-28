@@ -17,6 +17,9 @@ import DepositPage from "@/pages/DepositPage";
 import CommodityDetailPage from "@/pages/CommodityDetailPage";
 import ReceiptVerificationPage from "@/pages/ReceiptVerificationPage";
 import PaymentsPage from "@/pages/PaymentsPage";
+import GreenChannelPage from "@/pages/GreenChannelPage";
+import OrangeChannelPage from "@/pages/OrangeChannelPage";
+import RedChannelPage from "@/pages/RedChannelPage";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -35,9 +38,9 @@ function Router() {
       <Route path="/commodities/:id" component={CommodityDetailPage} />
       <Route path="/verify-receipt/:verificationCode" component={ReceiptVerificationPage} />
       <Route path="/receipts/verify/:code" component={ReceiptVerificationPage} />
-      <Route path="/green-channel" component={WarehousePage} />
-      <Route path="/orange-channel" component={WarehousePage} />
-      <Route path="/red-channel" component={WarehousePage} />
+      <Route path="/green-channel" component={GreenChannelPage} />
+      <Route path="/orange-channel" component={OrangeChannelPage} />
+      <Route path="/red-channel" component={RedChannelPage} />
       <Route component={NotFound} />
     </Switch>
   );
