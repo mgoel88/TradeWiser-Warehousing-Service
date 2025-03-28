@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiRequest } from '@/lib/queryClient';
 import { useLocation } from 'wouter';
 import { motion } from 'framer-motion';
-import { CheckSquare2, DollarSign, AlertCircle, CreditCard, BadgeIndianRupee } from 'lucide-react';
+import { CheckSquare2, DollarSign, AlertCircle, CreditCard, IndianRupee } from 'lucide-react';
 import { Slider } from '@/components/ui/slider';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -38,7 +38,7 @@ export function ReceiptCollateralLoanForm({ onSuccess }: ReceiptCollateralLoanFo
   const { toast } = useToast();
 
   // Fetch available collateral receipts
-  const { data: availableCollateral = [], isLoading } = useQuery({
+  const { data: availableCollateral = [], isLoading } = useQuery<Receipt[]>({
     queryKey: ['/api/receipts/available-collateral'],
   });
 
@@ -63,13 +63,29 @@ export function ReceiptCollateralLoanForm({ onSuccess }: ReceiptCollateralLoanFo
 
   // Handle receipt selection
   const toggleReceiptSelection = (receiptId: number) => {
-    setSelectedReceipts(prev => ({
-      ...prev,
-      [receiptId]: !prev[receiptId]
-    }));
+    const newSelection = {
+      ...selectedReceipts,
+      [receiptId]: !selectedReceipts[receiptId]
+    };
+    
+    setSelectedReceipts(newSelection);
+    
+    // Recalculate max lending based on new selection
+    const newSelectedIds = Object.entries(newSelection)
+      .filter(([_, isSelected]) => isSelected)
+      .map(([id]) => parseInt(id));
+      
+    const newSelectedCollateral = availableCollateral.filter(
+      (receipt: Receipt) => newSelectedIds.includes(receipt.id)
+    );
+    
+    const newMaxLending = newSelectedCollateral.reduce(
+      (sum: number, receipt: Receipt) => sum + receipt.maxLendingValue,
+      0
+    );
     
     // Reset drawdown if it exceeds new max after deselection
-    if (selectedReceipts[receiptId] && initialDrawdown > totalMaxLending) {
+    if (!newSelection[receiptId] && initialDrawdown > newMaxLending) {
       setInitialDrawdown(0);
     }
   };
@@ -169,7 +185,7 @@ export function ReceiptCollateralLoanForm({ onSuccess }: ReceiptCollateralLoanFo
       <Card className="w-full max-w-4xl mx-auto">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <BadgeIndianRupee className="h-5 w-5 text-primary" />
+            <IndianRupee className="h-5 w-5 text-primary" />
             Apply for a Loan
           </CardTitle>
           <CardDescription>
@@ -198,10 +214,11 @@ export function ReceiptCollateralLoanForm({ onSuccess }: ReceiptCollateralLoanFo
                   >
                     <div className="flex justify-between items-center">
                       <div className="flex items-center gap-3">
-                        <Checkbox 
-                          checked={!!selectedReceipts[receipt.id]} 
-                          onCheckedChange={() => toggleReceiptSelection(receipt.id)}
-                        />
+                        <div className="h-4 w-4 border rounded flex items-center justify-center">
+                          {selectedReceipts[receipt.id] && (
+                            <CheckSquare2 className="h-3 w-3 text-primary" />
+                          )}
+                        </div>
                         <div>
                           <h4 className="font-medium">{receipt.receiptNumber}</h4>
                           <p className="text-sm text-muted-foreground">
@@ -288,13 +305,15 @@ export function ReceiptCollateralLoanForm({ onSuccess }: ReceiptCollateralLoanFo
                   </div>
                 </div>
                 
-                <Alert variant="outline" className="mt-4">
-                  <AlertCircle className="h-4 w-4" />
-                  <AlertTitle>Flexible Credit Line</AlertTitle>
-                  <AlertDescription>
+                <div className="bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300 p-4 rounded border border-blue-200 dark:border-blue-900 mt-4">
+                  <div className="flex items-center gap-2 font-medium mb-1">
+                    <AlertCircle className="h-4 w-4" />
+                    <h4>Flexible Credit Line</h4>
+                  </div>
+                  <p className="text-sm">
                     You only pay interest on the amount you withdraw. The remaining credit is available anytime.
-                  </AlertDescription>
-                </Alert>
+                  </p>
+                </div>
               </div>
             </div>
           </div>

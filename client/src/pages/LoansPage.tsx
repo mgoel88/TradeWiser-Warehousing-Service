@@ -5,7 +5,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ReceiptCollateralLoanForm } from "@/components/loans/ReceiptCollateralLoanForm";
 import LoanRepaymentButton from "@/components/loans/LoanRepaymentButton";
-import { PlusCircle, CreditCard, CircleDollarSign, Clock, Check, AlertCircle, BadgeIndianRupee } from "lucide-react";
+import { PlusCircle, CreditCard, CircleDollarSign, Clock, Check, AlertCircle, IndianRupee } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
@@ -108,7 +108,7 @@ export default function LoansPage() {
             <Card className="mb-8">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <BadgeIndianRupee className="h-5 w-5 text-primary" />
+                  <IndianRupee className="h-5 w-5 text-primary" />
                   Receipt Collateral Loans
                 </CardTitle>
                 <CardDescription>
