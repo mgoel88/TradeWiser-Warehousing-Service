@@ -12,6 +12,12 @@ import documentParsingService from './services/DocumentParsingService';
 import fileUploadService from './services/FileUploadService';
 import externalWarehouseService from './services/ExternalWarehouseService';
 
+// Configure multer for file uploads
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024 } // 10MB
+});
+
 // Extend Express Request to include session
 declare module 'express-session' {
   interface SessionData {
@@ -943,6 +949,114 @@ export async function registerRoutes(app: Express): Promise<Server> {
           details: error instanceof Error ? error.stack : undefined
         });
       }
+    }
+  });
+
+  // Upload receipt file for Orange Channel - using OCR and document parsing
+  apiRouter.post("/receipts/upload", upload.single('file'), async (req: Request, res: Response) => {
+    try {
+      // Check if user is authenticated
+      if (!req.session || !req.session.userId) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+      
+      if (!req.file) {
+        return res.status(400).json({ message: "No file uploaded" });
+      }
+
+      const sourceType = req.body.sourceType || 'other';
+      
+      // Save the uploaded file to disk
+      const savedFile = await fileUploadService.handleReceiptUpload(req.file);
+      
+      // Process the file using document parsing service
+      const result = await documentParsingService.processUploadedFile(
+        savedFile.filePath, 
+        savedFile.fileType, 
+        req.session.userId
+      );
+      
+      // Clean up the file after processing
+      await fileUploadService.deleteFile(savedFile.filePath);
+      
+      res.status(200).json({
+        message: result.message,
+        receipts: result.receipts
+      });
+    } catch (error) {
+      console.error("Error processing uploaded receipt:", error);
+      res.status(500).json({ 
+        message: "Error processing receipt: " + (error instanceof Error ? error.message : String(error)) 
+      });
+    }
+  });
+
+  // Orange Channel - Manual receipt entry
+  apiRouter.post("/receipts/manual", async (req: Request, res: Response) => {
+    try {
+      // Check if user is authenticated
+      if (!req.session || !req.session.userId) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+      
+      const { 
+        receiptNumber, 
+        warehouseName, 
+        warehouseLocation, 
+        commodityName, 
+        quantity, 
+        qualityGrade, 
+        issuedDate, 
+        expiryDate, 
+        externalId, 
+        externalSource, 
+        channelType 
+      } = req.body;
+      
+      // Validate required fields
+      if (!receiptNumber || !warehouseName || !commodityName || !quantity) {
+        return res.status(400).json({ 
+          message: "Missing required fields: receipt number, warehouse name, commodity name, and quantity are required" 
+        });
+      }
+      
+      // Check if receipt with same external ID exists
+      if (externalId && externalSource) {
+        const existingReceipt = await storage.getWarehouseReceiptByExternalId(externalId, externalSource);
+        if (existingReceipt) {
+          return res.status(409).json({ 
+            message: "A receipt with this external ID already exists", 
+            receiptId: existingReceipt.id 
+          });
+        }
+      }
+      
+      // Create the receipt
+      const receipt = await storage.createWarehouseReceipt({
+        receiptNumber,
+        warehouseName,
+        warehouseAddress: warehouseLocation,
+        commodityName,
+        quantity,
+        qualityGrade,
+        issuedDate: issuedDate ? new Date(issuedDate) : new Date(),
+        expiryDate: expiryDate ? new Date(expiryDate) : null,
+        status: "active",
+        ownerId: req.session.userId,
+        externalId: externalId || receiptNumber,
+        externalSource: externalSource || 'manual',
+        channelType: channelType || 'orange'
+      });
+      
+      res.status(201).json({
+        message: "External receipt created successfully",
+        receipt
+      });
+    } catch (error) {
+      console.error("Error creating manual receipt:", error);
+      res.status(500).json({ 
+        message: "Error creating receipt: " + (error instanceof Error ? error.message : String(error)) 
+      });
     }
   });
 
