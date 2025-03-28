@@ -123,6 +123,8 @@ export const warehouseReceipts = pgTable('warehouse_receipts', {
   warehouseName: text('warehouse_name'),                 // External warehouse name
   warehouseAddress: text('warehouse_address'),           // External warehouse address
   measurementUnit: text('measurement_unit'),             // Unit of measurement
+  attachmentUrl: text('attachment_url'),                 // URL to uploaded receipt file attachment
+  smartContractId: text('smart_contract_id'),            // Smart contract identifier
   metadata: json('metadata'),                            // Additional metadata from external source
 });
 

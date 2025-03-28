@@ -5,10 +5,10 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { FileText, Download, ExternalLink, Calendar, Clock, CreditCard, ArrowUpRight, FileCheck, Printer, ShieldCheck } from "lucide-react";
+import { FileText, Download, ExternalLink, Calendar, Clock, CreditCard, ArrowUpRight, FileCheck, Printer, ShieldCheck, Eye } from "lucide-react";
 import { WarehouseReceipt, Commodity, Warehouse } from "@shared/schema";
 import { formatDate } from "@/lib/utils";
-import { downloadReceiptPDF, generateReceiptPDF } from '@/lib/receiptGenerator';
+import { generateReceiptPDF, generatePlainTextReceipt } from '@/lib/receiptGenerator';
 import { apiRequest } from '@/lib/queryClient';
 
 interface WarehouseReceiptCardProps {
@@ -88,65 +88,96 @@ export default function WarehouseReceiptCard({ receipt, onView, onPledge, classN
         warehouseName: warehouse?.name || "Unknown Warehouse",
         warehouseAddress: warehouse?.address || "Unknown Location",
         valuationAmount: receipt.valuation ? `₹${receipt.valuation.toString()}` : "₹0",
-        verificationCode: verificationCode
+        verificationCode: verificationCode,
+        smartContractId: receipt.smartContractId
       };
       
-      await downloadReceiptPDF(receiptData);
+      // Generate the PDF
+      const pdfBlob = await generateReceiptPDF(receiptData);
+      
+      // Create a download link
+      const url = URL.createObjectURL(pdfBlob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `TradeWiser_Receipt_${receipt.receiptNumber.replace(/[-\s]/g, '')}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      // Clean up the URL object
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
     } catch (error) {
       console.error("Error downloading receipt:", error);
     }
   };
   
-  // Simplified card view - like a credit card
+  // Styled card view like a real credit card
   return (
     <>
       <Card 
-        className={`relative overflow-hidden transition-all hover:shadow-md cursor-pointer ${className}`}
+        className={`relative overflow-hidden transition-all hover:shadow-md cursor-pointer ${className} rounded-xl`}
         onClick={() => setIsDetailOpen(true)}
+        style={{ 
+          background: `linear-gradient(135deg, #1a1a1a, #333)`,
+          maxWidth: '340px' 
+        }}
       >
-        <div className="absolute top-0 right-0 h-full w-2 z-10" style={{ backgroundColor: getStatusColor().replace('bg-', '') }}></div>
+        {/* Smart contract chip */}
+        <div className="absolute top-4 left-4 h-8 w-12 rounded-md bg-yellow-500/80 flex items-center justify-center overflow-hidden">
+          <div className="grid grid-cols-3 gap-0.5">
+            {[...Array(9)].map((_, i) => (
+              <div key={i} className="h-1 w-1 bg-yellow-300/70 rounded-sm"></div>
+            ))}
+          </div>
+        </div>
         
-        <CardContent className="p-4">
-          <div className="flex justify-between items-start">
-            <div className="flex items-center">
-              <CreditCard className="h-5 w-5 mr-2 text-primary" />
-              <span className="font-mono text-sm">{receipt.receiptNumber}</span>
-            </div>
-            <Badge className={getStatusColor()}>{receipt.status}</Badge>
+        {/* Status indicator */}
+        <div className="absolute top-0 right-0 h-full w-2" 
+          style={{ backgroundColor: getStatusColor().replace('bg-', '') }}></div>
+        
+        <CardContent className="p-4 text-white">
+          {/* Smart Contract ID */}
+          <div className="mt-12 mb-4">
+            <p className="text-xs text-white/70">Smart Contract ID</p>
+            <p className="font-mono text-sm">{receipt.smartContractId || "SC-" + receipt.id + "-" + Date.now().toString(16).slice(-6)}</p>
           </div>
           
-          <h3 className="font-medium mt-3 text-lg">{commodity?.name || "Commodity"}</h3>
+          {/* Receipt number displayed as credit card number */}
+          <div className="mt-4 mb-4">
+            <p className="text-xs text-white/70">Receipt Number</p>
+            <p className="font-mono text-lg tracking-wider">{receipt.receiptNumber}</p>
+          </div>
           
-          <div className="grid grid-cols-2 gap-2 mt-3 text-sm">
+          <div className="grid grid-cols-2 gap-2 mt-3">
             <div>
-              <p className="text-xs text-muted-foreground">Quantity</p>
-              <p>{receipt.quantity} {commodity?.measurementUnit || "MT"}</p>
+              <p className="text-xs text-white/70">Commodity</p>
+              <p className="font-medium">{commodity?.name || receipt.commodityName || "Commodity"}</p>
             </div>
             <div>
-              <p className="text-xs text-muted-foreground">Grade</p>
-              <p>{commodity?.gradeAssigned || "Standard"}</p>
+              <p className="text-xs text-white/70">Quantity</p>
+              <p>{receipt.quantity} {receipt.measurementUnit || commodity?.measurementUnit || "MT"}</p>
             </div>
           </div>
           
-          <Separator className="my-3" />
-          
-          <div className="grid grid-cols-2 gap-2 text-sm">
+          <div className="grid grid-cols-2 gap-2 mt-3">
             <div>
-              <p className="text-xs text-muted-foreground">Valuation</p>
-              <p className="font-medium text-primary">₹{receipt.valuation?.toString() || "0"}</p>
+              <p className="text-xs text-white/70">Valuation</p>
+              <p className="font-medium">₹{receipt.valuation?.toString() || "0"}</p>
             </div>
             <div>
-              <p className="text-xs text-muted-foreground">Issued</p>
+              <p className="text-xs text-white/70">Valid Until</p>
               <p className="flex items-center">
-                <Calendar className="h-3 w-3 mr-1" />
-                {formattedDate}
+                {formatDate(expiryDate)}
               </p>
             </div>
           </div>
         </CardContent>
         
-        <CardFooter className="p-3 bg-muted/30 border-t flex justify-end">
-          <ArrowUpRight className="h-4 w-4 text-muted-foreground" />
+        <CardFooter className="p-3 border-t border-white/10 flex justify-between items-center">
+          <Badge variant="outline" className="border-white/50 text-white">
+            {receipt.status}
+          </Badge>
+          <ArrowUpRight className="h-4 w-4 text-white/70" />
         </CardFooter>
       </Card>
       
@@ -233,18 +264,79 @@ export default function WarehouseReceiptCard({ receipt, onView, onPledge, classN
               </div>
             </div>
             
-            {/* Verification box */}
+            {/* Attachments & Documents */}
+            {receipt.attachmentUrl && (
+              <div className="mt-4">
+                <h3 className="font-medium mb-2">Attachments</h3>
+                <div className="border rounded-md overflow-hidden">
+                  <div className="p-3 bg-muted/30 flex items-center justify-between">
+                    <div className="flex items-center">
+                      <FileText className="h-4 w-4 mr-2 text-primary" />
+                      <span className="text-sm">Original Receipt Document</span>
+                    </div>
+                    <div className="flex space-x-2">
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          window.open(`/api/receipts/attachments/${receipt.attachmentUrl}`, '_blank');
+                        }}
+                      >
+                        <Eye className="h-4 w-4" />
+                      </Button>
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          const link = document.createElement('a');
+                          link.href = `/api/receipts/attachments/${receipt.attachmentUrl}`;
+                          link.download = receipt.attachmentUrl || 'receipt-document';
+                          document.body.appendChild(link);
+                          link.click();
+                          document.body.removeChild(link);
+                        }}
+                      >
+                        <Download className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                  {receipt.attachmentUrl?.match(/\.(jpg|jpeg|png)$/i) && (
+                    <div className="p-2 bg-background">
+                      <img 
+                        src={`/api/receipts/attachments/${receipt.attachmentUrl}`} 
+                        alt="Receipt Document" 
+                        className="w-full max-h-40 object-contain"
+                      />
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+            
+            {/* Smart Contract Info */}
             <div className="bg-muted p-3 rounded-md mt-4">
               <div className="flex items-center mb-1">
                 <ShieldCheck className="h-4 w-4 mr-2 text-primary" />
                 <h3 className="text-sm font-medium">Blockchain Verification</h3>
               </div>
-              <p className="text-xs text-muted-foreground">
-                This electronic warehouse receipt is secured using blockchain technology. 
-                Verification code:
-              </p>
-              <p className="bg-background p-2 rounded mt-1 text-center font-mono text-xs">
-                {verificationCode}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
+                <div>
+                  <p className="text-xs text-muted-foreground">Smart Contract ID</p>
+                  <p className="font-mono text-xs bg-background p-1 rounded mt-1">
+                    {receipt.smartContractId || `SC-${receipt.id}-${Date.now().toString(16).slice(-6)}`}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Verification Code</p>
+                  <p className="font-mono text-xs bg-background p-1 rounded mt-1">
+                    {verificationCode}
+                  </p>
+                </div>
+              </div>
+              <p className="text-xs text-muted-foreground mt-2">
+                This electronic warehouse receipt is secured using blockchain technology for tamper-proof verification.
               </p>
             </div>
           </div>
@@ -254,6 +346,40 @@ export default function WarehouseReceiptCard({ receipt, onView, onPledge, classN
               <Button variant="outline" size="sm" onClick={handleDownload}>
                 <Download className="h-4 w-4 mr-1" />
                 Download
+              </Button>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={(e) => {
+                  e.stopPropagation();
+                  try {
+                    const receiptData = {
+                      receiptNumber: receipt.receiptNumber,
+                      issueDate: formattedDate,
+                      expiryDate: formattedExpiryDate,
+                      depositorName: "Rajiv Farmer", // This should come from user data
+                      commodityName: commodity?.name || "Unknown Commodity",
+                      quantity: receipt.quantity?.toString() || "0" + " " + (commodity?.measurementUnit || "MT"),
+                      qualityGrade: commodity?.gradeAssigned || "Standard",
+                      warehouseName: warehouse?.name || "Unknown Warehouse",
+                      warehouseAddress: warehouse?.address || "Unknown Location",
+                      valuationAmount: receipt.valuation ? `₹${receipt.valuation.toString()}` : "₹0",
+                      verificationCode: verificationCode,
+                      smartContractId: receipt.smartContractId || ""
+                    };
+                    
+                    const textReceipt = generatePlainTextReceipt(receiptData);
+                    navigator.clipboard.writeText(textReceipt);
+                    
+                    // Show feedback (this would be better with a toast)
+                    alert("Receipt text copied to clipboard");
+                  } catch (error) {
+                    console.error("Error copying receipt text:", error);
+                  }
+                }}
+              >
+                <CreditCard className="h-4 w-4 mr-1" />
+                Copy Text
               </Button>
               <Button 
                 variant="outline" 
@@ -273,7 +399,8 @@ export default function WarehouseReceiptCard({ receipt, onView, onPledge, classN
                       warehouseName: warehouse?.name || "Unknown Warehouse",
                       warehouseAddress: warehouse?.address || "Unknown Location",
                       valuationAmount: receipt.valuation ? `₹${receipt.valuation.toString()}` : "₹0",
-                      verificationCode: verificationCode
+                      verificationCode: verificationCode,
+                      smartContractId: receipt.smartContractId
                     };
                     
                     // Generate PDF and create object URL

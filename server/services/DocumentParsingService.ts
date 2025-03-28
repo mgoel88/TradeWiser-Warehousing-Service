@@ -7,6 +7,8 @@ import csvParser from 'csv-parser';
 import { PNG } from 'pngjs';
 import { WarehouseReceipt, insertWarehouseReceiptSchema } from '@shared/schema';
 import { storage } from '../storage';
+import fileUploadService from './FileUploadService';
+import * as crypto from 'crypto';
 
 /**
  * DocumentParsingService
@@ -209,6 +211,56 @@ class DocumentParsingService {
   }
 
   /**
+   * Generate a unique smart contract ID for a receipt
+   */
+  generateSmartContractId(receiptNumber: string, userId: number): string {
+    // Format: SC-<timestamp>-<first 8 chars of hash>
+    const timestamp = Date.now().toString(16).slice(-8);
+    const hash = crypto
+      .createHash('sha256')
+      .update(`${receiptNumber}-${userId}-${timestamp}`)
+      .digest('hex')
+      .slice(0, 8);
+    
+    return `SC-${timestamp}-${hash}`.toUpperCase();
+  }
+
+  /**
+   * Format receipt number in credit card style
+   */
+  formatReceiptNumber(originalNumber: string | undefined | null, userId: number): string {
+    if (!originalNumber) {
+      // Create a new receipt number if none exists
+      const timestamp = Date.now().toString().slice(-8);
+      const randomDigits = Math.floor(Math.random() * 9000) + 1000;
+      return `WR${timestamp}${randomDigits}`;
+    }
+    
+    // Check if already in credit card format (4 groups of 4 digits)
+    if (/^\d{4}-\d{4}-\d{4}-\d{4}$/.test(originalNumber)) {
+      return originalNumber;
+    }
+    
+    // Clean the original number (remove non-alphanumeric chars)
+    const cleanNumber = originalNumber.replace(/[^A-Z0-9]/gi, '');
+    
+    // If it's still a valid length, format it as credit-card style
+    if (cleanNumber.length >= 8) {
+      // Use first 16 chars or pad with zeros
+      const paddedNumber = cleanNumber.slice(0, 16).padEnd(16, '0');
+      // Format as credit card: XXXX-XXXX-XXXX-XXXX
+      return `${paddedNumber.slice(0, 4)}-${paddedNumber.slice(4, 8)}-${paddedNumber.slice(8, 12)}-${paddedNumber.slice(12, 16)}`;
+    }
+    
+    // Create a new formatted receipt number based on original + padding
+    const timestamp = Date.now().toString().slice(-6);
+    const userIdLastDigits = userId.toString().slice(-2);
+    const paddedNumber = `${cleanNumber}${timestamp}${userIdLastDigits}`.slice(0, 16).padEnd(16, '0');
+    
+    return `${paddedNumber.slice(0, 4)}-${paddedNumber.slice(4, 8)}-${paddedNumber.slice(8, 12)}-${paddedNumber.slice(12, 16)}`;
+  }
+
+  /**
    * Process an uploaded file based on its type
    */
   async processUploadedFile(filePath: string, fileType: string, userId: number): Promise<{
@@ -256,10 +308,27 @@ class DocumentParsingService {
         throw new Error('Unsupported file type');
       }
       
-      // Save receipts to database - this could be moved to a separate function
+      // Save the original file as an attachment
+      const attachmentUrl = await fileUploadService.createAttachmentFromTempFile(filePath);
+      
+      // Save receipts to database with smart contract IDs and credit-card style receipt numbers
       const savedReceipts = [];
       for (const receipt of receipts) {
         try {
+          // Format receipt number as credit card style
+          const formattedReceiptNumber = this.formatReceiptNumber(receipt.receiptNumber, userId);
+          receipt.receiptNumber = formattedReceiptNumber;
+          
+          // Generate a smart contract ID
+          const smartContractId = this.generateSmartContractId(formattedReceiptNumber, userId);
+          
+          // Add smart contract ID and attachment URL
+          receipt.smartContractId = smartContractId;
+          receipt.attachmentUrl = attachmentUrl;
+          
+          // Default status to active
+          receipt.status = 'active';
+          
           // Check if receipt already exists
           const existingReceipt = await storage.getWarehouseReceiptByNumber(receipt.receiptNumber || '');
           

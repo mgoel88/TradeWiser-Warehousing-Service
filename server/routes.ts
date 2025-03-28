@@ -2,6 +2,8 @@ import express, { type Express, Request, Response, NextFunction } from "express"
 import { createServer, type Server } from "http";
 import { WebSocketServer, WebSocket } from 'ws';
 import multer from 'multer';
+import * as fs from 'fs';
+import * as path from 'path';
 import { storage } from "./storage";
 import { insertUserSchema, insertWarehouseSchema, insertCommoditySchema, insertWarehouseReceiptSchema, insertLoanSchema, insertProcessSchema } from "@shared/schema";
 import { z } from "zod";
@@ -853,6 +855,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ message: "Server error" });
     }
   });
+  
+  // Serve receipt attachments
+  apiRouter.get("/receipts/attachments/:filename", async (req: Request, res: Response) => {
+    try {
+      const { filename } = req.params;
+      
+      // Import file upload service to get the path to the attachment
+      const fileUploadService = await import('./services/FileUploadService');
+      
+      // Get the path to the attachment file
+      const attachmentPath = fileUploadService.default.getAttachmentPath(filename);
+      
+      // Check if the file exists
+      if (!fs.existsSync(attachmentPath)) {
+        return res.status(404).json({ message: "Attachment not found" });
+      }
+      
+      // Determine content type based on file extension
+      let contentType = 'application/octet-stream'; // Default
+      const ext = path.extname(filename).toLowerCase();
+      if (ext === '.pdf') contentType = 'application/pdf';
+      else if (ext === '.jpg' || ext === '.jpeg') contentType = 'image/jpeg';
+      else if (ext === '.png') contentType = 'image/png';
+      else if (ext === '.csv') contentType = 'text/csv';
+      else if (ext === '.xlsx') contentType = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+      
+      // Set content type and send the file
+      res.setHeader('Content-Type', contentType);
+      res.setHeader('Content-Disposition', `inline; filename="${filename}"`);
+      
+      // Stream the file to the response
+      fs.createReadStream(attachmentPath).pipe(res);
+    } catch (error) {
+      console.error("Error serving attachment:", error);
+      res.status(500).json({ 
+        message: "Error serving attachment: " + (error instanceof Error ? error.message : String(error)) 
+      });
+    }
+  });
 
   apiRouter.get("/receipts/:id", async (req: Request, res: Response) => {
     try {
@@ -1031,21 +1072,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       
+      // Import document parsing service to use its receipt number formatting and smart contract generation
+      const documentParsingService = await import('./services/DocumentParsingService');
+      
+      // Format the receipt number in credit card style
+      const formattedReceiptNumber = documentParsingService.default.formatReceiptNumber(
+        receiptNumber, 
+        req.session.userId
+      );
+      
+      // Generate a smart contract ID for the receipt
+      const smartContractId = documentParsingService.default.generateSmartContractId(
+        formattedReceiptNumber, 
+        req.session.userId
+      );
+      
       // Create the receipt
       const receipt = await storage.createWarehouseReceipt({
-        receiptNumber,
+        receiptNumber: formattedReceiptNumber,
         warehouseName,
         warehouseAddress: warehouseLocation,
         commodityName,
-        quantity,
+        quantity: quantity.toString(),
         qualityGrade,
-        issuedDate: issuedDate ? new Date(issuedDate) : new Date(),
-        expiryDate: expiryDate ? new Date(expiryDate) : null,
         status: "active",
         ownerId: req.session.userId,
-        externalId: externalId || receiptNumber,
+        externalId: externalId || formattedReceiptNumber,
         externalSource: externalSource || 'manual',
-        channelType: channelType || 'orange'
+        smartContractId,
+        issuedDate: new Date(), // Handle date separately in storage layer
+        expiryDate: expiryDate ? new Date(expiryDate) : undefined
       });
       
       res.status(201).json({

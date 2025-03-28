@@ -1,8 +1,5 @@
-import jsPDF from 'jspdf';
+import { jsPDF } from 'jspdf';
 
-/**
- * Interface for receipt data
- */
 interface ReceiptData {
   receiptNumber: string;
   issueDate: string;
@@ -15,119 +12,232 @@ interface ReceiptData {
   warehouseAddress: string;
   valuationAmount: string;
   verificationCode: string;
+  smartContractId?: string;
 }
 
 /**
- * Generates and downloads a PDF warehouse receipt
+ * Generate a PDF warehouse receipt document
  */
-export async function downloadReceiptPDF(data: ReceiptData): Promise<void> {
-  try {
-    // Create new PDF
-    const doc = new jsPDF({
-      orientation: 'portrait',
-      unit: 'mm',
-      format: 'a4'
-    });
-    
-    // Set up page
-    const pageWidth = doc.internal.pageSize.getWidth();
-    let y = 20; // Start position for content
-    const lineHeight = 7;
-    
-    // Helper for centered text
-    const centerText = (text: string, y: number, fontSize = 12) => {
-      doc.setFontSize(fontSize);
-      const textWidth = doc.getTextWidth(text);
-      const x = (pageWidth - textWidth) / 2;
-      doc.text(text, x, y);
-      return y + lineHeight;
-    };
-    
-    // Helper for drawing a line
-    const drawLine = (y: number) => {
-      doc.setDrawColor(0);
-      doc.setLineWidth(0.1);
-      doc.line(20, y, pageWidth - 20, y);
-      return y + lineHeight;
-    };
-    
-    // Add a field with label and value
-    const addField = (label: string, value: string, y: number) => {
-      doc.setFontSize(10);
-      doc.setFont(undefined, 'bold');
-      doc.text(label, 20, y);
-      doc.setFont(undefined, 'normal');
-      doc.text(value, 80, y);
-      return y + lineHeight;
-    };
-    
-    // Title
-    doc.setFont(undefined, 'bold');
-    y = centerText('ELECTRONIC WAREHOUSE RECEIPT', y, 16);
-    doc.setFont(undefined, 'normal');
-    y = centerText('TradeWiser Commodity Platform', y + 3, 12);
-    y = centerText('Secured by Blockchain Technology', y, 10);
-    
-    y = drawLine(y + 5);
-    
-    // Basic information
-    y = addField('Receipt Number:', data.receiptNumber, y + 5);
-    y = addField('Issue Date:', data.issueDate, y);
-    y = addField('Expiry Date:', data.expiryDate, y);
-    y = addField('Depositor:', data.depositorName, y);
-    
-    y = drawLine(y + 3);
-    
-    // Commodity information
-    y = centerText('COMMODITY DETAILS', y + 7, 12);
-    y = addField('Name:', data.commodityName, y + 5);
-    y = addField('Quantity:', data.quantity, y);
-    y = addField('Quality Grade:', data.qualityGrade, y);
-    y = addField('Valuation:', data.valuationAmount, y);
-    
-    y = drawLine(y + 3);
-    
-    // Warehouse information
-    y = centerText('WAREHOUSE DETAILS', y + 7, 12);
-    y = addField('Name:', data.warehouseName, y + 5);
-    y = addField('Address:', data.warehouseAddress, y);
-    
-    y = drawLine(y + 3);
-    
-    // Legal text
-    doc.setFontSize(8);
-    let legalText = 'This Electronic Warehouse Receipt (eWR) represents title to the commodity described herein, ';
-    legalText += 'stored at the specified warehouse. It is issued in accordance with the Warehousing Development and ';
-    legalText += 'Regulation Act and is transferable by endorsement. The holder of this receipt is entitled to the ';
-    legalText += 'commodity subject to the warehouse charges and conditions specified.';
-    
-    // Split text to fit on page
-    const splitText = doc.splitTextToSize(legalText, pageWidth - 40);
-    doc.text(splitText, 20, y + 7);
-    
-    y += splitText.length * 4 + 5;
-    
-    // Verification code
-    doc.setFontSize(10);
-    doc.setFont(undefined, 'bold');
-    doc.text('Verification Code:', 20, y);
-    doc.setFont(undefined, 'normal');
-    doc.text(data.verificationCode, 70, y);
-    
-    y += lineHeight * 2;
-    
-    // Fake signature placeholder
-    doc.setFont(undefined, 'bold');
-    doc.text('TradeWiser Platform', 20, y);
-    doc.setFont(undefined, 'normal');
-    doc.text('DIGITALLY SIGNED', 20, y + 4);
-    
-    // Download PDF
-    doc.save(`TradeWiser_Receipt_${data.receiptNumber}.pdf`);
-    
-    return Promise.resolve();
-  } catch (error) {
-    console.error('Error generating PDF:', error);
-    return Promise.reject(error);
+export const generateReceiptPDF = async (data: ReceiptData): Promise<Blob> => {
+  // Create new PDF document
+  const doc = new jsPDF({
+    orientation: 'portrait',
+    unit: 'mm',
+    format: 'a4'
+  });
+
+  // Document styles
+  const titleFont = 16;
+  const headingFont = 12;
+  const normalFont = 10;
+  const smallFont = 8;
+  const margin = 20;
+  const lineHeight = 7;
+  
+  // Current Y position tracker
+  let y = margin;
+  
+  // Add header
+  doc.setFontSize(titleFont);
+  doc.setFont('helvetica', 'bold');
+  doc.text('WAREHOUSE RECEIPT', 105, y, { align: 'center' });
+  
+  y += lineHeight * 2;
+  
+  // Add TradeWiser logo/branding
+  doc.setFontSize(normalFont);
+  doc.setFont('helvetica', 'normal');
+  doc.text('TradeWiser Platform', 105, y, { align: 'center' });
+  
+  y += lineHeight * 2;
+  
+  // Add receipt number with decorative border
+  doc.setFillColor(240, 240, 240);
+  doc.rect(margin, y, 170, 15, 'F');
+  doc.setFontSize(headingFont);
+  doc.setFont('helvetica', 'bold');
+  doc.text('Warehouse Receipt Number:', margin + 5, y + 7);
+  doc.setFont('courier', 'bold');
+  doc.text(data.receiptNumber, 105, y + 7);
+  
+  // Add smart contract ID if available
+  if (data.smartContractId) {
+    doc.setFontSize(smallFont);
+    doc.setFont('courier', 'normal');
+    doc.text(`Smart Contract ID: ${data.smartContractId}`, margin + 5, y + 12);
   }
-}
+  
+  y += 20;
+  
+  // Add dates section
+  doc.setFontSize(normalFont);
+  doc.setFont('helvetica', 'bold');
+  doc.text('Issue Date:', margin, y);
+  doc.setFont('helvetica', 'normal');
+  doc.text(data.issueDate, margin + 30, y);
+  
+  doc.setFont('helvetica', 'bold');
+  doc.text('Expiry Date:', 105, y);
+  doc.setFont('helvetica', 'normal');
+  doc.text(data.expiryDate, 105 + 30, y);
+  
+  y += lineHeight * 2;
+  
+  // Depositor details
+  doc.setFontSize(headingFont);
+  doc.setFont('helvetica', 'bold');
+  doc.text('Depositor:', margin, y);
+  
+  y += lineHeight;
+  
+  doc.setFontSize(normalFont);
+  doc.setFont('helvetica', 'normal');
+  doc.text(data.depositorName, margin + 5, y);
+  
+  y += lineHeight * 2;
+  
+  // Commodity details
+  doc.setFontSize(headingFont);
+  doc.setFont('helvetica', 'bold');
+  doc.text('Commodity Details:', margin, y);
+  
+  y += lineHeight;
+  
+  // Create table-like structure for commodity details
+  doc.setFillColor(240, 240, 240);
+  doc.rect(margin, y, 170, 7, 'F');
+  
+  doc.setFontSize(normalFont);
+  doc.setFont('helvetica', 'bold');
+  doc.text('Commodity', margin + 5, y + 5);
+  doc.text('Quantity', margin + 60, y + 5);
+  doc.text('Quality Grade', margin + 100, y + 5);
+  doc.text('Valuation', margin + 140, y + 5);
+  
+  y += 7;
+  
+  doc.setFont('helvetica', 'normal');
+  doc.text(data.commodityName, margin + 5, y + 5);
+  doc.text(data.quantity, margin + 60, y + 5);
+  doc.text(data.qualityGrade, margin + 100, y + 5);
+  doc.text(data.valuationAmount, margin + 140, y + 5);
+  
+  y += lineHeight * 3;
+  
+  // Warehouse details
+  doc.setFontSize(headingFont);
+  doc.setFont('helvetica', 'bold');
+  doc.text('Storage Facility:', margin, y);
+  
+  y += lineHeight;
+  
+  doc.setFontSize(normalFont);
+  doc.setFont('helvetica', 'normal');
+  doc.text(data.warehouseName, margin + 5, y);
+  
+  y += lineHeight;
+  
+  doc.setFont('helvetica', 'normal');
+  doc.text(data.warehouseAddress, margin + 5, y);
+  
+  y += lineHeight * 3;
+  
+  // Verification information
+  doc.setFillColor(240, 240, 240);
+  doc.rect(margin, y, 170, 25, 'F');
+  
+  doc.setFontSize(headingFont);
+  doc.setFont('helvetica', 'bold');
+  doc.text('Blockchain Verification:', margin + 5, y + 7);
+  
+  y += lineHeight;
+  
+  doc.setFontSize(normalFont);
+  doc.setFont('helvetica', 'normal');
+  doc.text('This electronic warehouse receipt is secured using blockchain technology.', margin + 5, y + 7);
+  
+  y += lineHeight;
+  
+  doc.setFont('courier', 'bold');
+  doc.text(`Verification Code: ${data.verificationCode}`, margin + 5, y + 7);
+  
+  y += lineHeight * 2;
+  
+  // Legal disclaimer
+  doc.setFontSize(smallFont);
+  doc.setFont('helvetica', 'italic');
+  doc.text('This warehouse receipt represents ownership of the commodity described herein.', margin, y + 10);
+  doc.text('The holder of this receipt may transfer ownership or use it as collateral.', margin, y + 15);
+  
+  // Add QR code placeholder
+  doc.setFillColor(220, 220, 220);
+  doc.roundedRect(150, y + 5, 30, 30, 2, 2, 'F');
+  doc.setFontSize(smallFont);
+  doc.setFont('helvetica', 'normal');
+  doc.text('Scan QR to verify', 165, y + 40, { align: 'center' });
+  
+  // Return PDF as blob
+  return doc.output('blob');
+};
+
+/**
+ * Generate a plain text representation of the receipt for copying
+ */
+export const generatePlainTextReceipt = (data: ReceiptData): string => {
+  return `
+WAREHOUSE RECEIPT
+-----------------
+Receipt Number: ${data.receiptNumber}
+${data.smartContractId ? `Smart Contract ID: ${data.smartContractId}` : ''}
+
+Issue Date: ${data.issueDate}
+Expiry Date: ${data.expiryDate}
+
+Depositor: ${data.depositorName}
+
+COMMODITY DETAILS:
+Commodity: ${data.commodityName}
+Quantity: ${data.quantity}
+Quality Grade: ${data.qualityGrade}
+Valuation: ${data.valuationAmount}
+
+STORAGE FACILITY:
+${data.warehouseName}
+${data.warehouseAddress}
+
+BLOCKCHAIN VERIFICATION:
+Verification Code: ${data.verificationCode}
+
+This warehouse receipt represents ownership of the commodity described herein.
+The holder of this receipt may transfer ownership or use it as collateral.
+`;
+};
+
+/**
+ * Generate and download a PDF receipt file with a given filename
+ */
+export const downloadReceiptPDF = async (data: ReceiptData, filename: string = 'warehouse-receipt.pdf'): Promise<void> => {
+  try {
+    // Generate the PDF blob
+    const pdfBlob = await generateReceiptPDF(data);
+    
+    // Create a download link
+    const url = URL.createObjectURL(pdfBlob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    
+    // Append to body, click and remove
+    document.body.appendChild(link);
+    link.click();
+    
+    // Clean up
+    setTimeout(() => {
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    }, 100);
+  } catch (error) {
+    console.error('Error downloading receipt PDF:', error);
+    throw error;
+  }
+};
