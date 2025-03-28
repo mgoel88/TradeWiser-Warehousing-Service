@@ -10,7 +10,7 @@ import {
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Loader2, FileText, Download, ArrowRight, Package, Shield, BadgeCheck } from "lucide-react";
+import { Loader2, FileText, Download, ArrowRight, Package, Shield, BadgeCheck, Upload } from "lucide-react";
 import { format } from "date-fns";
 import QRCode from "qrcode";
 import { jsPDF } from "jspdf";
@@ -20,6 +20,7 @@ import { verifyBlockchainRecord } from "@/lib/blockchainUtils";
 import OwnershipTransferDialog from "./OwnershipTransferDialog";
 import { WithdrawalDialog } from "./WithdrawalDialog";
 import WithdrawalTracker from "../withdraw/WithdrawalTracker";
+import UploadReceiptDialog from "./UploadReceiptDialog";
 
 export default function ReceiptWidget() {
   const { toast } = useToast();
@@ -28,6 +29,7 @@ export default function ReceiptWidget() {
   const [selectedReceipt, setSelectedReceipt] = useState<WarehouseReceipt | null>(null);
   const [isTransferDialogOpen, setIsTransferDialogOpen] = useState(false);
   const [isWithdrawalDialogOpen, setIsWithdrawalDialogOpen] = useState(false);
+  const [isUploadReceiptDialogOpen, setIsUploadReceiptDialogOpen] = useState(false);
   const [selectedWithdrawalProcess, setSelectedWithdrawalProcess] = useState<Process | null>(null);
   const [verificationStates, setVerificationStates] = useState<Record<number, 'idle' | 'verifying' | 'verified' | 'failed'>>({});
 
@@ -297,10 +299,21 @@ export default function ReceiptWidget() {
     <>
       <Card className="w-full">
         <CardHeader>
-          <CardTitle className="flex items-center">
-            <FileText className="h-5 w-5 mr-2 text-primary" />
-            Warehouse Receipts
-          </CardTitle>
+          <div className="flex justify-between items-center">
+            <CardTitle className="flex items-center">
+              <FileText className="h-5 w-5 mr-2 text-primary" />
+              Warehouse Receipts
+            </CardTitle>
+            <Button 
+              variant="secondary" 
+              size="sm" 
+              className="gap-1"
+              onClick={() => setIsUploadReceiptDialogOpen(true)}
+            >
+              <Upload className="h-4 w-4" />
+              Upload Receipt
+            </Button>
+          </div>
           <CardDescription>
             Manage your eWarehouse receipts, download receipts, and transfer ownership.
           </CardDescription>
@@ -485,6 +498,12 @@ export default function ReceiptWidget() {
           </div>
         </div>
       )}
+      
+      {/* Upload Receipt Dialog for Orange Channel */}
+      <UploadReceiptDialog
+        isOpen={isUploadReceiptDialogOpen}
+        onClose={() => setIsUploadReceiptDialogOpen(false)}
+      />
     </>
   );
 }

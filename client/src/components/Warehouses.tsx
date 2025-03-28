@@ -66,7 +66,7 @@ export default function Warehouses() {
             warehouse.city.toLowerCase().includes(searchTerm.toLowerCase()) ||
             warehouse.state.toLowerCase().includes(searchTerm.toLowerCase());
           
-          const matchesChannel = filterChannel === null || warehouse.channelType === filterChannel;
+          const matchesChannel = filterChannel === null || filterChannel === 'all' || warehouse.channelType === filterChannel;
           
           return matchesSearch && matchesChannel;
         })
@@ -105,7 +105,7 @@ export default function Warehouses() {
                 </div>
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All Channels</SelectItem>
+                <SelectItem value="all">All Channels</SelectItem>
                 <SelectItem value="green">Green Channel</SelectItem>
                 <SelectItem value="orange">Orange Channel</SelectItem>
                 <SelectItem value="red">Red Channel</SelectItem>
