@@ -195,7 +195,7 @@ async function seedDatabase() {
       
       console.log(`Successfully seeded ${warehouseData.length} warehouses`);
 
-      // Create test warehouse receipts
+      // Create test warehouse receipts with proper valuations
       const receiptData = [
         {
           receiptNumber: "WR-2024-001",
@@ -206,6 +206,8 @@ async function seedDatabase() {
           quantity: "500",
           status: "active",
           blockchainHash: "0x123f4567e89b",
+          // 500 MT wheat at ₹5000/MT
+          valuation: "2500000",
           issuedDate: new Date(),
           expiryDate: new Date(new Date().setMonth(new Date().getMonth() + 6)),
           valuation: "2500000", // 500 MT of wheat at ₹5000/MT
