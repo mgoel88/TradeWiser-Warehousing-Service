@@ -37,12 +37,12 @@ export default function GreenChannelPage() {
         <div className="mb-6">
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center">
             <div>
-              <h1 className="text-2xl font-bold flex items-center text-primary-800">
-                <Warehouse className="h-6 w-6 mr-2 text-primary-600" />
-                Green Channel
+              <h1 className="text-2xl font-bold flex items-center text-emerald-800">
+                <Warehouse className="h-6 w-6 mr-2 text-emerald-600" />
+                Verified Storage Network
               </h1>
               <p className="text-muted-foreground mt-1">
-                Store and manage your commodities in TradeWiser's network of verified warehouses
+                Store your commodities in our premium, fully-insured warehouses with complete quality certification
               </p>
             </div>
             <div className="mt-4 md:mt-0">

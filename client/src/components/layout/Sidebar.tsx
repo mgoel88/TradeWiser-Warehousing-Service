@@ -42,62 +42,59 @@ export default function Sidebar() {
             </Link>
           </li>
           
-          <li className="mb-1">
-            <div className="ml-2 mb-1">
-              <h3 className="font-medium text-sm text-primary-600 flex items-center">
-                <span className="w-2 h-5 bg-primary-500 rounded mr-2"></span>
-                Green Channel
+          <li className="mb-4">
+            <div className="ml-2 mb-2">
+              <h3 className="font-medium text-sm text-emerald-600 flex items-center">
+                <span className="w-2 h-5 bg-emerald-500 rounded mr-2"></span>
+                Storage & Warehousing
               </h3>
-              <p className="text-[10px] text-muted-foreground ml-4 mb-1">TradeWiser Warehouses</p>
             </div>
-            <Link href="/green-channel" className={cn(
+            <Link href="/warehouses" className={cn(
               "flex items-center p-2 pl-7 rounded-md text-sm",
-              location === "/green-channel" 
-                ? "bg-primary-50 text-primary-600 font-medium" 
+              location === "/warehouses" 
+                ? "bg-emerald-50 text-emerald-600 font-medium" 
                 : "text-gray-700 hover:bg-gray-100"
             )}>
               <Warehouse className="h-4 w-4 mr-2" />
-              Browse Warehouses
+              Find Warehouses
             </Link>
             <Link href="/deposit" className={cn(
               "flex items-center p-2 pl-7 rounded-md text-sm",
               location === "/deposit" 
-                ? "bg-primary-50 text-primary-600 font-medium" 
+                ? "bg-emerald-50 text-emerald-600 font-medium" 
                 : "text-gray-700 hover:bg-gray-100"
             )}>
               <Package className="h-4 w-4 mr-2" />
-              Deposit Commodity
+              Store Commodities
             </Link>
           </li>
           
-          <li className="mb-1">
-            <div className="ml-2 mb-1 mt-3">
-              <h3 className="font-medium text-sm text-orange-600 flex items-center">
-                <span className="w-2 h-5 bg-orange-500 rounded mr-2"></span>
-                Orange Channel
+          <li className="mb-4">
+            <div className="ml-2 mb-2">
+              <h3 className="font-medium text-sm text-blue-600 flex items-center">
+                <span className="w-2 h-5 bg-blue-500 rounded mr-2"></span>
+                External Receipts
               </h3>
-              <p className="text-[10px] text-muted-foreground ml-4 mb-1">External Warehouses</p>
             </div>
-            <Link href="/orange-channel" className={cn(
+            <Link href="/import-receipts" className={cn(
               "flex items-center p-2 pl-7 rounded-md text-sm",
-              location === "/orange-channel" 
-                ? "bg-primary-50 text-primary-600 font-medium" 
+              location === "/import-receipts" 
+                ? "bg-blue-50 text-blue-600 font-medium" 
                 : "text-gray-700 hover:bg-gray-100"
             )}>
               <ExternalLink className="h-4 w-4 mr-2" />
-              Upload Receipts
+              Import External WRs
             </Link>
           </li>
           
-          <li className="mb-1">
-            <div className="ml-2 mb-1 mt-3">
-              <h3 className="font-medium text-sm text-red-600 flex items-center">
-                <span className="w-2 h-5 bg-red-500 rounded mr-2"></span>
-                Red Channel
+          <li className="mb-4">
+            <div className="ml-2 mb-2">
+              <h3 className="font-medium text-sm text-purple-600 flex items-center">
+                <span className="w-2 h-5 bg-purple-500 rounded mr-2"></span>
+                Private Storage
               </h3>
-              <p className="text-[10px] text-muted-foreground ml-4 mb-1">Self-Certified Storage</p>
             </div>
-            <Link href="/red-channel" className={cn(
+            <Link href="/private-storage" className={cn(
               "flex items-center p-2 pl-7 rounded-md text-sm",
               location === "/red-channel" 
                 ? "bg-primary-50 text-primary-600 font-medium" 
