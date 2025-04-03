@@ -1,16 +1,16 @@
 import { db } from '../server/db';
-import { users, warehouses, warehouseReceipts, InsertUser, InsertWarehouse } from '../shared/schema';
+import { users, warehouses, warehouseReceipts, InsertUser, InsertWarehouse, commodities as commoditiesTable, InsertCommodity, loans as loansTable, InsertLoan } from '../shared/schema';
 
 async function seedDatabase() {
   console.log('Starting database seeding...');
-  
+
   try {
     // Check if we already have users in the database
     const existingUsers = await db.select().from(users);
-    
+
     if (existingUsers.length === 0) {
       console.log('Seeding users...');
-      
+
       // Create demo users
       const demoUser: InsertUser = {
         username: "rajiv",
@@ -23,10 +23,10 @@ async function seedDatabase() {
         kycDocuments: {},
         businessDetails: {}
       };
-      
+
       const [user] = await db.insert(users).values(demoUser).returning();
       console.log(`Created demo user: ${user.fullName}`);
-      
+
       // Sample warehouses in various locations across India
       const warehouseData: InsertWarehouse[] = [
         // Delhi and NCR region
@@ -75,7 +75,7 @@ async function seedDatabase() {
           specializations: { crops: ["wheat", "rice", "pulses", "oilseeds"] },
           facilities: { cleaning: true, sorting: true, packaging: true, refrigeration: true }
         },
-        
+
         // Mumbai and Maharashtra region
         {
           name: "Mumbai Port Warehouse",
@@ -107,7 +107,7 @@ async function seedDatabase() {
           specializations: { crops: ["sugarcane", "vegetables", "grains"] },
           facilities: { cleaning: true, sorting: true, cold_storage: true }
         },
-        
+
         // Punjab region
         {
           name: "Ludhiana Grain Storage",
@@ -139,7 +139,7 @@ async function seedDatabase() {
           specializations: { crops: ["wheat", "rice"] },
           facilities: { cleaning: true, packaging: true, refrigeration: false }
         },
-        
+
         // Southern India
         {
           name: "Chennai Port Storage",
@@ -187,27 +187,62 @@ async function seedDatabase() {
           facilities: { drying: true, fumigation: true, packaging: true }
         },
       ];
-      
+
       console.log('Seeding warehouses...');
       for (const warehouse of warehouseData) {
         await db.insert(warehouses).values(warehouse);
       }
-      
+
       console.log(`Successfully seeded ${warehouseData.length} warehouses`);
+
+      // Create test commodities first
+      const commodityData: InsertCommodity[] = [
+        {
+          name: "Premium Wheat",
+          type: "Wheat",
+          quantity: "500",
+          measurementUnit: "MT",
+          qualityParameters: { moisture: "12%", foreignMatter: "0.5%" },
+          gradeAssigned: "A",
+          warehouseId: 1,
+          ownerId: user.id,
+          status: "active",
+          channelType: "green",
+          valuation: "2500000" // 500 MT at ₹5000/MT
+        },
+        {
+          name: "Basmati Rice",
+          type: "Rice",
+          quantity: "320",
+          measurementUnit: "MT",
+          qualityParameters: { moisture: "11%", foreignMatter: "0.3%" },
+          gradeAssigned: "A+",
+          warehouseId: 2,
+          ownerId: user.id,
+          status: "active",
+          channelType: "green",
+          valuation: "1920000" // 320 MT at ₹6000/MT
+        }
+      ];
+
+      console.log('Creating test commodities...');
+      const commodities = [];
+      for (const commodity of commodityData) {
+        const [created] = await db.insert(commoditiesTable).values(commodity).returning('*');
+        commodities.push(created);
+      }
 
       // Create test warehouse receipts with proper valuations
       const receiptData = [
         {
           receiptNumber: "WR-2024-001",
           receiptType: "negotiable",
-          commodityId: 1,
+          commodityId: commodities[0].id,
           ownerId: user.id,
           warehouseId: 1,
           quantity: "500",
           status: "active",
           blockchainHash: "0x123f4567e89b",
-          // 500 MT wheat at ₹5000/MT
-          valuation: "2500000",
           issuedDate: new Date(),
           expiryDate: new Date(new Date().setMonth(new Date().getMonth() + 6)),
           valuation: "2500000", // 500 MT of wheat at ₹5000/MT
@@ -237,7 +272,7 @@ async function seedDatabase() {
         {
           receiptNumber: "WR-2024-002",
           receiptType: "non_negotiable",
-          commodityId: 2,
+          commodityId: commodities[1].id,
           ownerId: user.id,
           warehouseId: 2,
           quantity: "320",
@@ -275,12 +310,48 @@ async function seedDatabase() {
       for (const receipt of receiptData) {
         await db.insert(warehouseReceipts).values(receipt);
       }
-      
+
       console.log(`Successfully seeded ${receiptData.length} warehouse receipts`);
+
+
+      // Add demo loan data
+      const loanData: InsertLoan[] = [
+        {
+          loanId: "LN-2024-001",
+          borrowerId: user.id,
+          loanAmount: 1000000,
+          interestRate: 0.1,
+          loanTerm: 12,
+          collateral: { receiptIds: [commodities[0].id] },
+          status: "active",
+          disbursementDate: new Date(),
+          dueDate: new Date(new Date().setFullYear(new Date().getFullYear() + 1))
+        },
+        {
+          loanId: "LN-2024-002",
+          borrowerId: user.id,
+          loanAmount: 500000,
+          interestRate: 0.08,
+          loanTerm: 6,
+          collateral: { receiptIds: [commodities[1].id] },
+          status: "active",
+          disbursementDate: new Date(),
+          dueDate: new Date(new Date().setMonth(new Date().getMonth() + 6))
+        }
+      ];
+
+      console.log('Seeding loans...');
+      for (const loan of loanData) {
+        await db.insert(loansTable).values(loan);
+      }
+
+      console.log(`Successfully seeded ${loanData.length} loans`);
+
+
     } else {
       console.log('Database already has users, skipping seed process');
     }
-    
+
     console.log('Seeding completed successfully');
   } catch (error) {
     console.error('Failed to seed the database:', error);
