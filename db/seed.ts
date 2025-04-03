@@ -208,7 +208,7 @@ async function seedDatabase() {
           blockchainHash: "0x123f4567e89b",
           issuedDate: new Date(),
           expiryDate: new Date(new Date().setMonth(new Date().getMonth() + 6)),
-          valuation: "1050000",
+          valuation: "2500000", // 500 MT of wheat at ₹5000/MT
           storageFee: "25000",
           insuranceDetails: {
             provider: "Agri Insurance Co",

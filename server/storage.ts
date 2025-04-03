@@ -325,17 +325,38 @@ export class MemStorage implements IStorage {
     
     receipts.forEach(receipt => this.createWarehouseReceipt(receipt));
     
-    // Sample loan
-    const loan: InsertLoan = {
-      userId: 1,
-      amount: 188750,
-      interestRate: 9.5,
-      endDate: new Date(new Date().setMonth(new Date().getMonth() + 6)),
-      status: "active",
-      collateralReceiptIds: [1],
-      outstandingAmount: 188750,
-      repaymentSchedule: {}
-    };
+    // Sample loans
+    const loans: InsertLoan[] = [
+      {
+        userId: 1,
+        amount: 1500000, // 60% of wheat receipt valuation
+        interestRate: 9.5,
+        endDate: new Date(new Date().setMonth(new Date().getMonth() + 6)),
+        status: "active",
+        collateralReceiptIds: [1],
+        outstandingAmount: 1500000,
+        repaymentSchedule: {
+          type: "monthly",
+          installments: 6,
+          nextDueDate: new Date(new Date().setMonth(new Date().getMonth() + 1))
+        }
+      },
+      {
+        userId: 1,
+        amount: 800000,
+        interestRate: 10.5,
+        endDate: new Date(new Date().setMonth(new Date().getMonth() + 3)),
+        status: "active",
+        collateralReceiptIds: [2],
+        outstandingAmount: 600000, // Partially repaid
+        repaymentSchedule: {
+          type: "bullet",
+          maturityDate: new Date(new Date().setMonth(new Date().getMonth() + 3))
+        }
+      }
+    ];
+    
+    loans.forEach(loan => this.createLoan(loan));
     
     this.createLoan(loan);
     
