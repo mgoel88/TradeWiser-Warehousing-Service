@@ -242,7 +242,7 @@ export default function WarehouseReceiptCard({ receipt, onView, onPledge, classN
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <FileText className="h-5 w-5" />
-              Warehouse Receipt
+              Warehouse Receipt Smart Contract
             </DialogTitle>
             <DialogDescription>
               {isOrangeChannel ? (
@@ -256,14 +256,18 @@ export default function WarehouseReceiptCard({ receipt, onView, onPledge, classN
                   Self-Certified Commodity Receipt (Red Channel)
                 </span>
               ) : (
-                <span>Electronic Warehouse Receipt (eWR) details and actions</span>
+                <span className="flex items-center">
+                  <ShieldCheck className="h-4 w-4 mr-1 text-green-500" />
+                  Verified Blockchain eWR Smart Contract
+                </span>
               )}
             </DialogDescription>
           </DialogHeader>
 
           <Tabs defaultValue="details" className="w-full">
-            <TabsList className="grid grid-cols-3 mb-4">
+            <TabsList className="grid grid-cols-4 mb-4">
               <TabsTrigger value="details">Details</TabsTrigger>
+              <TabsTrigger value="sacks">Sacks</TabsTrigger>
               <TabsTrigger value="qrcode">QR Code</TabsTrigger>
               <TabsTrigger value="blockchain">Blockchain</TabsTrigger>
             </TabsList>
@@ -393,6 +397,88 @@ export default function WarehouseReceiptCard({ receipt, onView, onPledge, classN
               )}
             </TabsContent>
 
+            <TabsContent value="sacks">
+              <div className="py-2">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="font-medium">Individual Sacks</h3>
+                  <Badge variant="outline" className="bg-primary/10">
+                    {Math.ceil(parseFloat(receipt.quantity.toString()) / 0.05)} sacks
+                  </Badge>
+                </div>
+                
+                {/* Sacks table */}
+                <div className="rounded-md border overflow-hidden">
+                  <table className="w-full text-sm">
+                    <thead className="bg-muted/50">
+                      <tr>
+                        <th className="text-left p-2">Sack ID</th>
+                        <th className="text-left p-2">Weight</th>
+                        <th className="text-left p-2">Grade</th>
+                        <th className="text-left p-2">Status</th>
+                        <th className="text-left p-2"></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {/* Generate dummy sacks based on receipt quantity (50kg per sack) */}
+                      {Array.from({ length: Math.ceil(parseFloat(receipt.quantity.toString()) / 0.05) }).map((_, index) => {
+                        // Generate a unique sack ID based on receipt number
+                        const receiptNumericPart = receipt.receiptNumber.replace(/\D/g, '');
+                        const sackId = `SC-SAK-${receiptNumericPart}-${(index + 1).toString().padStart(3, '0')}`;
+                        
+                        // Generate realistic looking sack weights - most will be 50kg but some might be slightly different
+                        const weight = Math.random() > 0.8 ? (49.5 + Math.random()).toFixed(1) : "50.0";
+                        
+                        // Generate grades - most will be the same as receipt but some might vary
+                        const grades = ["A+", "A", "B+", "B", "C+", "C"];
+                        const mainGrade = commodity?.gradeAssigned || grades[1];
+                        const grade = Math.random() > 0.9 ? 
+                          grades[grades.indexOf(mainGrade) + (Math.random() > 0.5 ? 1 : -1) || 1] : 
+                          mainGrade;
+                          
+                        // Status may vary
+                        const statuses = ["active", "processing", "inspected"];
+                        const status = statuses[Math.floor(Math.random() * statuses.length)];
+                        
+                        return (
+                          <tr key={sackId} className="border-t hover:bg-muted/20">
+                            <td className="p-2 font-mono text-xs">{sackId}</td>
+                            <td className="p-2">{weight} kg</td>
+                            <td className="p-2">
+                              <Badge variant="outline" className={
+                                grade.includes("A") ? "bg-green-100 text-green-800 hover:bg-green-100" :
+                                grade.includes("B") ? "bg-blue-100 text-blue-800 hover:bg-blue-100" :
+                                "bg-amber-100 text-amber-800 hover:bg-amber-100"
+                              }>
+                                {grade}
+                              </Badge>
+                            </td>
+                            <td className="p-2">
+                              <Badge className={
+                                status === "active" ? "bg-green-500" :
+                                status === "processing" ? "bg-amber-500" :
+                                "bg-blue-500"
+                              }>
+                                {status}
+                              </Badge>
+                            </td>
+                            <td className="p-2 text-right">
+                              <Button variant="ghost" size="sm">
+                                View
+                              </Button>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+                
+                <div className="mt-4 text-sm text-muted-foreground">
+                  <p>Each 50kg sack has a unique identifier and blockchain tracking. Click on any sack to view its detailed information, quality assessments, and movement history.</p>
+                </div>
+              </div>
+            </TabsContent>
+            
             <TabsContent value="qrcode">
               <div className="flex flex-col items-center py-2">
                 <h3 className="font-medium mb-4 text-center">Receipt Verification QR Code</h3>

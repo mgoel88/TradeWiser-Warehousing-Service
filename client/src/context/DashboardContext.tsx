@@ -51,24 +51,26 @@ interface DashboardContextType {
 const DashboardContext = createContext<DashboardContextType | undefined>(undefined);
 
 // Define default widgets and their properties
+// Always put the map widget first in the array to ensure it's at the top
 const getDefaultWidgets = (): Widget[] => [
   {
     id: "warehousemap-widget",
     type: "warehousemap",
     title: "Warehouse Map",
     x: 0,
-    y: 0,
+    y: 0, // Always at y=0 to be at the top
     w: 12,
-    h: 4,
+    h: 4, // Taller map
     minW: 6,
-    minH: 4
+    minH: 4,
+    static: true // Make it static so it can't be moved from the top
   },
   {
     id: "receipts-widget",
     type: "receipts",
     title: "Recent Receipts",
     x: 0,
-    y: 4,
+    y: 4, // Position below the map
     w: 6,
     h: 2,
     minW: 4,
@@ -79,7 +81,7 @@ const getDefaultWidgets = (): Widget[] => [
     type: "loans",
     title: "Active Loans",
     x: 6,
-    y: 4,
+    y: 4, // Position below the map
     w: 6,
     h: 2,
     minW: 4,
