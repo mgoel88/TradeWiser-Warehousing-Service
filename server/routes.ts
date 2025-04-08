@@ -2688,7 +2688,66 @@ app.use("/api", apiRouter);
     }
   });
   
-  apiRouter.get("/commodity-sacks/:id/quality-history", async (req: Request, res: Response) => {
+  // Supply Chain Endpoints
+apiRouter.post("/supply-chain/track", async (req: Request, res: Response) => {
+  try {
+    const { sackId, event } = req.body;
+    const result = await SupplyChainService.trackDelivery(sackId, event);
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({ error: "Failed to track delivery" });
+  }
+});
+
+apiRouter.post("/supply-chain/route", async (req: Request, res: Response) => {
+  try {
+    const { origin, destination, constraints } = req.body;
+    const route = await SupplyChainService.calculateOptimalRoute(origin, destination, constraints);
+    res.json(route);
+  } catch (error) {
+    res.status(500).json({ error: "Failed to calculate route" });
+  }
+});
+
+// Risk Management Endpoints
+apiRouter.get("/risk/score/:commodityId", async (req: Request, res: Response) => {
+  try {
+    const score = await RiskManagementService.calculateRiskScore(parseInt(req.params.commodityId));
+    res.json(score);
+  } catch (error) {
+    res.status(500).json({ error: "Failed to calculate risk score" });
+  }
+});
+
+apiRouter.get("/risk/portfolio/:userId", async (req: Request, res: Response) => {
+  try {
+    const analysis = await RiskManagementService.calculatePortfolioDiversification(parseInt(req.params.userId));
+    res.json(analysis);
+  } catch (error) {
+    res.status(500).json({ error: "Failed to analyze portfolio" });
+  }
+});
+
+// Analytics Endpoints
+apiRouter.post("/analytics/report", async (req: Request, res: Response) => {
+  try {
+    const report = await AnalyticsService.generateReport(req.body);
+    res.json(report);
+  } catch (error) {
+    res.status(500).json({ error: "Failed to generate report" });
+  }
+});
+
+apiRouter.get("/analytics/portfolio/:userId", async (req: Request, res: Response) => {
+  try {
+    const analytics = await AnalyticsService.getPortfolioAnalytics(parseInt(req.params.userId));
+    res.json(analytics);
+  } catch (error) {
+    res.status(500).json({ error: "Failed to get portfolio analytics" });
+  }
+});
+
+apiRouter.get("/commodity-sacks/:id/quality-history", async (req: Request, res: Response) => {
     try {
       // Check if user is authenticated
       if (!req.session || !req.session.userId) {
