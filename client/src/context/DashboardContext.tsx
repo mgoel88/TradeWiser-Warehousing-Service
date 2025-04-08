@@ -53,11 +53,22 @@ const DashboardContext = createContext<DashboardContextType | undefined>(undefin
 // Define default widgets and their properties
 const getDefaultWidgets = (): Widget[] => [
   {
+    id: "warehousemap-widget",
+    type: "warehousemap",
+    title: "Warehouse Map",
+    x: 0,
+    y: 0,
+    w: 12,
+    h: 4,
+    minW: 6,
+    minH: 4
+  },
+  {
     id: "receipts-widget",
     type: "receipts",
     title: "Recent Receipts",
     x: 0,
-    y: 0,
+    y: 4,
     w: 6,
     h: 2,
     minW: 4,
@@ -68,7 +79,7 @@ const getDefaultWidgets = (): Widget[] => [
     type: "loans",
     title: "Active Loans",
     x: 6,
-    y: 0,
+    y: 4,
     w: 6,
     h: 2,
     minW: 4,
@@ -79,7 +90,7 @@ const getDefaultWidgets = (): Widget[] => [
     type: "commodities",
     title: "My Commodities",
     x: 0,
-    y: 2,
+    y: 6,
     w: 6,
     h: 2,
     minW: 4,
@@ -90,22 +101,11 @@ const getDefaultWidgets = (): Widget[] => [
     type: "quick-actions",
     title: "Quick Actions",
     x: 6,
-    y: 2,
+    y: 6,
     w: 6,
     h: 2,
     minW: 3,
     minH: 2
-  },
-  {
-    id: "warehousemap-widget",
-    type: "warehousemap",
-    title: "Warehouse Map",
-    x: 0,
-    y: 4,
-    w: 12,
-    h: 3,
-    minW: 6,
-    minH: 3
   }
 ];
 
@@ -217,9 +217,9 @@ const getAvailableWidgetTemplates = (): Widget[] => [
     x: 0,
     y: 0,
     w: 12,
-    h: 3,
+    h: 4,
     minW: 6,
-    minH: 3
+    minH: 4
   }
 ];
 

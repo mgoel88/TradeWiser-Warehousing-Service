@@ -69,7 +69,7 @@ export function WarehouseMap() {
       if (!userLocation) return [];
       
       const [lat, lng] = userLocation;
-      const res = await apiRequest('GET', `/api/warehouses/nearby?lat=${lat}&lng=${lng}`);
+      const res = await apiRequest('GET', `/api/warehouses/nearby?lat=${lat}&lng=${lng}&radius=50`);
       if (!res.ok) return [];
       
       return res.json();
