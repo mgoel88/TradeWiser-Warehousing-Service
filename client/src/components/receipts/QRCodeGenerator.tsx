@@ -5,6 +5,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Loader2, Download, RefreshCw } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import QRCode from "qrcode";
+import { apiRequest } from "@/lib/queryClient";
 
 interface QRCodeGeneratorProps {
   receiptId: number;
@@ -21,6 +22,15 @@ export function QRCodeGenerator({ receiptId }: QRCodeGeneratorProps) {
     receiptId: number;
   }>({
     queryKey: [`/api/receipts/${receiptId}/qr-code`],
+    queryFn: async () => {
+      if (!receiptId) throw new Error("No receipt ID provided");
+      const response = await apiRequest('GET', `/api/receipts/${receiptId}/qr-code`);
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || "Failed to generate QR code");
+      }
+      return response.json();
+    },
     enabled: !!receiptId,
   });
 

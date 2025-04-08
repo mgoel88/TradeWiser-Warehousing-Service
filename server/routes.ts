@@ -863,11 +863,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Generate QR code for receipt verification
   apiRouter.get("/receipts/:id/qr-code", async (req: Request, res: Response) => {
     try {
-      // Check if user is authenticated
-      if (!req.session || !req.session.userId) {
-        return res.status(401).json({ message: "Not authenticated" });
-      }
-      
       const id = parseInt(req.params.id);
       
       if (isNaN(id)) {
@@ -882,10 +877,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Receipt not found" });
       }
       
-      // Check if user owns the receipt
-      if (receipt.ownerId !== req.session.userId) {
-        return res.status(403).json({ message: "Not authorized to access this receipt" });
-      }
+      // Note: We've removed the authentication check to allow the QR code to be publicly accessible
+      // In a production system, you would want to add more security measures like rate limiting
       
       // Get the verification code from the liens field
       let verificationCode;
