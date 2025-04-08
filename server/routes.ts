@@ -141,23 +141,50 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   apiRouter.get("/warehouses/nearby", async (req: Request, res: Response) => {
     try {
-      const { latitude, longitude, radius } = req.query;
+      const { lat, lng, latitude, longitude, radius = "50" } = req.query;
       
-      if (!latitude || !longitude || !radius) {
-        return res.status(400).json({ message: "Latitude, longitude and radius are required" });
-      }
-      
-      const lat = parseFloat(latitude as string);
-      const lng = parseFloat(longitude as string);
+      // Accept either lat/lng or latitude/longitude parameters for flexibility
+      const userLat = parseFloat((lat || latitude) as string);
+      const userLng = parseFloat((lng || longitude) as string);
       const rad = parseFloat(radius as string);
       
-      if (isNaN(lat) || isNaN(lng) || isNaN(rad)) {
-        return res.status(400).json({ message: "Invalid latitude, longitude or radius" });
+      // If no location provided or invalid, return all warehouses
+      if (isNaN(userLat) || isNaN(userLng) || isNaN(rad)) {
+        const warehouses = await storage.listWarehouses();
+        return res.status(200).json(warehouses);
       }
       
-      const warehouses = await storage.listWarehousesByLocation(lat, lng, rad);
-      res.status(200).json(warehouses);
+      // Calculate distances for all warehouses
+      const warehouses = await storage.listWarehouses();
+      const warehousesWithDistances = warehouses.map(warehouse => {
+        const warehouseLat = parseFloat(warehouse.latitude.toString());
+        const warehouseLng = parseFloat(warehouse.longitude.toString());
+        
+        // Basic distance calculation (Haversine formula)
+        const R = 6371; // Earth radius in km
+        const dLat = (warehouseLat - userLat) * Math.PI / 180;
+        const dLng = (warehouseLng - userLng) * Math.PI / 180;
+        const a = 
+          Math.sin(dLat/2) * Math.sin(dLat/2) +
+          Math.cos(userLat * Math.PI / 180) * Math.cos(warehouseLat * Math.PI / 180) * 
+          Math.sin(dLng/2) * Math.sin(dLng/2);
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+        const distance = R * c; // Distance in km
+        
+        return {
+          ...warehouse,
+          distance: parseFloat(distance.toFixed(2))
+        };
+      });
+      
+      // Filter by radius and sort by distance
+      const nearbyWarehouses = warehousesWithDistances
+        .filter(warehouse => warehouse.distance <= rad)
+        .sort((a, b) => a.distance - b.distance);
+        
+      res.status(200).json(nearbyWarehouses);
     } catch (error) {
+      console.error('Error fetching nearby warehouses:', error);
       res.status(500).json({ message: "Server error" });
     }
   });

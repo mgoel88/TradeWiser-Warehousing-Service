@@ -8,6 +8,7 @@ import { NotificationsWidget } from "./NotificationsWidget";
 import { MarketPricesWidget } from "./MarketPricesWidget";
 import { WeatherWidget } from "./WeatherWidget";
 import { TransactionsWidget } from "./TransactionsWidget";
+import { WarehouseMapWidget } from "./WarehouseMapWidget";
 
 interface WidgetLoaderProps {
   id: string;
@@ -44,6 +45,8 @@ function renderWidget(widget: Widget) {
       return <QuickActionsWidget id={widget.id} title={widget.title} config={widget.config} />;
     case "notifications":
       return <NotificationsWidget id={widget.id} title={widget.title} config={widget.config} />;
+    case "warehousemap":
+      return <WarehouseMapWidget />;
     default:
       return <div>Unknown widget type: {widget.type}</div>;
   }

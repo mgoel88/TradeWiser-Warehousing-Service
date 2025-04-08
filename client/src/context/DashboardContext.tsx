@@ -12,7 +12,8 @@ export type WidgetType =
   | "market-prices"
   | "weather"
   | "quick-actions"
-  | "notifications";
+  | "notifications"
+  | "warehousemap";
 
 // Widget configuration
 export interface Widget {
@@ -94,6 +95,17 @@ const getDefaultWidgets = (): Widget[] => [
     h: 2,
     minW: 3,
     minH: 2
+  },
+  {
+    id: "warehousemap-widget",
+    type: "warehousemap",
+    title: "Warehouse Map",
+    x: 0,
+    y: 4,
+    w: 12,
+    h: 3,
+    minW: 6,
+    minH: 3
   }
 ];
 
@@ -197,6 +209,17 @@ const getAvailableWidgetTemplates = (): Widget[] => [
     h: 2,
     minW: 3,
     minH: 2
+  },
+  {
+    id: "template-warehousemap",
+    type: "warehousemap",
+    title: "Warehouse Map",
+    x: 0,
+    y: 0,
+    w: 12,
+    h: 3,
+    minW: 6,
+    minH: 3
   }
 ];
 
