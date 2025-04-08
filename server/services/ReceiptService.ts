@@ -4,7 +4,11 @@ import type { InsertWarehouseReceipt } from "@shared/schema";
 /**
  * Service for warehouse receipt operations - Simplified to match database schema
  */
-export class ReceiptService {
+export /**
+ * Service for handling warehouse receipt operations
+ * @class ReceiptService
+ */
+class ReceiptService {
   /**
    * Generates a receipt number
    */
