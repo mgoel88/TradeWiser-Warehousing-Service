@@ -16,6 +16,15 @@ import { apiRequest } from "./queryClient";
 export type PaymentMethod = 'upi' | 'card' | 'netbanking' | 'wallet';
 export type PaymentGateway = 'razorpay' | 'paytm' | 'stripe';
 
+export interface ReceiptCollateral {
+  receiptId: number;
+  receiptNumber: string;
+  commodityName: string;
+  quantity: string;
+  valuation: number;
+  creditLimit: number;
+}
+
 export interface PaymentDetails {
   amount: number;
   currency?: string;
@@ -190,6 +199,121 @@ export async function processPremiumServicePayment(
       serviceId
     }
   });
+}
+
+/**
+ * Calculate available credit limit based on collateral receipts
+ * @param userId User ID to calculate credit limit for
+ * @param receiptIds Optional array of receipt IDs to use as collateral
+ * @returns Credit limit details
+ */
+export async function calculateCreditLimit(
+  userId: number,
+  receiptIds?: number[]
+): Promise<{
+  userId: number;
+  totalValuation: number;
+  availableCredit: number;
+  receiptDetails: ReceiptCollateral[];
+  interestRate: number;
+  timestamp: string;
+}> {
+  try {
+    const response = await apiRequest(
+      "POST",
+      "/api/loans/credit-limit",
+      { userId, receiptIds }
+    );
+    
+    if (!response.ok) {
+      throw new Error(`Failed to calculate credit limit: ${response.statusText}`);
+    }
+    
+    return await response.json();
+  } catch (error) {
+    console.error("Failed to calculate credit limit:", error);
+    throw error;
+  }
+}
+
+/**
+ * Initialize overdraft loan against warehouse receipts
+ * @param userId User ID
+ * @param receiptIds Receipt IDs to use as collateral
+ * @param initialDrawdown Initial amount to withdraw (optional)
+ * @returns Loan details
+ */
+export async function initializeOverdraftLoan(
+  userId: number,
+  receiptIds: number[],
+  initialDrawdown?: number
+): Promise<{
+  loanId: number;
+  creditLimit: number;
+  availableCredit: number;
+  interestRate: number;
+  collateralDetails: ReceiptCollateral[];
+  status: 'active' | 'pending' | 'repaid' | 'defaulted';
+}> {
+  try {
+    const response = await apiRequest(
+      "POST",
+      "/api/loans/overdraft",
+      { 
+        userId, 
+        receiptIds, 
+        initialDrawdown: initialDrawdown || 0
+      }
+    );
+    
+    if (!response.ok) {
+      throw new Error(`Failed to initialize overdraft: ${response.statusText}`);
+    }
+    
+    return await response.json();
+  } catch (error) {
+    console.error("Failed to initialize overdraft:", error);
+    throw error;
+  }
+}
+
+/**
+ * Fetch commodity pricing data
+ * @param commodityType Type of commodity (e.g., Grain, Pulses)
+ * @param quality Quality assessment object with score
+ * @param quantity Quantity in standard units
+ * @returns Pricing information
+ */
+export async function fetchCommodityPricing(
+  commodityType: string,
+  quality: { score: number; [key: string]: any },
+  quantity: number | string
+): Promise<{
+  commodityType: string;
+  basePrice: number;
+  qualityAdjustedPrice: string;
+  totalValuation: string;
+  marketTrend: 'rising' | 'falling';
+  timestamp: string;
+  perUnitPrice: string;
+  creditLimit: string;
+}> {
+  try {
+    const response = await apiRequest(
+      "POST",
+      "/api/pricing/fetch",
+      { commodityType, quality, quantity }
+    );
+    
+    if (!response.ok) {
+      throw new Error(`Failed to fetch pricing data: ${response.statusText}`);
+    }
+    
+    return await response.json();
+  } catch (error) {
+    console.error("Failed to fetch pricing data:", error);
+    throw error;
+  }
 }
 
 /**

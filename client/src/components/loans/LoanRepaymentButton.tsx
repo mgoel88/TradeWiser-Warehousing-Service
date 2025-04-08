@@ -13,7 +13,8 @@ import { Label } from '@/components/ui/label';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiRequest } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
-import { CreditCard, DollarSign, BadgeCheck } from 'lucide-react';
+import { CreditCard, DollarSign, BadgeCheck, ExternalLink } from 'lucide-react';
+import { useLocation } from 'wouter';
 
 interface LoanRepaymentButtonProps {
   loanId: number;
@@ -35,40 +36,7 @@ export default function LoanRepaymentButton({
   
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  
-  // Repayment mutation
-  const repayLoanMutation = useMutation({
-    mutationFn: async () => {
-      const response = await apiRequest('POST', `/api/loans/${loanId}/repay`, {
-        amount: paymentAmount
-      });
-      return response.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/loans'] });
-      setIsProcessing(false);
-      setPaymentSuccess(true);
-      
-      toast({
-        title: "Payment Successful",
-        description: `You have successfully repaid ₹${Number(paymentAmount).toLocaleString()} of your loan.`,
-      });
-      
-      // Reset and close after 2 seconds
-      setTimeout(() => {
-        setOpen(false);
-        setPaymentSuccess(false);
-      }, 2000);
-    },
-    onError: (error) => {
-      setIsProcessing(false);
-      toast({
-        title: "Payment Failed",
-        description: error instanceof Error ? error.message : "An unexpected error occurred",
-        variant: "destructive",
-      });
-    }
-  });
+  const [, navigate] = useLocation();
   
   const handleRepayment = () => {
     if (!paymentAmount || isNaN(Number(paymentAmount)) || Number(paymentAmount) <= 0) {
@@ -88,8 +56,9 @@ export default function LoanRepaymentButton({
       });
     }
     
-    setIsProcessing(true);
-    repayLoanMutation.mutate();
+    // Navigate to the loan repayment page with query parameters
+    navigate(`/loans/${loanId}/repay?amount=${paymentAmount}`);
+    setOpen(false);
   };
   
   const buttonLabel = status === "active" ? "Make Payment" : "Process Approval";

@@ -14,6 +14,7 @@ import { z } from "zod";
 import { fromZodError } from "zod-validation-error";
 import 'express-session';
 import { paymentService, PaymentMethod, PaymentStatus } from './services/PaymentService';
+import { bankPaymentService, BankType, BankPaymentMethod } from './services/BankPaymentService';
 import documentParsingService from './services/DocumentParsingService';
 import fileUploadService from './services/FileUploadService';
 import externalWarehouseService from './services/ExternalWarehouseService';
@@ -34,6 +35,228 @@ declare module 'express-session' {
 export async function registerRoutes(app: Express): Promise<Server> {
   // API routes
   const apiRouter = express.Router();
+  
+  // Bank Payment API Routes
+  apiRouter.get("/bank/supported-banks", async (req: Request, res: Response) => {
+    try {
+      // Get supported banks and payment methods
+      const supportedBanks = bankPaymentService.getSupportedBanks();
+      res.status(200).json(supportedBanks);
+    } catch (error) {
+      console.error("Failed to fetch supported banks:", error);
+      res.status(500).json({ message: "Failed to fetch supported banks" });
+    }
+  });
+  
+  apiRouter.post("/bank/verify-account", async (req: Request, res: Response) => {
+    try {
+      const { accountNumber, ifscCode } = req.body;
+      
+      if (!accountNumber || !ifscCode) {
+        return res.status(400).json({ message: "Account number and IFSC code are required" });
+      }
+      
+      // Verify bank account details
+      const verificationResult = await bankPaymentService.verifyBankAccount(accountNumber, ifscCode);
+      res.status(200).json(verificationResult);
+    } catch (error) {
+      console.error("Failed to verify bank account:", error);
+      res.status(500).json({ message: "Failed to verify bank account" });
+    }
+  });
+  
+  apiRouter.post("/bank/verify-upi", async (req: Request, res: Response) => {
+    try {
+      const { upiId } = req.body;
+      
+      if (!upiId) {
+        return res.status(400).json({ message: "UPI ID is required" });
+      }
+      
+      // Verify UPI ID
+      const verificationResult = await bankPaymentService.verifyUpiId(upiId);
+      res.status(200).json(verificationResult);
+    } catch (error) {
+      console.error("Failed to verify UPI ID:", error);
+      res.status(500).json({ message: "Failed to verify UPI ID" });
+    }
+  });
+  
+  apiRouter.post("/bank/payment", async (req: Request, res: Response) => {
+    try {
+      // Check if user is authenticated
+      if (!req.session || !req.session.userId) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+      
+      const { 
+        amount, 
+        currency,
+        description, 
+        paymentMethod, 
+        bankType,
+        metadata,
+        customerInfo,
+        receiverInfo
+      } = req.body;
+      
+      // Basic validation
+      if (!amount || !paymentMethod || !bankType) {
+        return res.status(400).json({ 
+          message: "Missing required fields: amount, paymentMethod, and bankType are required" 
+        });
+      }
+      
+      // Get user details if not provided
+      if (!customerInfo || !customerInfo.name) {
+        const user = await storage.getUser(req.session.userId);
+        if (!user) {
+          return res.status(404).json({ message: "User not found" });
+        }
+        
+        // Set customer info with user details
+        req.body.customerInfo = {
+          ...req.body.customerInfo,
+          name: user.fullName,
+          email: user.email,
+          phone: user.phone
+        };
+      }
+      
+      // Create payment using bank payment service
+      const payment = await bankPaymentService.createPayment(req.body);
+      
+      res.status(201).json(payment);
+    } catch (error) {
+      console.error("Failed to create bank payment:", error);
+      const errorMessage = error instanceof Error ? error.message : "Failed to create bank payment";
+      res.status(500).json({ message: errorMessage });
+    }
+  });
+  
+  apiRouter.get("/bank/payment/:transactionId", async (req: Request, res: Response) => {
+    try {
+      const { transactionId } = req.params;
+      
+      if (!transactionId) {
+        return res.status(400).json({ message: "Transaction ID is required" });
+      }
+      
+      // Get payment details
+      const payment = bankPaymentService.getPayment(transactionId);
+      
+      if (!payment) {
+        return res.status(404).json({ message: "Payment not found" });
+      }
+      
+      res.status(200).json(payment);
+    } catch (error) {
+      console.error("Failed to fetch payment:", error);
+      res.status(500).json({ message: "Failed to fetch payment" });
+    }
+  });
+  
+  apiRouter.post("/bank/loan-repayment", async (req: Request, res: Response) => {
+    try {
+      // Check if user is authenticated
+      if (!req.session || !req.session.userId) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+      
+      const { 
+        loanId, 
+        amount, 
+        paymentMethod, 
+        bankType,
+        accountNumber,
+        ifscCode,
+        upiId
+      } = req.body;
+      
+      if (!loanId || !amount || !paymentMethod || !bankType) {
+        return res.status(400).json({ 
+          message: "Missing required fields: loanId, amount, paymentMethod, and bankType are required" 
+        });
+      }
+      
+      // Validate if loan exists and belongs to the user
+      const loan = await storage.getLoan(loanId);
+      
+      if (!loan) {
+        return res.status(404).json({ message: "Loan not found" });
+      }
+      
+      if (loan.userId !== req.session.userId) {
+        return res.status(403).json({ message: "Not authorized to repay this loan" });
+      }
+      
+      // Get user information
+      const user = await storage.getUser(req.session.userId);
+      
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      
+      // Get lender information
+      // For the demo, we'll use hardcoded TradeWiser bank details
+      const receiverInfo = {
+        name: "TradeWiser Finance",
+        accountNumber: "1122334455667788",
+        ifscCode: "TWIS0001122",
+        upiId: "finance@tradewiser"
+      };
+      
+      // Prepare customer info based on payment method
+      const customerInfo = {
+        name: user.fullName,
+        email: user.email,
+        phone: user.phone,
+        accountNumber: accountNumber,
+        ifscCode: ifscCode,
+        upiId: upiId
+      };
+      
+      // Create payment
+      const payment = await bankPaymentService.createPayment({
+        amount: amount.toString(),
+        currency: "INR",
+        description: `Loan repayment for loan #${loanId}`,
+        paymentMethod: paymentMethod as BankPaymentMethod,
+        bankType: bankType as BankType,
+        metadata: {
+          type: "loan_repayment",
+          loanId: loanId
+        },
+        customerInfo,
+        receiverInfo
+      });
+      
+      // Create loan repayment record
+      const interestRate = parseFloat(loan.interestRate || "0");
+      const principalAmount = parseFloat(amount) / (1 + (interestRate / 100));
+      const interestAmount = parseFloat(amount) - principalAmount;
+      
+      const loanRepayment = await storage.createLoanRepayment({
+        loanId: loanId,
+        userId: req.session.userId,
+        amount: amount.toString(),
+        transactionId: payment.transactionId,
+        paymentMethod: paymentMethod,
+        status: "pending",
+        interestAmount: interestAmount.toFixed(2),
+        principalAmount: principalAmount.toFixed(2)
+      });
+      
+      res.status(201).json({ 
+        payment,
+        loanRepayment
+      });
+    } catch (error) {
+      console.error("Failed to process loan repayment:", error);
+      const errorMessage = error instanceof Error ? error.message : "Failed to process loan repayment";
+      res.status(500).json({ message: errorMessage });
+    }
+  });
 
   // Auth routes
   apiRouter.post("/auth/register", async (req: Request, res: Response) => {
@@ -2771,6 +2994,112 @@ apiRouter.get("/analytics/portfolio/:userId", async (req: Request, res: Response
     res.json(analytics);
   } catch (error) {
     res.status(500).json({ error: "Failed to get portfolio analytics" });
+  }
+});
+
+// Commodity Pricing API
+apiRouter.post("/pricing/fetch", async (req: Request, res: Response) => {
+  try {
+    const { commodityType, quality, quantity } = req.body;
+    
+    if (!commodityType || !quality || !quantity) {
+      return res.status(400).json({ 
+        error: "Missing required parameters. Please provide commodityType, quality and quantity." 
+      });
+    }
+    
+    // Dummy pricing data based on commodity type, quality and quantity
+    // In a real scenario, this would fetch data from an external pricing API
+    const basePrice = {
+      'Grain': 2580,
+      'Pulses': 3650,
+      'Oilseeds': 4200,
+      'Spices': 7800,
+      'Fruits': 3200,
+      'Vegetables': 2400,
+    }[commodityType] || 3000;
+    
+    // Adjust price based on quality score (0-100)
+    const qualityFactor = Math.min(Math.max(quality.score / 100, 0.7), 1.3);
+    
+    // Create random price fluctuation to simulate market dynamics
+    const marketFluctuation = 0.95 + (Math.random() * 0.1);
+    
+    // Calculate price per unit (kg or appropriate unit)
+    const pricePerUnit = basePrice * qualityFactor * marketFluctuation;
+    
+    // Calculate total valuation
+    const totalValuation = pricePerUnit * parseFloat(quantity);
+    
+    // Add some delay to simulate external API call
+    setTimeout(() => {
+      res.json({
+        commodityType,
+        basePrice,
+        qualityAdjustedPrice: pricePerUnit.toFixed(2),
+        totalValuation: totalValuation.toFixed(2),
+        marketTrend: marketFluctuation > 1 ? "rising" : "falling",
+        timestamp: new Date().toISOString(),
+        perUnitPrice: pricePerUnit.toFixed(2),
+        creditLimit: (totalValuation * 0.8).toFixed(2) // 80% of valuation
+      });
+    }, 500);
+  } catch (error) {
+    res.status(500).json({ error: "Failed to fetch pricing data" });
+  }
+});
+
+// Loan Overdraft API
+apiRouter.post("/loans/credit-limit", async (req: Request, res: Response) => {
+  try {
+    const { userId, receiptIds } = req.body;
+    
+    if (!userId || !receiptIds || !Array.isArray(receiptIds)) {
+      return res.status(400).json({ 
+        error: "Missing required parameters. Please provide userId and receiptIds array." 
+      });
+    }
+    
+    // Get all receipts for the user
+    const receipts = await storage.getReceiptsByIds(receiptIds);
+    
+    // Calculate total valuation and available credit
+    let totalValuation = 0;
+    let availableCredit = 0;
+    
+    const receiptDetails = [];
+    
+    for (const receipt of receipts) {
+      // Calculate valuation based on commodity, quantity and quality
+      // In reality this would use the price API or database values
+      const receiptValue = receipt.valuation || 
+        (parseFloat(receipt.quantity) * 3000); // Default valuation if not set
+      
+      totalValuation += receiptValue;
+      
+      receiptDetails.push({
+        receiptId: receipt.id,
+        receiptNumber: receipt.receiptNumber,
+        commodityName: receipt.commodityName,
+        quantity: receipt.quantity,
+        valuation: receiptValue,
+        creditLimit: receiptValue * 0.8, // 80% of valuation
+      });
+    }
+    
+    // Set available credit to 80% of total valuation
+    availableCredit = totalValuation * 0.8;
+    
+    res.json({
+      userId,
+      totalValuation,
+      availableCredit,
+      receiptDetails,
+      interestRate: 12.0, // 12% p.a.
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    res.status(500).json({ error: "Failed to calculate credit limit" });
   }
 });
 

@@ -4,10 +4,12 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import MainLayout from '@/components/layout/MainLayout';
-import { Warehouse, ExternalLink, Package, ArrowRight, AlertCircle, ShieldCheck } from 'lucide-react';
+import { Warehouse, ExternalLink, Package, ArrowRight, AlertCircle, ShieldCheck, MapPin, DollarSign } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Dashboard } from '@/components/dashboard/Dashboard';
+import { WarehouseMap } from '@/components/map/WarehouseMap';
+import { Badge } from '@/components/ui/badge';
 
 export default function DashboardPage() {
   const [, navigate] = useLocation();
@@ -33,7 +35,7 @@ export default function DashboardPage() {
         </div>
 
         {/* Quick Actions */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
           <Button 
             variant="outline" 
             className="h-auto py-6 px-4 flex flex-col items-center justify-center border-emerald-200 hover:bg-emerald-50"
@@ -63,6 +65,112 @@ export default function DashboardPage() {
             <span className="text-base font-medium">Private Storage</span>
             <span className="text-xs text-muted-foreground mt-1">Self-certified storage</span>
           </Button>
+          
+          <Button 
+            variant="outline" 
+            className="h-auto py-6 px-4 flex flex-col items-center justify-center border-green-200 hover:bg-green-50"
+            onClick={() => navigate('/loans')}
+          >
+            <DollarSign className="h-10 w-10 mb-2 text-green-600" />
+            <span className="text-base font-medium">Get Financing</span>
+            <span className="text-xs text-muted-foreground mt-1">Based on your warehouse receipts</span>
+          </Button>
+        </div>
+        
+        {/* Warehouse Map Section */}
+        <div className="mb-8">
+          <div className="flex justify-between items-center mb-4">
+            <div>
+              <h2 className="text-xl font-semibold">Nearby Warehouses</h2>
+              <p className="text-sm text-muted-foreground">Explore warehouses and deposit commodities</p>
+            </div>
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={() => navigate('/warehouses')}
+            >
+              <MapPin className="h-4 w-4 mr-2" />
+              View All Warehouses
+            </Button>
+          </div>
+          
+          <div className="bg-white border rounded-lg overflow-hidden" style={{ height: "400px" }}>
+            <WarehouseMap />
+          </div>
+        </div>
+        
+        {/* Financing Summary */}
+        <div className="mb-8">
+          <div className="flex justify-between items-center mb-4">
+            <div>
+              <h2 className="text-xl font-semibold">Warehouse Receipt Financing</h2>
+              <p className="text-sm text-muted-foreground">Unlock the value of your stored commodities</p>
+            </div>
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={() => navigate('/loans')}
+            >
+              <DollarSign className="h-4 w-4 mr-2" />
+              Apply for Loan
+            </Button>
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-lg flex items-center">
+                  <div className="w-3 h-3 rounded-full bg-blue-500 mr-2"></div>
+                  Available Credit Limit
+                </CardTitle>
+                <CardDescription>80% of your receipts' valuation</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">
+                  ₹{(receipts.reduce((total: number, r: any) => total + (parseFloat(r.valuation?.toString() || "0") * 0.8), 0)).toLocaleString('en-IN')}
+                </div>
+                <div className="text-xs text-muted-foreground mt-1">
+                  Based on your warehouse receipts
+                </div>
+              </CardContent>
+            </Card>
+            
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-lg flex items-center">
+                  <div className="w-3 h-3 rounded-full bg-green-500 mr-2"></div>
+                  Outstanding Balance
+                </CardTitle>
+                <CardDescription>Currently utilized credit</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">
+                  ₹0
+                </div>
+                <div className="text-xs text-muted-foreground mt-1">
+                  No active loans
+                </div>
+              </CardContent>
+            </Card>
+            
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-lg flex items-center">
+                  <div className="w-3 h-3 rounded-full bg-purple-500 mr-2"></div>
+                  Interest Rate
+                </CardTitle>
+                <CardDescription>Pay only for what you use</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">
+                  12% <span className="text-sm font-normal">p.a.</span>
+                </div>
+                <div className="text-xs text-muted-foreground mt-1">
+                  Calculated on daily utilized amount
+                </div>
+              </CardContent>
+            </Card>
+          </div>
         </div>
 
         {/* Recent Receipts */}
