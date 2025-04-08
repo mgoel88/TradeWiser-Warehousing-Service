@@ -20,9 +20,13 @@ interface WarehouseReceiptCardProps {
   orangeChannelVariant?: boolean;
 }
 
+// Placeholder component -  Needs actual implementation
+const ReceiptQRVerification = () => <div>QR Code Scanner (Implementation Needed)</div>;
+
+
 export default function WarehouseReceiptCard({ receipt, onView, onPledge, className = '', redChannelVariant = false, orangeChannelVariant = false }: WarehouseReceiptCardProps) {
   const [isDetailOpen, setIsDetailOpen] = useState(false);
-  
+
   // Fetch commodity data for the receipt
   const { data: commodity } = useQuery({
     queryKey: ['/api/commodities', receipt.commodityId],
@@ -34,7 +38,7 @@ export default function WarehouseReceiptCard({ receipt, onView, onPledge, classN
     },
     enabled: !!receipt.commodityId,
   });
-  
+
   // Fetch warehouse data for the receipt
   const { data: warehouse } = useQuery({
     queryKey: ['/api/warehouses', receipt.warehouseId],
@@ -46,7 +50,7 @@ export default function WarehouseReceiptCard({ receipt, onView, onPledge, classN
     },
     enabled: !!receipt.warehouseId,
   });
-  
+
   // Determine the status color and background
   const getStatusColor = () => {
     switch (receipt.status) {
@@ -67,15 +71,15 @@ export default function WarehouseReceiptCard({ receipt, onView, onPledge, classN
 
   // Format the creation date
   const formattedDate = formatDate(receipt.issuedDate || new Date());
-  
+
   // Calculate expiry date (6 months from issue date)
   const expiryDate = new Date(receipt.issuedDate || new Date());
   expiryDate.setMonth(expiryDate.getMonth() + 6);
   const formattedExpiryDate = formatDate(expiryDate);
-  
+
   // Generate a verification code
   const verificationCode = `WR-${receipt.id}-${Date.now().toString(16)}`;
-  
+
   // Handle download receipt
   const handleDownload = async () => {
     try {
@@ -93,10 +97,10 @@ export default function WarehouseReceiptCard({ receipt, onView, onPledge, classN
         verificationCode: verificationCode,
         smartContractId: receipt.smartContractId || ""
       };
-      
+
       // Generate the PDF
       const pdfBlob = await generateReceiptPDF(receiptData);
-      
+
       // Create a download link
       const url = URL.createObjectURL(pdfBlob);
       const link = document.createElement('a');
@@ -105,55 +109,55 @@ export default function WarehouseReceiptCard({ receipt, onView, onPledge, classN
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-      
+
       // Clean up the URL object
       setTimeout(() => URL.revokeObjectURL(url), 1000);
     } catch (error) {
       console.error("Error downloading receipt:", error);
     }
   };
-  
+
   // Determine if this is an Orange Channel (third-party) receipt
   const isOrangeChannel = React.useMemo(() => {
     if (orangeChannelVariant) return true;
-    
+
     if (receipt.metadata && typeof receipt.metadata === 'object') {
       const metadata = receipt.metadata as Record<string, any>;
       return metadata.channelType === 'orange' || metadata.isExternal === true;
     }
-    
+
     // Also check if it has an externalSource as fallback
     return !!receipt.externalSource;
   }, [receipt, orangeChannelVariant]);
-  
+
   // Determine if this is a Red Channel (self-certified) receipt
   const isRedChannel = React.useMemo(() => {
     if (redChannelVariant) return true;
-    
+
     if (receipt.metadata && typeof receipt.metadata === 'object') {
       const metadata = receipt.metadata as Record<string, any>;
       return metadata.channelType === 'red' || metadata.isSelfCertified === true;
     }
-    
+
     return false;
   }, [receipt, redChannelVariant]);
-  
+
   // Determine card background based on channel type
   const cardBackground = React.useMemo(() => {
     if (isOrangeChannel) {
       // Orange Channel receipt - use orange gradient
       return `linear-gradient(135deg, #ff8c00, #e25822)`;
     }
-    
+
     if (isRedChannel) {
       // Red Channel receipt - use red gradient
       return `linear-gradient(135deg, #d32f2f, #b71c1c)`;
     }
-    
+
     // Default Green Channel receipt - use dark gradient
     return `linear-gradient(135deg, #1a1a1a, #333)`;
   }, [isOrangeChannel, isRedChannel]);
-  
+
   // Styled card view like a real credit card
   return (
     <>
@@ -179,24 +183,24 @@ export default function WarehouseReceiptCard({ receipt, onView, onPledge, classN
             ))}
           </div>
         </div>
-        
+
         {/* Status indicator */}
         <div className="absolute top-0 right-0 h-full w-2" 
           style={{ backgroundColor: getStatusColor().replace('bg-', '') }}></div>
-        
+
         <CardContent className="p-4 text-white">
           {/* Smart Contract ID */}
           <div className="mt-12 mb-4">
             <p className="text-xs text-white/70">Smart Contract ID</p>
             <p className="font-mono text-sm">{receipt.smartContractId || "SC-" + receipt.id + "-" + Date.now().toString(16).slice(-6)}</p>
           </div>
-          
+
           {/* Receipt number displayed as credit card number */}
           <div className="mt-4 mb-4">
             <p className="text-xs text-white/70">Receipt Number</p>
             <p className="font-mono text-lg tracking-wider">{receipt.receiptNumber}</p>
           </div>
-          
+
           <div className="grid grid-cols-2 gap-2 mt-3">
             <div>
               <p className="text-xs text-white/70">Commodity</p>
@@ -207,7 +211,7 @@ export default function WarehouseReceiptCard({ receipt, onView, onPledge, classN
               <p>{receipt.quantity} {receipt.measurementUnit || commodity?.measurementUnit || "MT"}</p>
             </div>
           </div>
-          
+
           <div className="grid grid-cols-2 gap-2 mt-3">
             <div>
               <p className="text-xs text-white/70">Valuation</p>
@@ -221,7 +225,7 @@ export default function WarehouseReceiptCard({ receipt, onView, onPledge, classN
             </div>
           </div>
         </CardContent>
-        
+
         <CardFooter className="p-3 border-t border-white/10 flex justify-between items-center">
           <Badge variant="outline" className="border-white/50 text-white">
             {receipt.status}
@@ -229,7 +233,7 @@ export default function WarehouseReceiptCard({ receipt, onView, onPledge, classN
           <ArrowUpRight className="h-4 w-4 text-white/70" />
         </CardFooter>
       </Card>
-      
+
       {/* Detailed receipt dialog */}
       <Dialog open={isDetailOpen} onOpenChange={setIsDetailOpen}>
         <DialogContent className="sm:max-w-[600px]">
@@ -254,7 +258,7 @@ export default function WarehouseReceiptCard({ receipt, onView, onPledge, classN
               )}
             </DialogDescription>
           </DialogHeader>
-          
+
           <div className="space-y-4 py-4">
             {/* Header with receipt number and status */}
             <div className="flex justify-between items-center">
@@ -264,9 +268,9 @@ export default function WarehouseReceiptCard({ receipt, onView, onPledge, classN
               </div>
               <Badge className={getStatusColor()}>{receipt.status}</Badge>
             </div>
-            
+
             <Separator />
-            
+
             {/* Commodity Details */}
             <div>
               <h3 className="font-medium mb-2">Commodity Details</h3>
@@ -296,9 +300,9 @@ export default function WarehouseReceiptCard({ receipt, onView, onPledge, classN
                 </div>
               </div>
             </div>
-            
+
             <Separator />
-            
+
             {/* Warehouse & Validity */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
@@ -306,7 +310,7 @@ export default function WarehouseReceiptCard({ receipt, onView, onPledge, classN
                 <p className="text-sm">{warehouse?.name || "Unknown Warehouse"}</p>
                 <p className="text-sm text-muted-foreground">{warehouse?.address || "Unknown Location"}</p>
               </div>
-              
+
               <div>
                 <h3 className="font-medium mb-2">Validity</h3>
                 <div className="grid grid-cols-2 gap-2 text-sm">
@@ -327,7 +331,7 @@ export default function WarehouseReceiptCard({ receipt, onView, onPledge, classN
                 </div>
               </div>
             </div>
-            
+
             {/* Attachments & Documents */}
             {receipt.attachmentUrl && (
               <div className="mt-4">
@@ -378,7 +382,7 @@ export default function WarehouseReceiptCard({ receipt, onView, onPledge, classN
                 </div>
               </div>
             )}
-            
+
             {/* External Source Info - Only shown for Orange Channel receipts */}
             {isOrangeChannel && (
               <div className="bg-orange-50 p-3 rounded-md mt-4 border border-orange-200">
@@ -409,7 +413,7 @@ export default function WarehouseReceiptCard({ receipt, onView, onPledge, classN
                 </p>
               </div>
             )}
-            
+
             {/* Red Channel Info - Only shown for Red Channel (self-certified) receipts */}
             {isRedChannel && (
               <div className="bg-red-50 p-3 rounded-md mt-4 border border-red-200">
@@ -440,7 +444,7 @@ export default function WarehouseReceiptCard({ receipt, onView, onPledge, classN
                 </p>
               </div>
             )}
-            
+
             {/* Smart Contract Info */}
             <div className="bg-muted p-3 rounded-md mt-4">
               <div className="flex items-center mb-1">
@@ -466,7 +470,7 @@ export default function WarehouseReceiptCard({ receipt, onView, onPledge, classN
               </p>
             </div>
           </div>
-          
+
           <DialogFooter className="flex-col sm:flex-row gap-2">
             <div className="flex gap-2 flex-1 flex-wrap">
               <Button variant="outline" size="sm" onClick={handleDownload}>
@@ -493,10 +497,10 @@ export default function WarehouseReceiptCard({ receipt, onView, onPledge, classN
                       verificationCode: verificationCode,
                       smartContractId: receipt.smartContractId || undefined
                     };
-                    
+
                     const textReceipt = generatePlainTextReceipt(receiptData);
                     navigator.clipboard.writeText(textReceipt);
-                    
+
                     // Show feedback (this would be better with a toast)
                     alert("Receipt text copied to clipboard");
                   } catch (error) {
@@ -528,11 +532,11 @@ export default function WarehouseReceiptCard({ receipt, onView, onPledge, classN
                       verificationCode: verificationCode,
                       smartContractId: receipt.smartContractId || undefined
                     };
-                    
+
                     // Generate PDF and create object URL
                     const pdfBlob = await generateReceiptPDF(receiptData);
                     const url = URL.createObjectURL(pdfBlob);
-                    
+
                     // Open in new window and print
                     const printWindow = window.open(url, '_blank');
                     if (printWindow) {
@@ -563,7 +567,7 @@ export default function WarehouseReceiptCard({ receipt, onView, onPledge, classN
                 Verify
               </Button>
             </div>
-            
+
             {receipt.status === 'active' && (
               <Button 
                 className="sm:w-auto w-full" 
