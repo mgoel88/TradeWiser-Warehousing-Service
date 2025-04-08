@@ -9,9 +9,14 @@ import { Warehouse, ArrowRight, Package, MapPin, Search } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 
 export default function GreenChannelPage() {
-  const [, navigate] = useLocation();
+  const [location, navigate] = useLocation();
   const [activeTab, setActiveTab] = useState('overview');
   const [searchQuery, setSearchQuery] = useState('');
+  
+  // Parse URL query parameters
+  const searchParams = new URLSearchParams(location.split('?')[1] || '');
+  const commodityParam = searchParams.get('commodity');
+  const quantityParam = searchParams.get('quantity');
 
   const { data: warehouses = [], isLoading: warehousesLoading } = useQuery({
     queryKey: ['/api/warehouses'],
@@ -41,7 +46,14 @@ export default function GreenChannelPage() {
               </p>
             </div>
             <Button 
-              onClick={() => navigate('/deposit')} 
+              onClick={() => {
+                // Pass commodity and quantity params if available
+                const params = new URLSearchParams();
+                if (commodityParam) params.append('commodity', commodityParam);
+                if (quantityParam) params.append('quantity', quantityParam);
+                const queryString = params.toString();
+                navigate(`/deposit${queryString ? `?${queryString}` : ''}`);
+              }} 
               className="mt-4 md:mt-0 bg-emerald-600 hover:bg-emerald-700"
             >
               <Package className="h-4 w-4 mr-2" />
@@ -123,7 +135,14 @@ export default function GreenChannelPage() {
                     variant="link" 
                     size="sm" 
                     className="p-0 h-auto text-emerald-600" 
-                    onClick={() => navigate('/deposit')}
+                    onClick={() => {
+                      // Pass commodity and quantity params if available
+                      const params = new URLSearchParams();
+                      if (commodityParam) params.append('commodity', commodityParam);
+                      if (quantityParam) params.append('quantity', quantityParam);
+                      const queryString = params.toString();
+                      navigate(`/deposit${queryString ? `?${queryString}` : ''}`);
+                    }}
                   >
                     Start now <ArrowRight className="h-4 w-4 ml-1" />
                   </Button>
@@ -188,7 +207,14 @@ export default function GreenChannelPage() {
                     <CardFooter>
                       <Button 
                         className="w-full bg-emerald-600 hover:bg-emerald-700"
-                        onClick={() => navigate(`/deposit?warehouse=${warehouse.id}`)}
+                        onClick={() => {
+                          // Build query parameters including warehouse ID and any commodity/quantity params
+                          const params = new URLSearchParams();
+                          params.append('warehouse', warehouse.id.toString());
+                          if (commodityParam) params.append('commodity', commodityParam);
+                          if (quantityParam) params.append('quantity', quantityParam);
+                          navigate(`/deposit?${params.toString()}`);
+                        }}
                       >
                         Select Warehouse
                       </Button>

@@ -57,9 +57,18 @@ enum DepositStep {
 interface DepositFlowProps {
   warehouses: Warehouse[];
   userLocation?: [number, number] | null;
+  initialWarehouseId?: number;
+  initialCommodity?: string;
+  initialQuantity?: string;
 }
 
-export default function DepositFlow({ warehouses, userLocation }: DepositFlowProps) {
+export default function DepositFlow({ 
+  warehouses, 
+  userLocation, 
+  initialWarehouseId, 
+  initialCommodity, 
+  initialQuantity 
+}: DepositFlowProps) {
   const { user } = useAuth();
   const { toast } = useToast();
   const [_, setLocation] = useLocation();
@@ -82,16 +91,44 @@ export default function DepositFlow({ warehouses, userLocation }: DepositFlowPro
   const form = useForm<DepositCommodityFormValues>({
     resolver: zodResolver(depositCommoditySchema),
     defaultValues: {
-      name: "",
+      name: initialCommodity || "",
       type: "",
-      quantity: "0" as any, // Type assertion to resolve string type in a numeric field
+      quantity: initialQuantity || "0" as any, // Type assertion to resolve string type in a numeric field
       measurementUnit: "MT",
       qualityParameters: {},
       gradeAssigned: "",
-      warehouseId: 0,
+      warehouseId: initialWarehouseId || 0,
       notes: "",
     },
   });
+  
+  // Initialize form fields and steps from URL parameters
+  useEffect(() => {
+    // If we have warehouse ID from URL, find and select that warehouse
+    if (initialWarehouseId) {
+      const warehouse = warehouses.find(w => w.id === initialWarehouseId);
+      if (warehouse) {
+        setSelectedWarehouse(warehouse);
+        // If we also have commodity and quantity data, we can skip to scheduling
+        if (initialCommodity && initialQuantity) {
+          setCurrentStep(DepositStep.SchedulePickup);
+        }
+      }
+    }
+    
+    // Set commodity name if provided
+    if (initialCommodity) {
+      form.setValue("name", initialCommodity);
+    }
+    
+    // Set quantity if provided and valid
+    if (initialQuantity) {
+      const qty = parseFloat(initialQuantity);
+      if (!isNaN(qty)) {
+        form.setValue("quantity", initialQuantity as any);
+      }
+    }
+  }, [initialWarehouseId, initialCommodity, initialQuantity, warehouses, form]);
 
   // Sort warehouses by distance if user location is available
   const sortedWarehouses = warehouses.slice().sort((a, b) => {

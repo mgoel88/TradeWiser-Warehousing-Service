@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { useLocation } from 'wouter';
 import MainLayout from '@/components/layout/MainLayout';
 import DepositFlow from '@/components/deposit/DepositFlow';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -9,6 +10,13 @@ import { Warehouse } from '@shared/schema';
 
 export default function DepositPage() {
   const [userLocation, setUserLocation] = useState<[number, number] | null>(null);
+  const [location] = useLocation();
+  
+  // Parse URL query parameters
+  const searchParams = new URLSearchParams(location.split('?')[1] || '');
+  const warehouseIdParam = searchParams.get('warehouse');
+  const commodityParam = searchParams.get('commodity');
+  const quantityParam = searchParams.get('quantity');
   
   // Fetch warehouses
   const { data: warehouses, isLoading, error } = useQuery({
@@ -70,7 +78,13 @@ export default function DepositPage() {
         <h1 className="text-2xl font-bold mb-6">Deposit Commodity</h1>
         
         {warehouses && warehouses.length > 0 ? (
-          <DepositFlow warehouses={warehouses} userLocation={userLocation} />
+          <DepositFlow 
+            warehouses={warehouses} 
+            userLocation={userLocation}
+            initialWarehouseId={warehouseIdParam ? parseInt(warehouseIdParam, 10) : undefined}
+            initialCommodity={commodityParam || undefined}
+            initialQuantity={quantityParam || undefined}
+          />
         ) : (
           <Card>
             <CardHeader>
