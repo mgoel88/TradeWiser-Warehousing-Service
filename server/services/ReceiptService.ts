@@ -1,112 +1,217 @@
-import { storage } from "../storage";
-import type { InsertWarehouseReceipt } from "@shared/schema";
+/**
+ * Receipt Service
+ * 
+ * Handles generation, storage, and retrieval of payment receipts.
+ */
+import fs from 'fs';
+import path from 'path';
+import { jsPDF } from 'jspdf';
+import 'jspdf-autotable';
+import { LoanRepayment, BankPayment } from '@shared/schema';
+
+// Ensure receipts directory exists
+const RECEIPTS_DIR = path.join(process.cwd(), 'uploads', 'receipts');
+if (!fs.existsSync(RECEIPTS_DIR)) {
+  fs.mkdirSync(RECEIPTS_DIR, { recursive: true });
+  console.log(`Created receipts directory at ${RECEIPTS_DIR}`);
+}
 
 /**
- * Service for warehouse receipt operations - Simplified to match database schema
+ * Generate a unique receipt number
+ * Format: TW-RCPT-{timestamp}-{random digits}
  */
-export /**
- * Service for handling warehouse receipt operations
- * @class ReceiptService
+function generateReceiptNumber(): string {
+  const timestamp = Date.now().toString().slice(-8); // Last 8 digits of timestamp
+  const randomDigits = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
+  return `TW-RCPT-${timestamp}-${randomDigits}`;
+}
+
+interface ReceiptResult {
+  url: string;
+  filepath: string;
+  receiptNumber: string;
+}
+
+/**
+ * Additional information that can be included in the receipt
  */
+interface ReceiptAdditionalInfo {
+  loanDetails?: {
+    interestRate: string;
+    startDate: string;
+    lendingPartnerName: string;
+  };
+  userDetails?: {
+    fullName: string;
+    email: string;
+    phone: string | null;
+  };
+}
+
 class ReceiptService {
   /**
-   * Generates a receipt number
+   * Generate a receipt for a bank payment
+   * @param payment Bank payment details
+   * @param loanRepayment Loan repayment details
+   * @returns Object containing receipt information
    */
-  generateReceiptNumber(): string {
-    const timestamp = Date.now().toString(16).slice(-8).toUpperCase();
-    const random = Math.floor(Math.random() * 10000).toString().padStart(4, '0');
-    return `WR${timestamp}${random}`;
+  async createReceipt(
+    payment: BankPayment, 
+    loanRepayment: LoanRepayment, 
+    additionalInfo?: ReceiptAdditionalInfo
+  ): Promise<ReceiptResult> {
+    return this.generateReceipt(payment, loanRepayment, additionalInfo);
   }
-
   /**
-   * Generates a blockchain hash (mock)
+   * Generate a PDF receipt for a payment
+   * @param payment Bank payment details
+   * @param loanRepayment Loan repayment details
+   * @param additionalInfo Additional information for the receipt
+   * @returns Object containing path to the generated receipt
    */
-  generateBlockchainHash(): string {
-    const timestamp = Date.now();
-    const randomStr = Math.random().toString(36).substring(7);
-    return `${timestamp.toString(16)}${randomStr}`;
+  async generateReceipt(
+    payment: BankPayment, 
+    loanRepayment: LoanRepayment,
+    additionalInfo?: ReceiptAdditionalInfo
+  ): Promise<ReceiptResult> {
+    // Use existing receipt number if available, otherwise generate new one
+    const receiptNumber = loanRepayment.receiptNumber || generateReceiptNumber();
+    
+    // Create PDF document
+    const doc = new jsPDF();
+    
+    // Add title
+    doc.setFontSize(20);
+    doc.text('TradeWiser Payment Receipt', 105, 20, { align: 'center' });
+    
+    // Add logo placeholder
+    doc.setFontSize(10);
+    doc.setTextColor(100);
+    doc.text('[TradeWiser Logo]', 105, 30, { align: 'center' });
+    
+    // Reset text color
+    doc.setTextColor(0);
+    
+    // Add receipt number and date
+    doc.setFontSize(12);
+    doc.text(`Receipt Number: ${receiptNumber}`, 15, 40);
+    doc.text(`Date: ${new Date(payment.timestamp).toLocaleDateString()}`, 15, 47);
+    
+    // Add payment information
+    doc.setFontSize(14);
+    doc.text('Payment Information', 15, 60);
+    
+    // Payment details table
+    const paymentData = [
+      ['Transaction ID', payment.transactionId],
+      ['Amount', `₹${parseFloat(loanRepayment.amount).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`],
+      ['Status', payment.status],
+      ['Payment Method', loanRepayment.paymentMethod],
+      ['Principal Amount', `₹${parseFloat(loanRepayment.principalAmount || '0').toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`],
+      ['Interest Amount', `₹${parseFloat(loanRepayment.interestAmount || '0').toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`]
+    ];
+    
+    // @ts-ignore - jsPDF-autoTable extends jsPDF but TypeScript doesn't recognize it
+    doc.autoTable({
+      startY: 65,
+      body: paymentData,
+      theme: 'grid',
+      styles: { fontSize: 10 },
+      columnStyles: { 
+        0: { fontStyle: 'bold', cellWidth: 80 },
+        1: { cellWidth: 'auto' } 
+      },
+      alternateRowStyles: { fillColor: [245, 245, 245] }
+    });
+    
+    // Get the latest y position after the table
+    // @ts-ignore - jsPDF-autoTable adds lastAutoTable to jsPDF
+    const lastY = doc.lastAutoTable.finalY + 10;
+    
+    // Add loan information if available
+    if (additionalInfo?.loanDetails) {
+      doc.setFontSize(14);
+      doc.text('Loan Information', 15, lastY);
+      
+      const loanData = [
+        ['Loan ID', `#${loanRepayment.loanId}`],
+        ['Interest Rate', `${additionalInfo.loanDetails.interestRate}%`],
+        ['Start Date', additionalInfo.loanDetails.startDate],
+        ['Lending Partner', additionalInfo.loanDetails.lendingPartnerName]
+      ];
+      
+      // @ts-ignore - jsPDF-autoTable extends jsPDF
+      doc.autoTable({
+        startY: lastY + 5,
+        body: loanData,
+        theme: 'grid',
+        styles: { fontSize: 10 },
+        columnStyles: { 
+          0: { fontStyle: 'bold', cellWidth: 80 },
+          1: { cellWidth: 'auto' } 
+        },
+        alternateRowStyles: { fillColor: [245, 245, 245] }
+      });
+    }
+    
+    // Add footer
+    const pageCount = doc.getNumberOfPages();
+    for (let i = 1; i <= pageCount; i++) {
+      doc.setPage(i);
+      doc.setFontSize(8);
+      doc.setTextColor(100);
+      doc.text(
+        'This is a computer-generated receipt and does not require a signature. For any queries, please contact support@tradewiser.com',
+        105, 
+        doc.internal.pageSize.height - 10, 
+        { align: 'center' }
+      );
+      
+      // Add page number
+      doc.text(
+        `Page ${i} of ${pageCount}`,
+        105,
+        doc.internal.pageSize.height - 5,
+        { align: 'center' }
+      );
+    }
+    
+    // Save PDF
+    const filename = `receipt-${receiptNumber}.pdf`;
+    const filepath = path.join(RECEIPTS_DIR, filename);
+    
+    // Save the PDF to disk
+    const pdfOutput = doc.output();
+    fs.writeFileSync(filepath, pdfOutput, 'binary');
+    
+    // Return the URL to the receipt
+    return {
+      url: `/uploads/receipts/${filename}`,
+      filepath,
+      receiptNumber
+    };
   }
-
+  
   /**
-   * Creates a new warehouse receipt from client data - Simplified for actual database schema
+   * Retrieve a receipt by its filename
+   * @param filename Name of the receipt file
+   * @returns The receipt file buffer or null if not found
    */
-  async createReceipt(data: any, userId: number) {
+  getReceiptFile(filename: string): Buffer | null {
     try {
-      console.log("ReceiptService: Creating receipt with data", JSON.stringify(data, null, 2));
+      const filepath = path.join(RECEIPTS_DIR, filename);
       
-      // Calculate expiry date (6 months from now)
-      const now = new Date();
-      const expiryDate = new Date(now);
-      expiryDate.setMonth(expiryDate.getMonth() + 6);
-      
-      // Generate a verification code for QR scanning
-      const verificationCode = Math.random().toString(36).substring(2, 10).toUpperCase();
-      
-      // Store all additional metadata in the liens field as a JSON object
-      // This allows us to handle fields that don't exist in the actual database schema
-      const liensData: Record<string, any> = {
-        // Add verification code for QR scanning and public verification
-        verificationCode,
-        
-        // Store process info if available
-        processId: data.processId || null,
-        
-        // Store dates for reference
-        depositDate: now.toISOString(),
-        expiryDate: expiryDate.toISOString(),
-        
-        // Store commodity details that aren't in the main receipt table
-        commodityName: data.commodityName || null,
-        qualityGrade: data.qualityGrade || 'Standard',
-        qualityParameters: data.qualityParameters || null,
-        
-        // Store warehouse details that aren't in the main receipt table
-        warehouseName: data.warehouseName || null,
-        warehouseAddress: data.warehouseAddress || null,
-        
-        // Transfer any metadata field if it exists
-        ...(data.metadata || {})
-      };
-      
-      // If client sent liens data, merge it with our generated data
-      if (data.liens && typeof data.liens === 'object') {
-        Object.assign(liensData, data.liens);
+      // Ensure the file exists and is within the receipts directory
+      if (!fs.existsSync(filepath) || !filepath.startsWith(RECEIPTS_DIR)) {
+        console.error(`Receipt file not found or invalid path: ${filepath}`);
+        return null;
       }
       
-      // Prepare the receipt data with only fields that exist in the database
-      const receiptData: Partial<InsertWarehouseReceipt> = {
-        // Required fields
-        receiptNumber: data.receiptNumber || this.generateReceiptNumber(),
-        quantity: String(data.quantity || "0"),
-        
-        // Foreign keys
-        commodityId: data.commodityId,
-        warehouseId: data.warehouseId,
-        ownerId: userId,
-        
-        // Status is a typed enum
-        status: "active",
-        
-        // Optional fields that exist in the database
-        blockchainHash: data.blockchainHash || this.generateBlockchainHash(),
-        expiryDate,
-        valuation: data.valuation ? String(data.valuation) : undefined,
-        
-        // Store all additional metadata in the liens field
-        liens: liensData
-      };
-      
-      console.log("ReceiptService: Prepared receipt data", JSON.stringify(receiptData, null, 2));
-      
-      // Create the receipt in storage
-      const receipt = await storage.createWarehouseReceipt(receiptData as InsertWarehouseReceipt);
-      
-      console.log("ReceiptService: Receipt created successfully", receipt.id);
-      
-      return receipt;
+      // Read and return the file
+      return fs.readFileSync(filepath);
     } catch (error) {
-      console.error("ReceiptService: Error creating receipt", error);
-      throw error;
+      console.error('Error retrieving receipt file:', error);
+      return null;
     }
   }
 }

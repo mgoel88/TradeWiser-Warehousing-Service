@@ -299,6 +299,8 @@ export const loanRepayments = pgTable('loan_repayments', {
   principalAmount: numeric('principal_amount', { precision: 14, scale: 2 }),
   transactionHash: text('transaction_hash'),
   blockchainData: json('blockchain_data'),
+  receiptUrl: text('receipt_url'),
+  receiptNumber: text('receipt_number'),
 });
 
 // User credit profiles
@@ -454,3 +456,17 @@ export type SackMovement = typeof sackMovements.$inferSelect;
 
 export type InsertSackQualityAssessment = z.infer<typeof insertSackQualityAssessmentSchema>;
 export type SackQualityAssessment = typeof sackQualityAssessments.$inferSelect;
+
+// Bank payment type for receipt generation
+export interface BankPayment {
+  transactionId: string;
+  status: string;
+  amount: string;
+  paymentMethod: string;
+  timestamp: Date | string;
+  accountNumber?: string;
+  ifscCode?: string;
+  upiId?: string;
+  referenceNumber?: string;
+  createdAt?: Date;
+}

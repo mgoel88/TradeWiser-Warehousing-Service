@@ -11,7 +11,7 @@ import { useToast } from '@/hooks/use-toast';
 import { apiRequest } from '@/lib/queryClient';
 import BankPaymentForm, { BankPaymentFormValues } from '@/components/payment/BankPaymentForm';
 import { BankPaymentStatus, BankType, BankPaymentMethod } from '@/lib/bankPaymentClient';
-import { CalendarIcon, AlertCircle, CheckCircle2, CreditCard } from 'lucide-react';
+import { CalendarIcon, AlertCircle, CheckCircle2, CreditCard, Download } from 'lucide-react';
 import { format } from 'date-fns';
 
 type LoanDetailParams = {
@@ -58,9 +58,15 @@ interface Payment {
   completedAt?: Date;
 }
 
+interface Receipt {
+  url: string;
+  receiptNumber: string;
+}
+
 interface PaymentResponse {
   payment: Payment;
   loanRepayment: LoanRepayment;
+  receipt?: Receipt;
 }
 
 function LoanRepaymentPage() {
@@ -243,9 +249,21 @@ function LoanRepaymentPage() {
             <Button variant="outline" onClick={() => setLocation('/loans')}>
               Back to Loans
             </Button>
-            <Button variant="outline" onClick={() => setLocation('/payments')}>
-              Payment History
-            </Button>
+            <div className="flex gap-2">
+              {paymentSuccess.receipt?.url && (
+                <Button 
+                  variant="default"
+                  onClick={() => window.open(paymentSuccess.receipt?.url, '_blank')}
+                  className="flex items-center"
+                >
+                  <Download className="h-4 w-4 mr-2" />
+                  Download Receipt
+                </Button>
+              )}
+              <Button variant="outline" onClick={() => setLocation('/payments')}>
+                Payment History
+              </Button>
+            </div>
           </CardFooter>
         </Card>
       </div>

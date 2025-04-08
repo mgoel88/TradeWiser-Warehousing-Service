@@ -15,6 +15,7 @@ import { fromZodError } from "zod-validation-error";
 import 'express-session';
 import { paymentService, PaymentMethod, PaymentStatus } from './services/PaymentService';
 import { bankPaymentService, BankType, BankPaymentMethod } from './services/BankPaymentService';
+import { receiptService } from './services/ReceiptService';
 import documentParsingService from './services/DocumentParsingService';
 import fileUploadService from './services/FileUploadService';
 import externalWarehouseService from './services/ExternalWarehouseService';
@@ -236,20 +237,58 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const principalAmount = parseFloat(amount) / (1 + (interestRate / 100));
       const interestAmount = parseFloat(amount) - principalAmount;
       
+      // Generate receipt number
+      const receiptNumber = `TW-RCPT-${Date.now().toString().slice(-8)}-${Math.floor(Math.random() * 1000).toString().padStart(3, '0')}`;
+      
       const loanRepayment = await storage.createLoanRepayment({
         loanId: loanId,
         userId: req.session.userId,
         amount: amount.toString(),
-        transactionId: payment.transactionId,
+        externalTransactionId: payment.transactionId,
         paymentMethod: paymentMethod,
         status: "pending",
         interestAmount: interestAmount.toFixed(2),
-        principalAmount: principalAmount.toFixed(2)
+        principalAmount: principalAmount.toFixed(2),
+        receiptNumber: receiptNumber
       });
+      
+      // Generate receipt PDF
+      const paymentWithTimestamp = {
+        ...payment,
+        timestamp: payment.createdAt // Add timestamp field to match BankPayment in schema
+      };
+      
+      const receipt = await receiptService.createReceipt(
+        paymentWithTimestamp,
+        loanRepayment,
+        {
+          loanDetails: {
+            interestRate: loan.interestRate || "0",
+            startDate: loan.startDate ? new Date(loan.startDate).toLocaleDateString() : 'N/A',
+            lendingPartnerName: loan.lendingPartnerName || 'TradeWiser Finance'
+          },
+          userDetails: {
+            fullName: user.fullName,
+            email: user.email,
+            phone: user.phone
+          }
+        }
+      );
+      
+      // Update loan repayment with receipt URL
+      await storage.updateLoanRepaymentReceipt(loanRepayment.id, receipt.url, receipt.receiptNumber);
+      
+      // Update the object to include receipt information
+      loanRepayment.receiptUrl = receipt.url;
+      loanRepayment.receiptNumber = receipt.receiptNumber;
       
       res.status(201).json({ 
         payment,
-        loanRepayment
+        loanRepayment,
+        receipt: {
+          url: receipt.url,
+          receiptNumber: receipt.receiptNumber
+        }
       });
     } catch (error) {
       console.error("Failed to process loan repayment:", error);
@@ -2397,7 +2436,65 @@ apiRouter.post("/smart-contracts/:id/execute", async (req: Request, res: Respons
 });
 
 // Add all API routes under /api prefix
-app.use("/api", apiRouter);
+// Receipt download route
+  app.get("/uploads/receipts/:filename", (req, res) => {
+    try {
+      const { filename } = req.params;
+      
+      // Check if file exists
+      const receipt = receiptService.getReceiptFile(filename);
+      
+      if (!receipt) {
+        return res.status(404).json({ message: "Receipt not found" });
+      }
+      
+      // Set content type for PDF
+      res.contentType('application/pdf');
+      
+      // Set content disposition for download
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      
+      // Send the file
+      res.send(receipt);
+    } catch (error) {
+      console.error('Error downloading receipt:', error);
+      res.status(500).json({ message: "Error downloading receipt" });
+    }
+  });
+
+  // Serve receipt files
+  app.get('/uploads/receipts/:filename', (req: Request, res: Response) => {
+    try {
+      const { filename } = req.params;
+      
+      // Security check: Make sure the filename only contains valid characters
+      if (!/^[a-zA-Z0-9_\-\.]+\.pdf$/.test(filename)) {
+        return res.status(400).json({ message: 'Invalid filename' });
+      }
+      
+      // Get the receipt file
+      const fileBuffer = receiptService.getReceiptFile(filename);
+      
+      if (!fileBuffer) {
+        return res.status(404).json({ message: 'Receipt file not found' });
+      }
+      
+      // Set headers
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `inline; filename="${filename}"`);
+      
+      // Send the file
+      res.send(fileBuffer);
+    } catch (error) {
+      console.error('Error serving receipt file:', error);
+      res.status(500).json({ message: 'Failed to serve receipt file' });
+    }
+  });
+
+  // Serve static files from the uploads directory
+  app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
+
+  app.use("/api", apiRouter);
 
   const httpServer = createServer(app);
   
