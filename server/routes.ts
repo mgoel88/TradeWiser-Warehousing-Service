@@ -2099,8 +2099,55 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Add all API routes under /api prefix
-  app.use("/api", apiRouter);
+  // Smart Contract Routes
+apiRouter.post("/smart-contracts/lien", async (req: Request, res: Response) => {
+  try {
+    const { loanId, receiptIds, amount } = req.body;
+    const contractId = await SmartContractService.createLienContract(loanId, receiptIds, amount);
+    res.status(201).json({ contractId });
+  } catch (error) {
+    res.status(500).json({ message: "Failed to create lien contract" });
+  }
+});
+
+apiRouter.post("/smart-contracts/repayment", async (req: Request, res: Response) => {
+  try {
+    const { loanId, amount, schedule } = req.body;
+    const contractId = await SmartContractService.createRepaymentContract(loanId, amount, schedule);
+    res.status(201).json({ contractId });
+  } catch (error) {
+    res.status(500).json({ message: "Failed to create repayment contract" });
+  }
+});
+
+apiRouter.post("/smart-contracts/escrow", async (req: Request, res: Response) => {
+  try {
+    const { commodityId, sellerId, buyerId, amount, conditions } = req.body;
+    const contractId = await SmartContractService.createEscrowContract(
+      commodityId, sellerId, buyerId, amount, conditions
+    );
+    res.status(201).json({ contractId });
+  } catch (error) {
+    res.status(500).json({ message: "Failed to create escrow contract" });
+  }
+});
+
+apiRouter.post("/smart-contracts/:id/execute", async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const success = await SmartContractService.executeContract(id);
+    if (success) {
+      res.status(200).json({ message: "Contract executed successfully" });
+    } else {
+      res.status(400).json({ message: "Failed to execute contract" });
+    }
+  } catch (error) {
+    res.status(500).json({ message: "Error executing contract" });
+  }
+});
+
+// Add all API routes under /api prefix
+app.use("/api", apiRouter);
 
   const httpServer = createServer(app);
   
