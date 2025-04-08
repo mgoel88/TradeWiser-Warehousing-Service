@@ -860,6 +860,68 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
+  // Generate QR code for receipt verification
+  apiRouter.get("/receipts/:id/qr-code", async (req: Request, res: Response) => {
+    try {
+      // Check if user is authenticated
+      if (!req.session || !req.session.userId) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+      
+      const id = parseInt(req.params.id);
+      
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid receipt ID" });
+      }
+      
+      // Get the receipt
+      const receipts = await storage.listWarehouseReceipts();
+      const receipt = receipts.find(r => r.id === id);
+      
+      if (!receipt) {
+        return res.status(404).json({ message: "Receipt not found" });
+      }
+      
+      // Check if user owns the receipt
+      if (receipt.ownerId !== req.session.userId) {
+        return res.status(403).json({ message: "Not authorized to access this receipt" });
+      }
+      
+      // Get the verification code from the liens field
+      let verificationCode;
+      if (receipt.liens && typeof receipt.liens === 'object') {
+        const liens = receipt.liens as Record<string, any>;
+        verificationCode = liens.verificationCode;
+      }
+      
+      // If no verification code exists, generate one and update the receipt
+      if (!verificationCode) {
+        // Generate a unique verification code: combination of receipt ID, current timestamp, and a random string
+        verificationCode = `R${id}-${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 8)}`;
+        
+        // Update the receipt with the verification code
+        const liens = receipt.liens && typeof receipt.liens === 'object' 
+          ? { ...(receipt.liens as Record<string, any>), verificationCode } 
+          : { verificationCode };
+          
+        await storage.updateWarehouseReceipt(id, { liens });
+      }
+      
+      // Build the verification URL
+      const verificationUrl = `${req.protocol}://${req.get('host')}/verify-receipt/${verificationCode}`;
+      
+      // Return the verification URL and code for QR generation on client
+      res.status(200).json({
+        receiptId: id,
+        verificationCode,
+        verificationUrl
+      });
+    } catch (error) {
+      console.error("QR code generation error:", error);
+      res.status(500).json({ message: "Server error generating QR code" });
+    }
+  });
+  
   // Serve receipt attachments
   apiRouter.get("/receipts/attachments/:filename", async (req: Request, res: Response) => {
     try {

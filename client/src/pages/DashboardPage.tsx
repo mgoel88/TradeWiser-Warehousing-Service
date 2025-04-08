@@ -7,7 +7,7 @@ import MainLayout from '@/components/layout/MainLayout';
 import { Warehouse, ExternalLink, Package, ArrowRight, AlertCircle, ShieldCheck } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import Dashboard from '@/components/dashboard/Dashboard';
+import { Dashboard } from '@/components/dashboard/Dashboard';
 
 export default function DashboardPage() {
   const [, navigate] = useLocation();

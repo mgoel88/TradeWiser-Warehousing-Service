@@ -155,3 +155,6 @@ export function Dashboard() {
     </DashboardProvider>
   );
 }
+
+// Add default export to fix the import issue
+export default Dashboard;
