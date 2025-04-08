@@ -96,8 +96,8 @@ export default function Sidebar() {
             </div>
             <Link href="/private-storage" className={cn(
               "flex items-center p-2 pl-7 rounded-md text-sm",
-              location === "/red-channel" 
-                ? "bg-primary-50 text-primary-600 font-medium" 
+              location === "/private-storage" 
+                ? "bg-purple-50 text-purple-600 font-medium" 
                 : "text-gray-700 hover:bg-gray-100"
             )}>
               <FileCheck className="h-4 w-4 mr-2" />
