@@ -95,7 +95,7 @@ export default function ImportReceiptsPage() {
               <CardContent>
                 {isSuccess && (
                   <Alert className="mb-4 bg-green-50">
-                    <FileUpload className="h-4 w-4" />
+                    <CheckCircle2 className="h-4 w-4" />
                     <AlertTitle>Upload Complete</AlertTitle>
                     <AlertDescription>
                       Your receipt has been successfully uploaded and is being processed.
