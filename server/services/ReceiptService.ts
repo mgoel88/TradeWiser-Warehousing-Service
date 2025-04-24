@@ -9,6 +9,16 @@ import { jsPDF } from 'jspdf';
 import 'jspdf-autotable';
 import { LoanRepayment, BankPayment } from '@shared/schema';
 
+// Explicitly extend jsPDF with autoTable for TypeScript
+declare module 'jspdf' {
+  interface jsPDF {
+    autoTable: (options: any) => void;
+    lastAutoTable: {
+      finalY: number;
+    };
+  }
+}
+
 // Ensure receipts directory exists
 const RECEIPTS_DIR = path.join(process.cwd(), 'uploads', 'receipts');
 if (!fs.existsSync(RECEIPTS_DIR)) {
@@ -111,7 +121,7 @@ class ReceiptService {
       ['Interest Amount', `₹${parseFloat(loanRepayment.interestAmount || '0').toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`]
     ];
     
-    // @ts-ignore - jsPDF-autoTable extends jsPDF but TypeScript doesn't recognize it
+    // No need for ts-ignore now that we've defined the interface
     doc.autoTable({
       startY: 65,
       body: paymentData,
@@ -125,7 +135,6 @@ class ReceiptService {
     });
     
     // Get the latest y position after the table
-    // @ts-ignore - jsPDF-autoTable adds lastAutoTable to jsPDF
     const lastY = doc.lastAutoTable.finalY + 10;
     
     // Add loan information if available
@@ -140,7 +149,7 @@ class ReceiptService {
         ['Lending Partner', additionalInfo.loanDetails.lendingPartnerName]
       ];
       
-      // @ts-ignore - jsPDF-autoTable extends jsPDF
+      // No need for ts-ignore anymore
       doc.autoTable({
         startY: lastY + 5,
         body: loanData,
