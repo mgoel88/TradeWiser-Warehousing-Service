@@ -2494,6 +2494,20 @@ apiRouter.post("/smart-contracts/:id/execute", async (req: Request, res: Respons
   // Serve static files from the uploads directory
   app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
 
+  // Test data generation endpoint (for development only)
+  app.post('/api/generate-test-data', async (req: Request, res: Response) => {
+    try {
+      const result = await generateTestData();
+      res.json(result);
+    } catch (error) {
+      console.error('Error generating test data:', error);
+      res.status(500).json({ 
+        message: 'Error generating test data',
+        error: error instanceof Error ? error.message : String(error)
+      });
+    }
+  });
+
   app.use("/api", apiRouter);
 
   const httpServer = createServer(app);
