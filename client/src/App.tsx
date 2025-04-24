@@ -23,6 +23,8 @@ import OrangeChannelPage from "@/pages/OrangeChannelPage";
 import RedChannelPage from "@/pages/RedChannelPage";
 import ReceiptSacksPage from "@/pages/ReceiptSacksPage";
 import SackDetailPage from "@/pages/SackDetailPage";
+import ImportReceiptsPage from "@/pages/ImportReceiptsPage";
+import PrivateStoragePage from "@/pages/PrivateStoragePage";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -49,6 +51,9 @@ function Router() {
       {/* New sack management routes */}
       <Route path="/receipt/:id/sacks" component={ReceiptSacksPage} />
       <Route path="/commodity-sacks/:id/details" component={SackDetailPage} />
+      {/* Import and private storage routes */}
+      <Route path="/import-receipts" component={ImportReceiptsPage} />
+      <Route path="/private-storage" component={PrivateStoragePage} />
       <Route component={NotFound} />
     </Switch>
   );
