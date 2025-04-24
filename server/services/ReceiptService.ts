@@ -6,6 +6,7 @@
 import fs from 'fs';
 import path from 'path';
 import { jsPDF } from 'jspdf';
+// Import jspdf-autotable
 import 'jspdf-autotable';
 import { LoanRepayment, BankPayment } from '@shared/schema';
 
