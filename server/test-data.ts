@@ -521,40 +521,15 @@ export async function generateTestData() {
       interestAmount: '400',
       paymentMethod: 'NETBANKING',
       status: 'COMPLETED',
-      referenceNumber: 'PAY-' + Date.now(),
       receiptNumber: 'RCPT-' + Date.now()
     });
 
-    // Create repayment receipt
-    const payment1 = {
-      id: 1,
-      userId: 1,
-      amount: '5000',
-      status: 'COMPLETED',
-      transactionId: 'TXN-' + Date.now(),
-      referenceNumber: repayment1.referenceNumber,
-      timestamp: new Date(),
-      paymentMethod: 'NETBANKING',
-      bankCode: 'HDFC',
-      accountNumber: 'XXXX1234',
-      createdAt: new Date()
-    };
-
-    const receipt1 = await receiptService.generateReceipt(payment1, repayment1, {
-      loanDetails: {
-        interestRate: wheat_loan.interestRate,
-        startDate: wheat_loan.startDate.toLocaleDateString(),
-        lendingPartnerName: wheat_loan.lendingPartnerName
-      },
-      userDetails: {
-        fullName: 'Test User',
-        email: 'test@example.com',
-        phone: '+911234567890'
-      }
-    });
-
-    // Update loan repayment with receipt info
-    await storage.updateLoanRepaymentReceipt(repayment1.id, receipt1.url, receipt1.receiptNumber);
+    // Skip receipt generation for test data to avoid PDF generation issues
+    // Just set a fake receipt URL
+    const receiptUrl = `/uploads/receipts/test-receipt-${Date.now()}.pdf`;
+    
+    // Update loan repayment with receipt info (mock data)
+    await storage.updateLoanRepaymentReceipt(repayment1.id, receiptUrl, repayment1.receiptNumber || '');
 
     // Update outstanding amounts on the loan
     await storage.updateLoan(wheat_loan.id, {
