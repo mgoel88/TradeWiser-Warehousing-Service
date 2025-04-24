@@ -18,6 +18,7 @@ import { bankPaymentService, BankType, BankPaymentMethod } from './services/Bank
 import { receiptService } from './services/ReceiptService';
 import documentParsingService from './services/DocumentParsingService';
 import fileUploadService from './services/FileUploadService';
+import { generateTestData } from './test-data';
 import externalWarehouseService from './services/ExternalWarehouseService';
 
 // Configure multer for file uploads
