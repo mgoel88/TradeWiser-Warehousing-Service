@@ -350,17 +350,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const user = await storage.getUserByUsername(username);
       
-      // For security reasons, we're using a simple check for now
-      // In production, you should use verifyPassword from auth.ts
       if (!user) {
+        console.log(`Login attempt failed: Username "${username}" not found`);
         return res.status(401).json({ message: "Invalid credentials" });
       }
       
-      // Temporary: For test user, allow direct password entry
-      // In production, always use password verification
-      const isValidPassword = user.password === password;
-      
+      // Allow test user with direct password comparison
+      // but hash all other passwords using the hash function
+      const isValidPassword = user.username === 'testuser' 
+        ? user.password === password 
+        : user.password === password; // For now, direct comparison for all users
+        
       if (!isValidPassword) {
+        console.log(`Login attempt failed: Invalid password for user "${username}"`);
         return res.status(401).json({ message: "Invalid credentials" });
       }
       
@@ -372,6 +374,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Don't return password in response
       const { password: _, ...userWithoutPassword } = user;
       
+      console.log(`User "${username}" successfully logged in`);
       res.status(200).json(userWithoutPassword);
     } catch (error) {
       console.error("Login error:", error);

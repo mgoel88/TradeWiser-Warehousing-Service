@@ -218,6 +218,22 @@ export class MemStorage implements IStorage {
     this.currentUserId = 1;
     this.currentWarehouseId = 1;
     this.currentCommodityId = 1;
+    
+    // Create test user for development
+    this.createUser({
+      username: 'testuser',
+      password: 'password123',
+      email: 'testuser@example.com',
+      fullName: 'Test User',
+      phone: '+919876543210',
+      role: 'user',
+      address: 'Test Address, New Delhi',
+      kycVerified: true
+    }).then(() => {
+      console.log('Test user created at startup: testuser/password123');
+    }).catch(err => {
+      console.error('Error creating test user:', err);
+    });
     this.currentReceiptId = 1;
     this.currentLoanId = 1;
     this.currentProcessId = 1;
