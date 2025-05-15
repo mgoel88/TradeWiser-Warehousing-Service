@@ -229,8 +229,77 @@ export class MemStorage implements IStorage {
       role: 'user',
       address: 'Test Address, New Delhi',
       kycVerified: true
-    }).then(() => {
+    }).then(user => {
       console.log('Test user created at startup: testuser/password123');
+      
+      // Create sample warehouses
+      Promise.all([
+        this.createWarehouse({
+          name: "Delhi Central Warehouse",
+          address: "Industrial Area, New Delhi",
+          latitude: "28.6139",
+          longitude: "77.2090",
+          capacity: "5000",
+          availableSpace: "3500",
+          storageRate: "2.50",
+          phoneNumber: "+911234567890",
+          email: "delhi@warehouses.com",
+          manager: "Rajiv Sharma",
+          certifications: ["ISO 9001", "FSSAI"],
+          storageConditions: ["Climate Controlled", "Secure"],
+          whType: "public"
+        }),
+        this.createWarehouse({
+          name: "Mumbai Port Storage",
+          address: "Port Area, Mumbai",
+          latitude: "19.0760",
+          longitude: "72.8777",
+          capacity: "8000",
+          availableSpace: "4000",
+          storageRate: "3.25",
+          phoneNumber: "+912234567890",
+          email: "mumbai@warehouses.com",
+          manager: "Priya Patel",
+          certifications: ["ISO 9001", "FSSAI", "SAFE"],
+          storageConditions: ["Fumigated", "24/7 Security"],
+          whType: "public"
+        }),
+        this.createWarehouse({
+          name: "Kolkata Bulk Storage",
+          address: "Riverside Area, Kolkata",
+          latitude: "22.5726",
+          longitude: "88.3639",
+          capacity: "6000",
+          availableSpace: "2000",
+          storageRate: "2.00",
+          phoneNumber: "+913334567890",
+          email: "kolkata@warehouses.com",
+          manager: "Amit Sen",
+          certifications: ["ISO 9001"],
+          storageConditions: ["Pest Control", "Fire Safety"],
+          whType: "private"
+        })
+      ]).then(() => {
+        console.log('Created 3 sample warehouses');
+      });
+
+      // Create sample commodities for the test user
+      this.createCommodity({
+        name: "Premium Wheat",
+        type: "Grain",
+        grade: "A",
+        quantity: "1500",
+        measurementUnit: "kg",
+        storageConditions: ["Dry", "Climate Controlled"],
+        ownerId: user.id,
+        warehouseId: 1,
+        quality: "Premium",
+        harvestDate: new Date('2023-11-15'),
+        status: "active",
+        channelType: "green"
+      }).then(() => {
+        console.log('Created sample commodities for test user');
+      });
     }).catch(err => {
       console.error('Error creating test user:', err);
     });
