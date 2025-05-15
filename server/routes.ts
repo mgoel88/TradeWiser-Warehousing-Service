@@ -2568,11 +2568,24 @@ apiRouter.post("/smart-contracts/:id/execute", async (req: Request, res: Respons
   // Test data generation endpoint (for development only)
   app.post('/api/generate-test-data', async (req: Request, res: Response) => {
     try {
-      const result = await generateTestData();
-      res.json(result);
+      console.log("Starting test data generation process...");
+      
+      // Import the seed function from our module
+      const { seedTestData } = await import('./seed-test-data');
+      
+      // Run the seeding function
+      await seedTestData();
+      
+      console.log("Test data generation completed successfully");
+      
+      res.json({
+        success: true, 
+        message: "Test data has been successfully populated including electronic warehouse receipts, commodity sacks with blockchain tracking, and complete history records"
+      });
     } catch (error) {
       console.error('Error generating test data:', error);
       res.status(500).json({ 
+        success: false,
         message: 'Error generating test data',
         error: error instanceof Error ? error.message : String(error)
       });
