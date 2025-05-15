@@ -367,9 +367,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // Set user in session
-      if (req.session) {
-        req.session.userId = user.id;
-      }
+      req.session.userId = user.id;
+      await new Promise<void>((resolve) => {
+        req.session.save((err) => {
+          if (err) {
+            console.error("Error saving session:", err);
+          }
+          console.log(`Session saved for user ${username}, userId: ${user.id}, sessionID: ${req.sessionID}`);
+          resolve();
+        });
+      });
       
       // Don't return password in response
       const { password: _, ...userWithoutPassword } = user;
@@ -384,22 +391,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   apiRouter.get("/auth/session", async (req: Request, res: Response) => {
     try {
+      console.log("Checking session:", req.sessionID, req.session);
+      
       // Check if user is authenticated
       if (!req.session || !req.session.userId) {
+        console.log("Session check failed: Not authenticated");
         return res.status(401).json({ message: "Not authenticated" });
       }
       
-      const user = await storage.getUser(req.session.userId);
+      const userId = req.session.userId;
+      console.log("Session check: Found userId in session:", userId);
+      
+      const user = await storage.getUser(userId);
       
       if (!user) {
+        console.log("Session check failed: User not found for ID:", userId);
         return res.status(401).json({ message: "User not found" });
       }
       
       // Don't return password in response
       const { password, ...userWithoutPassword } = user;
       
+      console.log("Session check successful for user:", user.username);
       res.status(200).json(userWithoutPassword);
     } catch (error) {
+      console.error("Session check error:", error);
       res.status(500).json({ message: "Server error" });
     }
   });

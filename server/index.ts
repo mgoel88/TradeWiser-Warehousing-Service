@@ -14,16 +14,26 @@ const MemoryStoreSession = MemoryStore(session);
 // Set up session middleware
 app.use(session({
   secret: "tradewiser-session-secret",
-  resave: false,
-  saveUninitialized: false,
+  resave: true,
+  saveUninitialized: true,
   store: new MemoryStoreSession({
     checkPeriod: 86400000 // prune expired entries every 24h
   }),
   cookie: { 
     secure: false, // set to true in production with HTTPS
-    maxAge: 24 * 60 * 60 * 1000 // 24 hours
+    maxAge: 24 * 60 * 60 * 1000, // 24 hours
+    httpOnly: true,
+    sameSite: 'lax'
   }
 }));
+
+// Add session debugging middleware
+app.use((req, res, next) => {
+  if (req.path.startsWith('/api/')) {
+    console.log(`Session ID: ${req.sessionID}, Session data:`, req.session);
+  }
+  next();
+});
 
 app.use((req, res, next) => {
   const start = Date.now();

@@ -254,7 +254,25 @@ export default function DepositFlow({
         return;
       }
 
-      if (!user || !user.id) {
+      // Check if user is authenticated by making a direct session check
+      const sessionResponse = await fetch('/api/auth/session', {
+        credentials: 'include'
+      });
+      
+      if (!sessionResponse.ok) {
+        console.error("Session validation failed:", await sessionResponse.text());
+        toast({
+          title: "Authentication required",
+          description: "Your session has expired. Please log in again to continue.",
+          variant: "destructive",
+        });
+        return;
+      }
+      
+      const userData = await sessionResponse.json();
+      console.log("Session validated, user data:", userData);
+      
+      if (!userData || !userData.id) {
         toast({
           title: "Authentication required",
           description: "Please log in to continue",
@@ -287,7 +305,7 @@ export default function DepositFlow({
       const formattedData = {
         ...data,
         qualityParameters: selectedQualityParams,
-        ownerId: user.id,
+        ownerId: userData.id, // Use the validated user data from session check
         status: "processing", // Initial status
         channelType: "green", // Default channel
         quantity: quantityString, // Send as string to match API expectations
@@ -324,7 +342,7 @@ export default function DepositFlow({
         const processData = {
           commodityId: typeof commodity.id === 'string' ? parseInt(commodity.id) : commodity.id,
           warehouseId: typeof selectedWarehouse.id === 'string' ? parseInt(selectedWarehouse.id) : selectedWarehouse.id,
-          userId: typeof user.id === 'string' ? parseInt(user.id) : user.id,
+          userId: typeof userData.id === 'string' ? parseInt(userData.id) : userData.id,
           processType: "deposit", // Using "deposit" as a more standard process type
           status: "pending",
           currentStage: "deposit_reception",
