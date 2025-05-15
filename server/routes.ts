@@ -567,18 +567,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       // Check if user is authenticated
       if (!req.session || !req.session.userId) {
+        console.log("Authentication failed: No valid session or userId in session", req.session);
         return res.status(401).json({ message: "Not authenticated" });
       }
+      
+      console.log("Authenticated user creating commodity, userId:", req.session.userId);
       
       const validData = insertCommoditySchema.parse({
         ...req.body,
         ownerId: req.session.userId
       });
       
+      console.log("Creating commodity with data:", validData);
       const commodity = await storage.createCommodity(validData);
       
       res.status(201).json(commodity);
     } catch (error) {
+      console.error("Error creating commodity:", error);
       if (error instanceof z.ZodError) {
         const validationError = fromZodError(error);
         res.status(400).json({ message: validationError.message });
