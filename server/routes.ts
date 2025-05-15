@@ -581,6 +581,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   apiRouter.post("/commodities", async (req: Request, res: Response) => {
     try {
+      console.log("POST /commodities received: Session ID:", req.sessionID);
+      console.log("Session data:", req.session);
+      
       // Check if user is authenticated
       if (!req.session || !req.session.userId) {
         console.log("Authentication failed: No valid session or userId in session", req.session);
@@ -589,14 +592,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       console.log("Authenticated user creating commodity, userId:", req.session.userId);
       
-      const validData = insertCommoditySchema.parse({
+      // Always ensure the ownerId is set from the session
+      const commodityData = {
         ...req.body,
         ownerId: req.session.userId
-      });
+      };
       
-      console.log("Creating commodity with data:", validData);
+      console.log("Commodity data to validate:", commodityData);
+      
+      const validData = insertCommoditySchema.parse(commodityData);
+      
+      console.log("Creating commodity with validated data:", validData);
       const commodity = await storage.createCommodity(validData);
       
+      console.log("Commodity created successfully:", commodity);
       res.status(201).json(commodity);
     } catch (error) {
       console.error("Error creating commodity:", error);
@@ -2004,13 +2013,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   apiRouter.post("/processes", async (req: Request, res: Response) => {
     try {
+      console.log("POST /processes received: Session ID:", req.sessionID);
+      console.log("Session data:", req.session);
+      
       // Check if user is authenticated
       if (!req.session || !req.session.userId) {
+        console.log("Process creation failed: No userId in session");
         return res.status(401).json({ message: "Not authenticated" });
       }
       
-      // Ensure we properly handle the estimatedCompletionTime
-      let processData = { ...req.body, userId: req.session.userId };
+      console.log("Process creation: User is authenticated, userId:", req.session.userId);
+      
+      // Ensure we properly handle the estimatedCompletionTime and always use userId from session
+      let processData = { 
+        ...req.body, 
+        userId: req.session.userId  // Always override userId with the one from session
+      };
+      
+      console.log("Process data being validated:", processData);
       
       // If we have a date string, convert it to a proper Date object
       if (processData.estimatedCompletionTime && typeof processData.estimatedCompletionTime === 'string') {
@@ -2018,8 +2038,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       const validData = insertProcessSchema.parse(processData);
+      console.log("Process data validated successfully:", validData);
       
       const process = await storage.createProcess(validData);
+      console.log("Process created successfully:", process);
+      
+      res.status(201).json(process);
       
       // If this is a deposit or inward_processing process, simulate automatic updates for demo purposes
       if ((process.processType === 'deposit' || process.processType === 'inward_processing') && process.status === 'pending') {
