@@ -2,20 +2,23 @@
 
 A comprehensive digital platform for warehouse management, collateral management, and lending services focused on agricultural commodities. The platform integrates blockchain technology for secure ownership transfers and lending processes with real-time tracking capabilities.
 
-## 🚀 Quick Start with Docker
+## 🚀 Quick Start
 
-### Prerequisites
+### Development Setup
+For local development and testing:
+
+#### Prerequisites
 - Docker and Docker Compose installed
 - Git (to clone the repository)
 
-### 1. Clone and Setup
+#### 1. Clone and Setup
 ```bash
 git clone <repository-url>
 cd tradewiser
 cp .env.docker .env
 ```
 
-### 2. Start with Docker Compose
+#### 2. Start Development Environment
 ```bash
 # Option 1: Use provided scripts (recommended)
 ./start.sh              # Linux/Mac
@@ -25,38 +28,65 @@ start.bat               # Windows
 docker-compose up --build -d    # or: docker compose up --build -d
 ```
 
-### 3. Wait for Services (2-3 minutes)
-```bash
-# Monitor startup progress
-docker-compose logs -f
-
-# Check service status
-docker-compose ps
-
-# Test when ready
-curl http://localhost:5000/api/test
-```
-
-### 4. Access the Application
+#### 3. Access Development Application
 - **Web App**: http://localhost:5000
 - **Database**: localhost:5432
 - **Redis**: localhost:6379
+- **Login**: testuser / password123
 
-### 5. Default Login Credentials
-- **Username**: `testuser`
-- **Password**: `password123`
+### Production Deployment
+For production environments:
 
-### 6. Troubleshooting
+#### Prerequisites
+- Production server with 4GB+ RAM
+- Domain name and SSL certificates
+- Docker and Docker Compose installed
+
+#### 1. Production Setup
+```bash
+git clone <repository-url>
+cd tradewiser
+cp .env.production .env.production.local
+# Edit .env.production.local with your secure settings
+```
+
+#### 2. Deploy to Production
+```bash
+# Make deployment script executable
+chmod +x deploy-production.sh
+
+# Run production deployment
+./deploy-production.sh
+```
+
+#### 3. Access Production Application
+- **Web App**: https://yourdomain.com
+- **Admin Interface**: https://yourdomain.com/admin
+- **API**: https://yourdomain.com/api
+
+### Key Differences
+
+| Feature | Development | Production |
+|---------|-------------|------------|
+| **Security** | Basic passwords | Strong passwords, SSL |
+| **Performance** | Single container | Multi-container, optimized |
+| **Monitoring** | Basic logging | Comprehensive monitoring |
+| **Backup** | Not included | Automated backups |
+| **SSL** | Not configured | HTTPS with certificates |
+| **Rate Limiting** | Disabled | Enabled |
+| **Environment** | `.env.docker` | `.env.production` |
+
+### Troubleshooting
 If you encounter issues:
 ```bash
-# Run comprehensive test
+# Development
 ./docker-test-complete.sh
 
-# Or check individual components
-docker-compose logs app
-docker-compose logs database
-docker-compose exec database pg_isready -U tradewiser
+# Production
+docker-compose -f docker-compose.production.yml logs -f
 ```
+
+For detailed production setup, see [PRODUCTION_GUIDE.md](PRODUCTION_GUIDE.md)
 
 ## 📋 Manual Setup (Alternative)
 
