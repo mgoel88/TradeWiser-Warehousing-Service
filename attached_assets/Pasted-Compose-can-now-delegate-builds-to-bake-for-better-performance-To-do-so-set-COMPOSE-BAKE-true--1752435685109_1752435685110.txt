@@ -1,0 +1,29 @@
+Compose can now delegate builds to bake for better performance.
+ To do so, set COMPOSE_BAKE=true.
+[+] Building 58.7s (19/25)                                                                                                      docker:default
+ => [app internal] load build definition from Dockerfile                                                                                  0.2s
+ => => transferring dockerfile: 1.88kB                                                                                                    0.0s
+ => [app internal] load metadata for docker.io/library/node:20-alpine                                                                     0.8s
+ => [app internal] load .dockerignore                                                                                                     0.2s
+ => => transferring context: 786B                                                                                                         0.0s
+ => [app internal] load build context                                                                                                     0.9s
+ => => transferring context: 21.14MB                                                                                                      0.4s
+ => CACHED [app builder 1/8] FROM docker.io/library/node:20-alpine@sha256:fa316946c0cb1f041fe46dda150f3085b71168555e5706ec0c7466a5bae122  0.0s
+ => [app production  2/14] RUN apk add --no-cache     postgresql-client     curl     bash     ca-certificates     tzdata     && update-c  8.0s
+ => [app builder 2/8] RUN apk add --no-cache     python3     make     g++     curl     bash     postgresql-client                        16.2s
+ => [app production  3/14] RUN addgroup -g 1001 -S nodejs &&     adduser -S tradewiser -u 1001 -G nodejs                                  0.4s
+ => [app production  4/14] WORKDIR /app                                                                                                   0.1s
+ => [app production  5/14] COPY package*.json ./                                                                                          0.1s
+ => [app production  6/14] RUN npm ci --only=production && npm cache clean --force                                                       18.6s
+ => [app builder 3/8] WORKDIR /app                                                                                                        0.8s
+ => [app builder 4/8] COPY package*.json ./                                                                                               0.9s 
+ => [app builder 5/8] RUN npm ci                                                                                                         20.3s 
+ => [app builder 6/8] COPY . .                                                                                                            0.6s 
+ => [app builder 7/8] RUN mkdir -p uploads                                                                                                0.9s 
+ => [app builder 8/8] RUN npm run build                                                                                                  16.2s 
+ => CACHED [app production  7/14] COPY --from=builder /app/dist ./dist                                                                    0.0s 
+ => ERROR [app production  8/14] COPY --from=builder /app/client/dist ./client/dist                                                       0.0s 
+------                                                                                                                                         
+ > [app production  8/14] COPY --from=builder /app/client/dist ./client/dist:                                                                  
+------                                                                                                                                         
+failed to solve: failed to compute cache key: failed to calculate checksum of ref 7c349be8-8c6b-47de-a6f4-77b61f863240::j4pg5cpvr0rvotuhdqu9vo9se: "/app/client/dist": not found

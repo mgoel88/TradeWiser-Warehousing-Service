@@ -60,19 +60,19 @@ RUN npm ci --only=production && npm cache clean --force
 
 # Copy built application from builder stage
 COPY --from=builder /app/dist ./dist
+# Note: Client assets are served by the Express server, no separate client/dist needed
 
-# Copy necessary runtime files from builder stage
-COPY --from=builder /app/server ./server
-COPY --from=builder /app/shared ./shared
-COPY --from=builder /app/db ./db
-COPY --from=builder /app/drizzle.config.ts ./drizzle.config.ts
-COPY --from=builder /app/docker-entrypoint.sh ./docker-entrypoint.sh
+# Copy necessary runtime files
+COPY server ./server
+COPY shared ./shared
+COPY db ./db
 
 # Create necessary directories
 RUN mkdir -p uploads logs
 
-# Set permissions for entry point
-RUN chmod +x ./docker-entrypoint.sh
+# Copy and set permissions for entry point
+COPY --from=builder /app/docker-entrypoint.sh /docker-entrypoint.sh
+RUN chmod +x /docker-entrypoint.sh
 
 # Change ownership to non-root user
 RUN chown -R tradewiser:nodejs /app
@@ -86,4 +86,4 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
   CMD curl -f http://localhost:5000/api/test || exit 1
 
 # Use entry point script
-ENTRYPOINT ["./docker-entrypoint.sh"]
+ENTRYPOINT ["/docker-entrypoint.sh"]

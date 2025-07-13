@@ -41,11 +41,17 @@ I've updated the Dockerfile to:
 
 ### Quick Fix
 ```bash
-# On your Ubuntu system, run:
-./start-ubuntu.sh
+# On your Ubuntu system, run this fix script:
+./fix-docker-build.sh
+
+# Or manually:
+docker-compose down
+docker system prune -af
+docker-compose build --no-cache
+docker-compose up -d
 ```
 
-This will now work without the build error because the Dockerfile has been corrected.
+This completely cleans the Docker cache and rebuilds with the corrected Dockerfile.
 
 ### Validation Steps
 ```bash
