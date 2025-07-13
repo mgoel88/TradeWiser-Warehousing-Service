@@ -87,11 +87,11 @@ if ! docker info &> /dev/null; then
     fi
 fi
 
-# Check Docker Compose
-if command -v docker-compose &> /dev/null; then
-    COMPOSE_CMD="docker-compose"
-elif docker compose version &> /dev/null; then
+# Check Docker Compose (prefer plugin version)
+if docker compose version &> /dev/null; then
     COMPOSE_CMD="docker compose"
+elif command -v docker-compose &> /dev/null; then
+    COMPOSE_CMD="docker-compose"
 else
     echo "❌ Docker Compose is not available."
     if [[ "$OSTYPE" == "linux-gnu"* ]]; then

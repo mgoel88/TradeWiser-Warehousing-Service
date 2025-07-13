@@ -45,10 +45,10 @@ I've updated the Dockerfile to:
 ./fix-docker-build.sh
 
 # Or manually:
-docker-compose down
+docker compose down
 docker system prune -af
-docker-compose build --no-cache
-docker-compose up -d
+docker compose build --no-cache
+docker compose up -d
 ```
 
 This completely cleans the Docker cache and rebuilds with the corrected Dockerfile.

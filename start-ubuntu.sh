@@ -90,14 +90,14 @@ fi
 
 echo "✅ Docker is installed and running"
 
-# Check Docker Compose
+# Check Docker Compose (prefer plugin version)
 COMPOSE_CMD=""
-if command -v docker-compose &> /dev/null; then
-    COMPOSE_CMD="docker-compose"
-    echo "✅ Using docker-compose (standalone)"
-elif docker compose version &> /dev/null; then
+if docker compose version &> /dev/null; then
     COMPOSE_CMD="docker compose"
     echo "✅ Using docker compose (plugin)"
+elif command -v docker-compose &> /dev/null; then
+    COMPOSE_CMD="docker-compose"
+    echo "✅ Using docker-compose (standalone)"
 else
     echo "❌ Docker Compose is not available."
     if [[ "$OSTYPE" == "linux-gnu"* ]]; then

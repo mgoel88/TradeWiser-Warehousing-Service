@@ -120,7 +120,7 @@ If you encounter issues:
 ./docker-test-ubuntu.sh
 
 # Production
-docker-compose -f docker-compose.production.yml logs -f
+docker compose -f docker-compose.production.yml logs -f
 ```
 
 ### Documentation

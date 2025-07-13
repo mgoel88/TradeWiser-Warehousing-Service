@@ -74,14 +74,14 @@ TradeWiser is a comprehensive blockchain-powered agricultural commodity platform
 ## Development Workflow
 1. **Development Setup**: `./start.sh` or `start.bat` for one-command deployment
 2. **Local Development**: `npm run dev` for local development
-3. **Docker Development**: `docker-compose up -d` for containerized deployment
+3. **Docker Development**: `docker compose up -d` for containerized deployment
 4. **Database**: `npm run db:push` for schema updates
 5. **Testing**: Default credentials testuser/password123
 
 ## Production Workflow
 1. **Production Setup**: `cp .env.production .env.production.local` and customize
 2. **Production Deployment**: `./deploy-production.sh` for automated deployment
-3. **Production Docker**: `docker-compose -f docker-compose.production.yml up -d`
+3. **Production Docker**: `docker compose -f docker-compose.production.yml up -d`
 4. **SSL Configuration**: Configure certificates and domain
 5. **Monitoring**: Use production logging and health checks
 

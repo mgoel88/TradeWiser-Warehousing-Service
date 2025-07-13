@@ -32,14 +32,14 @@ if ! command -v docker &> /dev/null; then
     exit 1
 fi
 
-# Check Docker Compose with better detection
+# Check Docker Compose (prefer plugin version)
 COMPOSE_CMD=""
-if command -v docker-compose &> /dev/null; then
-    COMPOSE_CMD="docker-compose"
-    echo "✅ Using docker-compose (standalone)"
-elif docker compose version &> /dev/null; then
+if docker compose version &> /dev/null; then
     COMPOSE_CMD="docker compose"
     echo "✅ Using docker compose (plugin)"
+elif command -v docker-compose &> /dev/null; then
+    COMPOSE_CMD="docker-compose"
+    echo "✅ Using docker-compose (standalone) - consider upgrading to plugin"
 else
     echo "❌ Docker Compose is not available."
     if [ "$OS_TYPE" = "linux" ]; then

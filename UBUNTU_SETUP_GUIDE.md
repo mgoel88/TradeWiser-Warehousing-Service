@@ -154,7 +154,7 @@ SSL_ENABLED=true
 
 ### Production Scripts
 - `./deploy-production.sh` - Production deployment
-- `docker-compose -f docker-compose.production.yml` - Production containers
+- `docker compose -f docker-compose.production.yml` - Production containers
 
 ## Ubuntu Version Compatibility
 

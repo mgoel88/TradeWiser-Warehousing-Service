@@ -6,7 +6,7 @@ echo "============================="
 
 # Stop all containers and clean cache
 echo "🛑 Stopping containers and cleaning cache..."
-docker-compose down || docker compose down || true
+docker compose down || true
 docker system prune -af
 docker builder prune -af
 
@@ -23,10 +23,10 @@ fi
 
 # Build without cache
 echo "🏗️ Building without cache..."
-docker-compose build --no-cache
+docker compose build --no-cache
 
 echo "🚀 Starting services..."
-docker-compose up -d
+docker compose up -d
 
 echo ""
 echo "🎉 Docker build fix completed!"
