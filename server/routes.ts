@@ -14,6 +14,8 @@ declare module 'express-session' {
 
 export async function registerRoutes(app: Express): Promise<Server> {
   const apiRouter = express.Router();
+  
+  console.log("Registering API routes...");
 
   // Auth routes
   apiRouter.post("/auth/register", async (req: Request, res: Response) => {
@@ -95,12 +97,75 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   });
 
+  // Warehouse routes
+  apiRouter.get("/warehouses", async (req: Request, res: Response) => {
+    try {
+      console.log("GET /api/warehouses called");
+      const warehouses = await storage.listWarehouses();
+      console.log(`Found ${warehouses.length} warehouses`);
+      res.setHeader('Content-Type', 'application/json');
+      return res.json(warehouses);
+    } catch (error) {
+      console.error("Error fetching warehouses:", error);
+      res.setHeader('Content-Type', 'application/json');
+      return res.status(500).json({ message: "Failed to fetch warehouses" });
+    }
+  });
+
+  apiRouter.get("/warehouses/:id", async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id);
+      const warehouse = await storage.getWarehouse(id);
+      
+      if (!warehouse) {
+        return res.status(404).json({ message: "Warehouse not found" });
+      }
+      
+      res.json(warehouse);
+    } catch (error) {
+      console.error("Error fetching warehouse:", error);
+      res.status(500).json({ message: "Failed to fetch warehouse" });
+    }
+  });
+
+  // Commodity routes
+  apiRouter.get("/commodities", async (req: Request, res: Response) => {
+    try {
+      if (!req.session?.userId) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+      
+      const commodities = await storage.listCommoditiesByOwner(req.session.userId);
+      res.json(commodities);
+    } catch (error) {
+      console.error("Error fetching commodities:", error);
+      res.status(500).json({ message: "Failed to fetch commodities" });
+    }
+  });
+
+  // Receipt routes
+  apiRouter.get("/receipts", async (req: Request, res: Response) => {
+    try {
+      if (!req.session?.userId) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+      
+      const receipts = await storage.listWarehouseReceiptsByOwner(req.session.userId);
+      res.json(receipts);
+    } catch (error) {
+      console.error("Error fetching receipts:", error);
+      res.status(500).json({ message: "Failed to fetch receipts" });
+    }
+  });
+
   // Test endpoint
   apiRouter.get("/test", (req: Request, res: Response) => {
     res.json({ message: "API is working", timestamp: new Date().toISOString() });
   });
 
   app.use("/api", apiRouter);
+  
+  console.log("API routes registered successfully");
   
   const httpServer = createServer(app);
   return httpServer;
