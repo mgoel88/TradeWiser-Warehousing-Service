@@ -22,9 +22,21 @@ fi
 if [ ! -f .env ]; then
     echo "📝 Creating .env file from template..."
     cp .env.docker .env
-    echo "✅ .env file created. You can modify it if needed."
+    echo "✅ .env file created with default configuration."
 else
     echo "✅ .env file already exists."
+    echo "💡 If you're having issues, you can reset it with: cp .env.docker .env"
+fi
+
+# Validate environment file
+if [ -f .env ]; then
+    echo "🔍 Validating environment configuration..."
+    if grep -q "PGDATABASE=tradewiser_db" .env && grep -q "PGUSER=tradewiser" .env; then
+        echo "✅ Environment configuration looks good."
+    else
+        echo "⚠️  Environment configuration might be incomplete. Using defaults."
+        cp .env.docker .env
+    fi
 fi
 
 # Create necessary directories

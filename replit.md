@@ -18,6 +18,11 @@ TradeWiser is a comprehensive blockchain-powered agricultural commodity platform
 - **Containerization**: Docker with multi-service compose setup
 
 ## Recent Changes
+- **2025-01-13**: Fixed Docker environment variable issues in docker-compose.yml
+- **2025-01-13**: Added proper env_file configuration and Docker entry point script
+- **2025-01-13**: Enhanced startup scripts with environment validation
+- **2025-01-13**: Created comprehensive .dockerignore for optimized builds
+- **2025-01-13**: Added database initialization script for PostgreSQL setup
 - **2025-01-11**: Fixed application startup issues by resolving template literal syntax errors
 - **2025-01-11**: Added comprehensive Docker support with docker-compose.yml
 - **2025-01-11**: Created detailed README.md with complete database schema documentation
@@ -39,9 +44,9 @@ TradeWiser is a comprehensive blockchain-powered agricultural commodity platform
 - **Real-time Updates**: WebSocket integration for live tracking
 
 ## Known Issues
-- **Full Features**: Advanced features temporarily simplified for stable startup
-- **Routes Restoration**: Need to restore full routes.ts functionality
-- **Production Deployment**: Ready for production with Docker setup
+- **Routes Restoration**: Need to restore full routes.ts functionality from routes-full.ts
+- **Environment Variables**: Fixed Docker environment loading issues
+- **Production Ready**: Docker setup fully functional with proper database initialization
 
 ## Database Schema
 ### Core Tables

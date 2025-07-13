@@ -1,0 +1,92 @@
+docker compose up --build
+WARN[0000] The "PGDATABASE" variable is not set. Defaulting to a blank string. 
+WARN[0000] The "PGUSER" variable is not set. Defaulting to a blank string. 
+WARN[0000] The "PGPASSWORD" variable is not set. Defaulting to a blank string. 
+WARN[0000] The "PGPORT" variable is not set. Defaulting to a blank string. 
+WARN[0000] The "PGUSER" variable is not set. Defaulting to a blank string. 
+WARN[0000] The "PGDATABASE" variable is not set. Defaulting to a blank string. 
+WARN[0000] The "PGUSER" variable is not set. Defaulting to a blank string. 
+WARN[0000] The "PGPASSWORD" variable is not set. Defaulting to a blank string. 
+WARN[0000] The "PGDATABASE" variable is not set. Defaulting to a blank string. 
+WARN[0000] The "PGUSER" variable is not set. Defaulting to a blank string. 
+WARN[0000] The "PGPASSWORD" variable is not set. Defaulting to a blank string. 
+WARN[0000] The "PGDATABASE" variable is not set. Defaulting to a blank string. 
+WARN[0000] The "SESSION_SECRET" variable is not set. Defaulting to a blank string. 
+WARN[0000] /home/codetrade/Desktop/CP/replit/From Replit Site only/WIZSTORE/docker-compose.yml: the attribute `version` is obsolete, it will be ignored, please remove it to avoid potential confusion 
+Compose can now delegate builds to bake for better performance.
+ To do so, set COMPOSE_BAKE=true.
+[+] Building 2.0s (17/17) FINISHED                                                                                              docker:default
+ => [app internal] load build definition from Dockerfile                                                                                  0.0s
+ => => transferring dockerfile: 1.03kB                                                                                                    0.0s
+ => [app internal] load metadata for docker.io/library/node:20-alpine                                                                     1.6s
+ => [app internal] load .dockerignore                                                                                                     0.1s
+ => => transferring context: 862B                                                                                                         0.0s
+ => [app  1/11] FROM docker.io/library/node:20-alpine@sha256:fa316946c0cb1f041fe46dda150f3085b71168555e5706ec0c7466a5bae12244             0.0s
+ => [app internal] load build context                                                                                                     0.0s
+ => => transferring context: 15.88kB                                                                                                      0.0s
+ => CACHED [app  2/11] WORKDIR /app                                                                                                       0.0s
+ => CACHED [app  3/11] RUN apk add --no-cache     postgresql-client     curl     bash     python3     make     g++                        0.0s
+ => CACHED [app  4/11] COPY package*.json ./                                                                                              0.0s
+ => CACHED [app  5/11] RUN npm install                                                                                                    0.0s
+ => CACHED [app  6/11] COPY . .                                                                                                           0.0s
+ => CACHED [app  7/11] RUN mkdir -p uploads                                                                                               0.0s
+ => CACHED [app  8/11] RUN npm run build                                                                                                  0.0s
+ => CACHED [app  9/11] RUN npm prune --production                                                                                         0.0s
+ => CACHED [app 10/11] COPY docker-entrypoint.sh /docker-entrypoint.sh                                                                    0.0s
+ => CACHED [app 11/11] RUN chmod +x /docker-entrypoint.sh                                                                                 0.0s
+ => [app] exporting to image                                                                                                              0.1s
+ => => exporting layers                                                                                                                   0.0s
+ => => writing image sha256:7e47661a5586d221f7fe76837d628cc41c56d320890c13d69eb1ea8bbc2033cc                                              0.0s
+ => => naming to docker.io/library/wizstore-app                                                                                           0.0s
+ => [app] resolving provenance for metadata file                                                                                          0.0s
+[+] Running 7/7
+ ✔ app                              Built                                                                                                 0.0s 
+ ✔ Network wizstore_default         Created                                                                                               0.1s 
+ ✔ Volume "wizstore_redis_data"     Created                                                                                               0.0s 
+ ✔ Volume "wizstore_postgres_data"  Created                                                                                               0.0s 
+ ✔ Container wizstore-redis-1       Created                                                                                               0.1s 
+ ✔ Container wizstore-database-1    Created                                                                                               0.1s 
+ ✔ Container wizstore-app-1         Created                                                                                               0.1s 
+Attaching to app-1, database-1, redis-1
+redis-1     | 1:C 13 Jul 2025 18:28:42.519 # WARNING Memory overcommit must be enabled! Without it, a background save or replication may fail under low memory condition. Being disabled, it can also cause failures without low memory condition, see https://github.com/jemalloc/jemalloc/issues/1328. To fix this issue add 'vm.overcommit_memory = 1' to /etc/sysctl.conf and then reboot or run the command 'sysctl vm.overcommit_memory=1' for this to take effect.
+redis-1     | 1:C 13 Jul 2025 18:28:42.520 * oO0OoO0OoO0Oo Redis is starting oO0OoO0OoO0Oo
+redis-1     | 1:C 13 Jul 2025 18:28:42.520 * Redis version=7.4.4, bits=64, commit=00000000, modified=0, pid=1, just started
+redis-1     | 1:C 13 Jul 2025 18:28:42.520 * Configuration loaded
+redis-1     | 1:M 13 Jul 2025 18:28:42.520 * monotonic clock: POSIX clock_gettime
+redis-1     | 1:M 13 Jul 2025 18:28:42.521 * Running mode=standalone, port=6379.
+redis-1     | 1:M 13 Jul 2025 18:28:42.521 * Server initialized
+redis-1     | 1:M 13 Jul 2025 18:28:42.527 * Creating AOF base file appendonly.aof.1.base.rdb on server start
+redis-1     | 1:M 13 Jul 2025 18:28:42.543 * Creating AOF incr file appendonly.aof.1.incr.aof on server start
+redis-1     | 1:M 13 Jul 2025 18:28:42.543 * Ready to accept connections tcp
+database-1  | Error: Database is uninitialized and superuser password is not specified.
+database-1  |        You must specify POSTGRES_PASSWORD to a non-empty value for the
+database-1  |        superuser. For example, "-e POSTGRES_PASSWORD=password" on "docker run".
+database-1  | 
+database-1  |        You may also use "POSTGRES_HOST_AUTH_METHOD=trust" to allow all
+database-1  |        connections without a password. This is *not* recommended.
+database-1  | 
+database-1  |        See PostgreSQL documentation about "trust":
+database-1  |        https://www.postgresql.org/docs/current/auth-trust.html
+database-1 exited with code 0
+database-1  | Error: Database is uninitialized and superuser password is not specified.
+database-1  |        You must specify POSTGRES_PASSWORD to a non-empty value for the
+database-1  |        superuser. For example, "-e POSTGRES_PASSWORD=password" on "docker run".
+database-1  | 
+database-1  |        You may also use "POSTGRES_HOST_AUTH_METHOD=trust" to allow all
+database-1  |        connections without a password. This is *not* recommended.
+database-1  | 
+database-1  |        See PostgreSQL documentation about "trust":
+database-1  |        https://www.postgresql.org/docs/current/auth-trust.html
+database-1 exited with code 0
+database-1  | Error: Database is uninitialized and superuser password is not specified.
+database-1  |        You must specify POSTGRES_PASSWORD to a non-empty value for the
+database-1  |        superuser. For example, "-e POSTGRES_PASSWORD=password" on "docker run".
+database-1  | 
+database-1  |        You may also use "POSTGRES_HOST_AUTH_METHOD=trust" to allow all
+database-1  |        connections without a password. This is *not* recommended.
+database-1  | 
+database-1  |        See PostgreSQL documentation about "trust":
+database-1  |        https://www.postgresql.org/docs/current/auth-trust.html
+database-1 exited with code 1
+Gracefully stopping... (press Ctrl+C again to force)
+dependency failed to start: container wizstore-database-1 is unhealthy

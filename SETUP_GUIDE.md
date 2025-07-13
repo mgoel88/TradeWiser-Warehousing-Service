@@ -1,509 +1,325 @@
-# TradeWiser Platform - Complete Setup Guide
+# TradeWiser Setup Guide
 
-## Overview
-TradeWiser is a blockchain-powered agricultural commodity platform providing secure, transparent digital infrastructure for warehousing, quality assessment, and collateral-based lending.
+## Quick Docker Setup (Recommended)
 
-## Prerequisites
+### 1. Prerequisites
+- Docker and Docker Compose installed
+- Git for cloning the repository
 
-### System Requirements
-- **Operating System**: Ubuntu 20.04+ or Windows 10/11
-- **Node.js**: Version 18 or higher
-- **PostgreSQL**: Version 12 or higher
-- **RAM**: Minimum 4GB (8GB recommended)
-- **Storage**: At least 2GB free space
-
-## Ubuntu Setup
-
-### 1. Update System Packages
+### 2. Clone and Start
 ```bash
-sudo apt update && sudo apt upgrade -y
-```
-
-### 2. Install Node.js 18+
-```bash
-# Install Node.js using NodeSource repository
-curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
-sudo apt-get install -y nodejs
-
-# Verify installation
-node --version
-npm --version
-```
-
-### 3. Install PostgreSQL
-```bash
-# Install PostgreSQL
-sudo apt install postgresql postgresql-contrib -y
-
-# Start and enable PostgreSQL service
-sudo systemctl start postgresql
-sudo systemctl enable postgresql
-
-# Create database user and database
-sudo -u postgres psql
-```
-
-In PostgreSQL shell, run:
-```sql
-CREATE USER tradewiser WITH PASSWORD 'tradewiser123';
-CREATE DATABASE tradewiser_db OWNER tradewiser;
-GRANT ALL PRIVILEGES ON DATABASE tradewiser_db TO tradewiser;
-\q
-```
-
-### 4. Install Git (if not already installed)
-```bash
-sudo apt install git -y
-```
-
-### 5. Clone and Setup Project
-```bash
-# Clone the repository
-git clone <your-repository-url>
+git clone <repository-url>
 cd tradewiser
 
+# Linux/Mac users
+./start.sh
+
+# Windows users
+start.bat
+```
+
+### 3. Access the Application
+- **Web App**: http://localhost:5000
+- **Login**: testuser / password123
+
+## Troubleshooting Docker Issues
+
+### Environment Variable Warnings
+If you see warnings like:
+```
+WARN[0000] The "PGDATABASE" variable is not set. Defaulting to a blank string.
+```
+
+**Solution:**
+```bash
+# Copy the environment template
+cp .env.docker .env
+
+# Verify the file exists and has content
+cat .env
+
+# Restart Docker services
+docker-compose down
+docker-compose up -d
+```
+
+### Database Connection Issues
+If PostgreSQL fails to start:
+
+**Check logs:**
+```bash
+docker-compose logs database
+```
+
+**Common fixes:**
+```bash
+# Clean up and restart
+docker-compose down -v
+docker system prune -f
+cp .env.docker .env
+docker-compose up -d
+```
+
+### Application Not Starting
+If the app container fails:
+
+**Check logs:**
+```bash
+docker-compose logs app
+```
+
+**Common fixes:**
+```bash
+# Rebuild the application
+docker-compose down
+docker-compose build --no-cache
+docker-compose up -d
+```
+
+## Manual Setup (Alternative)
+
+### 1. Prerequisites
+- Node.js 18+
+- PostgreSQL 13+
+- npm
+
+### 2. Database Setup
+```bash
+# Create database
+createdb tradewiser_db
+
+# Create user (optional)
+psql -c "CREATE USER tradewiser WITH PASSWORD 'password';"
+psql -c "GRANT ALL PRIVILEGES ON DATABASE tradewiser_db TO tradewiser;"
+```
+
+### 3. Application Setup
+```bash
 # Install dependencies
 npm install
 
-# The .env file is already included and ready to use!
-# No need to copy from .env.example - it's preconfigured
-```
+# Configure environment
+cp .env.docker .env
+# Edit .env with your database credentials
 
-### 6. Configure PostgreSQL Database
-The `.env` file is preconfigured with these database settings:
-- **Database Name**: `tradewiser_db`
-- **Username**: `tradewiser`
-- **Password**: `tradewiser123`
-
-You just need to create the database user and database to match these settings:
-
-### 7. Initialize Database
-```bash
-# Push database schema
+# Setup database schema
 npm run db:push
 
-# Generate test data
-curl -X POST http://localhost:5000/api/generate-test-data
-```
-
-### 8. Start the Application
-```bash
-# Development mode
-npm run dev
-
-# Production mode
-npm run build
-npm start
-```
-
-## Windows Setup
-
-### 1. Install Node.js
-1. Download Node.js 18+ from [nodejs.org](https://nodejs.org/)
-2. Run the installer with administrator privileges
-3. Verify installation in Command Prompt:
-```cmd
-node --version
-npm --version
-```
-
-### 2. Install PostgreSQL
-1. Download PostgreSQL from [postgresql.org](https://www.postgresql.org/download/windows/)
-2. Run the installer
-3. During installation:
-   - Set superuser password
-   - Default port: 5432
-   - Default locale: [Default locale]
-
-### 3. Configure PostgreSQL
-Open PostgreSQL command line (psql) or pgAdmin:
-```sql
-CREATE USER tradewiser WITH PASSWORD 'tradewiser123';
-CREATE DATABASE tradewiser_db OWNER tradewiser;
-GRANT ALL PRIVILEGES ON DATABASE tradewiser_db TO tradewiser;
-```
-
-### 4. Install Git
-Download and install Git from [git-scm.com](https://git-scm.com/download/win)
-
-### 5. Clone and Setup Project
-Open Command Prompt or PowerShell as Administrator:
-```cmd
-# Clone the repository
-git clone <your-repository-url>
-cd tradewiser
-
-# Install dependencies
-npm install
-
-# The .env file is already included and ready to use!
-# No need to copy from .env.example - it's preconfigured
-```
-
-### 6. Configure PostgreSQL Database
-The `.env` file is preconfigured with these database settings:
-- **Database Name**: `tradewiser_db`
-- **Username**: `tradewiser`
-- **Password**: `tradewiser123`
-
-You just need to create the database user and database to match these settings.
-
-### 7. Initialize Database
-```cmd
-# Push database schema
-npm run db:push
-
-# Generate test data (after starting the server)
-curl -X POST http://localhost:5000/api/generate-test-data
-```
-
-### 8. Start the Application
-```cmd
-# Development mode
-npm run dev
-
-# Production mode
-npm run build
-npm start
-```
-
-## Running the Application
-
-### Default Access
-- **URL**: http://localhost:5000
-- **Test User**: 
-  - Username: `testuser`
-  - Password: `password123`
-
-### Available Scripts
-```bash
-# Development with hot reload
-npm run dev
-
-# Build for production
-npm run build
-
-# Start production server
-npm start
-
-# Database operations
-npm run db:push     # Apply schema changes
-npm run db:generate # Generate migrations
-
-# Utilities
-npm run lint        # Code linting
-npm run test        # Run tests
-```
-
-## Application Features
-
-### 1. Dashboard
-- View commodity holdings
-- Track warehouse receipts
-- Monitor loan status
-- Real-time notifications
-
-### 2. Commodity Management
-- **Green Channel**: Direct deposits using internal warehouses
-- **Orange Channel**: Import external warehouse receipts
-- **Red Channel**: Self-certified commodity documentation
-
-### 3. Electronic Warehouse Receipts (eWRs)
-- Blockchain-secured receipts
-- QR code verification
-- Transferable ownership
-- Collateral for loans
-
-### 4. Individual Sack Tracking
-- 50kg sack granularity
-- Unique blockchain hashes
-- Movement history
-- Quality assessments
-
-### 5. Lending System
-- Warehouse receipt financing (WRF)
-- Overdraft-style credit facilities
-- Multiple lending partner integration
-- Automated underwriting
-
-### 6. Payment System
-- Bank API integration
-- UPI support
-- Downloadable receipts
-- Transaction tracking
-
-## Step-by-Step First Run
-
-### After Installation:
-
-1. **Start the server**:
-```bash
+# Start development server
 npm run dev
 ```
 
-2. **Generate test data** (in a new terminal):
-```bash
-curl -X POST http://localhost:5000/api/generate-test-data
+## Environment Variables Explained
+
+### Required Variables
+```env
+# Database connection
+DATABASE_URL=postgresql://user:pass@host:port/database
+PGHOST=database          # Database host
+PGDATABASE=tradewiser_db # Database name
+PGUSER=tradewiser        # Database user
+PGPASSWORD=password      # Database password
+PGPORT=5432              # Database port
+
+# Application security
+SESSION_SECRET=your-secure-session-secret
 ```
 
-3. **Access the application**:
-   - Open browser to http://localhost:5000
-   - Login with: `testuser` / `password123`
+### Optional Variables
+```env
+# Application settings
+NODE_ENV=production
+PORT=5000
+DEBUG=false
 
-4. **Explore the features**:
-   - Dashboard shows commodity overview
-   - Receipts page shows electronic warehouse receipts
-   - Individual sack tracking with blockchain hashes
-   - Warehouse locations across India
+# Redis (if using)
+REDIS_URL=redis://redis:6379
 
-## Troubleshooting
-
-### Common Issues
-
-#### Database Connection Errors
-```bash
-# Check PostgreSQL status (Ubuntu)
-sudo systemctl status postgresql
-
-# Check PostgreSQL status (Windows)
-# Use Services.msc to check PostgreSQL service
-
-# Test database connection
-psql -h localhost -U tradewiser -d tradewiser_db
+# File uploads
+MAX_FILE_SIZE=10485760
+UPLOAD_DIR=./uploads
 ```
 
-#### Port Already in Use
-```bash
-# Find process using port 5000
-sudo lsof -i :5000  # Ubuntu
-netstat -ano | findstr :5000  # Windows
+## Docker Commands Reference
 
-# Kill the process
-sudo kill -9 <PID>  # Ubuntu
-taskkill /PID <PID> /F  # Windows
+### Basic Operations
+```bash
+# Start all services
+docker-compose up -d
+
+# Stop all services
+docker-compose down
+
+# View logs
+docker-compose logs -f
+
+# View specific service logs
+docker-compose logs -f app
+docker-compose logs -f database
+
+# Check service status
+docker-compose ps
 ```
 
-#### Node.js Module Errors
+### Maintenance Operations
 ```bash
-# Clear npm cache and reinstall
-npm cache clean --force
-rm -rf node_modules package-lock.json  # Ubuntu
-rmdir /s node_modules & del package-lock.json  # Windows
-npm install
+# Rebuild application
+docker-compose build --no-cache app
+
+# Clean up volumes (CAUTION: deletes data)
+docker-compose down -v
+
+# Clean up system
+docker system prune -f
+
+# Remove all containers and images
+docker-compose down --rmi all
 ```
 
-### Performance Optimization
-
-#### Ubuntu
+### Development Operations
 ```bash
-# Increase file watchers for development
-echo fs.inotify.max_user_watches=524288 | sudo tee -a /etc/sysctl.conf
-sudo sysctl -p
+# Access application container
+docker-compose exec app sh
+
+# Access database container
+docker-compose exec database psql -U tradewiser -d tradewiser_db
+
+# Run database migrations
+docker-compose exec app npm run db:push
 ```
 
-#### Windows
-```cmd
-# Increase Node.js memory limit
-set NODE_OPTIONS=--max_old_space_size=4096
+## Application Structure
+
+### Docker Services
+- **app**: Main TradeWiser application (Node.js)
+- **database**: PostgreSQL database
+- **redis**: Redis cache (optional)
+
+### Ports
+- **5000**: Web application
+- **5432**: PostgreSQL database
+- **6379**: Redis cache
+
+### Volumes
+- **postgres_data**: Database persistence
+- **redis_data**: Redis persistence
+- **./uploads**: File uploads (mounted)
+- **./logs**: Application logs (mounted)
+
+## Health Checks
+
+### Application Health
+```bash
+curl http://localhost:5000/api/test
+```
+
+### Database Health
+```bash
+docker-compose exec database pg_isready -U tradewiser
+```
+
+### Redis Health
+```bash
+docker-compose exec redis redis-cli ping
+```
+
+## Common Issues and Solutions
+
+### Issue: "Database is uninitialized"
+**Cause**: Missing environment variables
+**Solution**: Ensure .env file exists with proper database credentials
+
+### Issue: "Connection refused"
+**Cause**: Services not fully started
+**Solution**: Wait for health checks to pass, check logs
+
+### Issue: "Permission denied"
+**Cause**: File permissions on startup scripts
+**Solution**: 
+```bash
+chmod +x start.sh
+chmod +x docker-entrypoint.sh
+```
+
+### Issue: "Port already in use"
+**Cause**: Port 5000 or 5432 already occupied
+**Solution**: 
+```bash
+# Find and kill processes using the port
+lsof -ti:5000 | xargs kill -9
+# Or change ports in docker-compose.yml
+```
+
+## Development Workflow
+
+### 1. Make Changes
+Edit files in your preferred editor
+
+### 2. Test Changes
+```bash
+# For frontend changes (auto-reload)
+# Just refresh browser
+
+# For backend changes
+docker-compose restart app
+
+# For database schema changes
+docker-compose exec app npm run db:push
+```
+
+### 3. Debug Issues
+```bash
+# View real-time logs
+docker-compose logs -f app
+
+# Access container for debugging
+docker-compose exec app sh
 ```
 
 ## Production Deployment
 
-### Ubuntu Server
-1. Install PM2 for process management:
+### 1. Environment Setup
 ```bash
-npm install -g pm2
+# Copy and customize environment
+cp .env.docker .env.production
+
+# Edit production values
+# - Change passwords
+# - Set NODE_ENV=production
+# - Configure external database if needed
 ```
 
-2. Create PM2 ecosystem file:
-```javascript
-// ecosystem.config.js
-module.exports = {
-  apps: [{
-    name: 'tradewiser',
-    script: 'server/index.js',
-    instances: 'max',
-    exec_mode: 'cluster',
-    env: {
-      NODE_ENV: 'production',
-      PORT: 5000
-    }
-  }]
-}
-```
-
-3. Start with PM2:
+### 2. Deploy
 ```bash
-pm2 start ecosystem.config.js
-pm2 save
-pm2 startup
+# Build production image
+docker-compose build
+
+# Start in production mode
+docker-compose -f docker-compose.yml up -d
 ```
 
-### Nginx Configuration
-```nginx
-server {
-    listen 80;
-    server_name your-domain.com;
-    
-    location / {
-        proxy_pass http://localhost:5000;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection 'upgrade';
-        proxy_set_header Host $host;
-        proxy_cache_bypass $http_upgrade;
-    }
-}
-```
-
-## Security Considerations
-
-1. **Database Security**
-   - Use strong passwords
-   - Configure PostgreSQL for secure connections
-   - Regular backups
-
-2. **Application Security**
-   - Keep dependencies updated
-   - Use environment variables for secrets
-   - Implement rate limiting
-
-3. **Network Security**
-   - Use HTTPS in production
-   - Configure firewall rules
-   - Regular security audits
-
-## Test Data Included
-
-The platform comes with comprehensive test data:
-
-### Test User
-- **Username**: testuser
-- **Password**: password123
-- **Role**: Farmer
-- **KYC**: Verified
-
-### Sample Warehouses
-- Delhi Central Warehouse (Delhi)
-- Mumbai Port Warehouse (Maharashtra)
-- Kolkata East Warehouse (West Bengal)
-
-### Sample Commodities
-- Premium Wheat (1000kg)
-- Basmati Rice (2000kg)
-- Yellow Soybean (1500kg)
-
-### Electronic Warehouse Receipts
-- EWR-WHEAT-2023-001
-- EWR-RICE-2023-002
-- EWR-SOY-2023-003
-
-### Individual Sack Tracking
-- 10 sacks per commodity (50kg each)
-- Unique blockchain hashes
-- Movement and quality assessment records
-
-## Support and Documentation
-
-### Logs Location
-- **Development**: Console output
-- **Production**: PM2 logs (`pm2 logs tradewiser`)
-
-### Configuration Files
-- `.env` - Environment variables
-- `drizzle.config.ts` - Database configuration
-- `package.json` - Dependencies and scripts
-
-For additional support or questions, please refer to the project documentation or contact the development team.
-
----
-
-## Super Quick Start (Ready-to-Use Configuration)
-
-The repository includes a pre-configured `.env` file with working defaults. Just follow these steps:
-
-### Ubuntu/Linux:
+### 3. Monitoring
 ```bash
-# 1. Install dependencies
-sudo apt update && sudo apt install -y nodejs npm postgresql postgresql-contrib git
+# Check health
+docker-compose ps
+docker-compose logs --tail=50
 
-# 2. Setup PostgreSQL
-sudo -u postgres psql -c "CREATE USER tradewiser WITH PASSWORD 'tradewiser123';"
-sudo -u postgres psql -c "CREATE DATABASE tradewiser_db OWNER tradewiser;"
-sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE tradewiser_db TO tradewiser;"
-
-# 3. Clone and start
-git clone <your-repository-url>
-cd tradewiser
-npm install
-npm run db:push
-npm run dev
-
-# 4. In another terminal, generate test data
-curl -X POST http://localhost:5000/api/generate-test-data
-
-# 5. Access the app
-# Open http://localhost:5000
-# Login: testuser / password123
+# Monitor resources
+docker stats
 ```
 
-### Windows:
-```cmd
-# 1. Install Node.js and PostgreSQL from their websites
-# 2. In PostgreSQL (psql or pgAdmin):
-CREATE USER tradewiser WITH PASSWORD 'tradewiser123';
-CREATE DATABASE tradewiser_db OWNER tradewiser;
-GRANT ALL PRIVILEGES ON DATABASE tradewiser_db TO tradewiser;
+## Support
 
-# 3. Clone and start
-git clone <your-repository-url>
-cd tradewiser
-npm install
-npm run db:push
-npm run dev
+If you encounter issues:
 
-# 4. In another command prompt, generate test data
-curl -X POST http://localhost:5000/api/generate-test-data
+1. Check the logs: `docker-compose logs -f`
+2. Verify environment variables are set correctly
+3. Ensure Docker and Docker Compose are up to date
+4. Try the clean restart procedure:
+   ```bash
+   docker-compose down -v
+   cp .env.docker .env
+   docker-compose up -d
+   ```
 
-# 5. Access the app
-# Open http://localhost:5000
-# Login: testuser / password123
-```
-
-## Configuration Files Included
-
-### `.env` (Ready to Use)
-The repository includes a working `.env` file with these preconfigured settings:
-```env
-DATABASE_URL=postgresql://tradewiser:tradewiser123@localhost:5432/tradewiser_db
-PGHOST=localhost
-PGPORT=5432
-PGUSER=tradewiser
-PGPASSWORD=tradewiser123
-PGDATABASE=tradewiser_db
-SESSION_SECRET=tradewiser_super_secure_session_secret_2024_blockchain_commodity_platform
-PORT=5000
-NODE_ENV=development
-```
-
-### `.env.example` (Template)
-Contains the same configuration as a template for different environments.
-
-**No manual configuration needed!** Just create the PostgreSQL user and database to match the settings above.
-
-## Quick Start Checklist
-
-- [ ] Install Node.js 18+
-- [ ] Install PostgreSQL
-- [ ] Create database user: `tradewiser` with password: `tradewiser123`
-- [ ] Create database: `tradewiser_db`
-- [ ] Clone repository
-- [ ] Run `npm install`
-- [ ] Run `npm run db:push`
-- [ ] Start server with `npm run dev`
-- [ ] Generate test data via API call
-- [ ] Access http://localhost:5000
-- [ ] Login with testuser/password123
-- [ ] Explore the platform features
-
-The platform is now ready for use with comprehensive test data including electronic warehouse receipts and blockchain-tracked commodity sacks!
+For persistent issues, check the main README.md for detailed API documentation and architecture information.

@@ -1,10 +1,10 @@
-version: '3.8'
-
 services:
   # PostgreSQL Database
   database:
     image: postgres:15-alpine
     restart: unless-stopped
+    env_file:
+      - .env
     environment:
       POSTGRES_DB: ${PGDATABASE}
       POSTGRES_USER: ${PGUSER}
@@ -24,6 +24,8 @@ services:
   app:
     build: .
     restart: unless-stopped
+    env_file:
+      - .env
     depends_on:
       database:
         condition: service_healthy

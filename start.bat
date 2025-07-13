@@ -25,9 +25,22 @@ REM Create .env file if it doesn't exist
 if not exist .env (
     echo 📝 Creating .env file from template...
     copy .env.docker .env
-    echo ✅ .env file created. You can modify it if needed.
+    echo ✅ .env file created with default configuration.
 ) else (
     echo ✅ .env file already exists.
+    echo 💡 If you're having issues, you can reset it with: copy .env.docker .env
+)
+
+REM Validate environment file
+if exist .env (
+    echo 🔍 Validating environment configuration...
+    findstr /C:"PGDATABASE=tradewiser_db" .env >nul && findstr /C:"PGUSER=tradewiser" .env >nul
+    if %errorlevel% equ 0 (
+        echo ✅ Environment configuration looks good.
+    ) else (
+        echo ⚠️  Environment configuration might be incomplete. Using defaults.
+        copy .env.docker .env
+    )
 )
 
 REM Create necessary directories
