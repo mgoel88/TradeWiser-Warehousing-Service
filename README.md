@@ -8,23 +8,42 @@ A comprehensive digital platform for warehouse management, collateral management
 For local development and testing:
 
 #### Prerequisites
-- Docker and Docker Compose installed
-- Git (to clone the repository)
+- **Ubuntu 20.04+** (or compatible Linux distribution)
+- **Docker and Docker Compose** installed
+- **Git** (to clone the repository)
+- **Minimum:** 2GB RAM, 10GB disk space
+- **Recommended:** 4GB+ RAM, 20GB+ disk space
 
-#### 1. Clone and Setup
+#### 1. System Validation (Ubuntu)
 ```bash
 git clone <repository-url>
 cd tradewiser
+
+# Validate Ubuntu compatibility
+chmod +x validate-ubuntu-setup.sh
+./validate-ubuntu-setup.sh
+```
+
+#### 2. Environment Setup
+```bash
+# Copy environment configuration
 cp .env.docker .env
 ```
 
-#### 2. Start Development Environment
+#### 3. Start Development Environment
 ```bash
-# Option 1: Use provided scripts (recommended)
-./start.sh              # Linux/Mac
-start.bat               # Windows
+# Ubuntu/Linux (recommended)
+chmod +x start.sh
+./start.sh
 
-# Option 2: Manual Docker commands
+# Alternative: Ubuntu-specific script with auto-installation
+chmod +x start-ubuntu.sh
+./start-ubuntu.sh
+
+# Windows
+start.bat
+
+# Manual Docker commands
 docker-compose up --build -d    # or: docker compose up --build -d
 ```
 
@@ -38,9 +57,11 @@ docker-compose up --build -d    # or: docker compose up --build -d
 For production environments:
 
 #### Prerequisites
-- Production server with 4GB+ RAM
-- Domain name and SSL certificates
-- Docker and Docker Compose installed
+- **Ubuntu Server 20.04 LTS+** (recommended)
+- **4GB+ RAM, 20GB+ SSD storage**
+- **Domain name and SSL certificates**
+- **Docker and Docker Compose** installed
+- **Firewall configured** (UFW recommended)
 
 #### 1. Production Setup
 ```bash
@@ -76,17 +97,36 @@ chmod +x deploy-production.sh
 | **Rate Limiting** | Disabled | Enabled |
 | **Environment** | `.env.docker` | `.env.production` |
 
+### Ubuntu-Specific Setup
+For Ubuntu systems, use the specialized scripts:
+```bash
+# System validation
+./validate-ubuntu-setup.sh
+
+# Ubuntu-optimized setup
+./start-ubuntu.sh
+
+# Ubuntu Docker testing
+./docker-test-ubuntu.sh
+```
+
 ### Troubleshooting
 If you encounter issues:
 ```bash
 # Development
 ./docker-test-complete.sh
 
+# Ubuntu-specific testing
+./docker-test-ubuntu.sh
+
 # Production
 docker-compose -f docker-compose.production.yml logs -f
 ```
 
-For detailed production setup, see [PRODUCTION_GUIDE.md](PRODUCTION_GUIDE.md)
+### Documentation
+- **[UBUNTU_SETUP_GUIDE.md](UBUNTU_SETUP_GUIDE.md)** - Complete Ubuntu setup guide
+- **[PRODUCTION_GUIDE.md](PRODUCTION_GUIDE.md)** - Production deployment guide
+- **[SETUP_GUIDE.md](SETUP_GUIDE.md)** - General setup instructions
 
 ## 📋 Manual Setup (Alternative)
 

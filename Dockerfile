@@ -1,9 +1,16 @@
 # Multi-stage build for TradeWiser Platform
+# Ubuntu-compatible base with Node.js
 # Stage 1: Build stage
 FROM node:20-alpine AS builder
 
-# Install build dependencies
-RUN apk add --no-cache python3 make g++
+# Install build dependencies including Ubuntu compatibility tools
+RUN apk add --no-cache \
+    python3 \
+    make \
+    g++ \
+    curl \
+    bash \
+    postgresql-client
 
 # Set working directory
 WORKDIR /app
@@ -26,11 +33,21 @@ RUN npm run build
 # Stage 2: Production stage
 FROM node:20-alpine AS production
 
-# Install runtime dependencies
+# Install runtime dependencies including Ubuntu compatibility
 RUN apk add --no-cache \
     postgresql-client \
     curl \
-    bash
+    bash \
+    ca-certificates \
+    tzdata \
+    && update-ca-certificates
+
+# Set timezone (useful for production)
+ENV TZ=UTC
+
+# Add non-root user for security
+RUN addgroup -g 1001 -S nodejs && \
+    adduser -S tradewiser -u 1001 -G nodejs
 
 # Set working directory
 WORKDIR /app

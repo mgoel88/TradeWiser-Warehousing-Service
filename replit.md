@@ -34,11 +34,13 @@ TradeWiser is a comprehensive blockchain-powered agricultural commodity platform
 
 ## User Preferences
 - **Deployment**: User prefers Docker-based deployment for easy setup
+- **Platform**: Ubuntu compatibility required for both development and production
 - **Production Ready**: Requires separate production configuration with security
 - **Documentation**: Comprehensive documentation with database schema details
 - **Simplicity**: Focus on one-command setup and clear instructions
 - **Environment**: Prefer environment variables over hardcoded configuration
 - **Security**: Production deployment must have proper security measures
+- **Cross-Platform**: Must work on default development and specific production environments
 
 ## Technical Decisions
 - **Dual Environment**: Separate development and production configurations
@@ -91,3 +93,5 @@ TradeWiser is a comprehensive blockchain-powered agricultural commodity platform
 - Add comprehensive test suite
 - Enhance real-time tracking capabilities
 - Improve mobile responsiveness
+- Deploy to Ubuntu production server
+- Configure SSL certificates and domain

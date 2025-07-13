@@ -1,10 +1,10 @@
 #!/bin/bash
-# TradeWiser Platform - Production Deployment Script
+# TradeWiser Platform - Ubuntu Production Deployment Script
 
 set -e
 
-echo "🚀 TradeWiser Platform - Production Deployment"
-echo "=============================================="
+echo "🚀 TradeWiser Platform - Ubuntu Production Deployment"
+echo "===================================================="
 
 # Check if running as root (not recommended for production)
 if [ "$EUID" -eq 0 ]; then
@@ -12,10 +12,79 @@ if [ "$EUID" -eq 0 ]; then
     echo "   Consider creating a dedicated user for the application."
 fi
 
+# Ubuntu-specific system checks
+if [[ "$OSTYPE" == "linux-gnu"* ]]; then
+    echo "✅ Detected Linux system (Ubuntu compatible)"
+    if command -v lsb_release &> /dev/null; then
+        DISTRO=$(lsb_release -si)
+        VERSION=$(lsb_release -sr)
+        echo "📋 System: $DISTRO $VERSION"
+        
+        # Ubuntu version compatibility check
+        if [[ "$DISTRO" == "Ubuntu" ]]; then
+            MAJOR_VERSION=$(echo $VERSION | cut -d. -f1)
+            if [[ $MAJOR_VERSION -ge 20 ]]; then
+                echo "✅ Ubuntu $VERSION is supported"
+            else
+                echo "⚠️  Ubuntu $VERSION might have compatibility issues. Ubuntu 20.04+ recommended."
+            fi
+        fi
+    fi
+    
+    # Check for required system packages
+    echo "🔍 Checking system requirements..."
+    MISSING_PACKAGES=()
+    
+    if ! command -v curl &> /dev/null; then
+        MISSING_PACKAGES+=("curl")
+    fi
+    
+    if ! command -v jq &> /dev/null; then
+        MISSING_PACKAGES+=("jq")
+    fi
+    
+    if ! command -v htop &> /dev/null; then
+        MISSING_PACKAGES+=("htop")
+    fi
+    
+    if [ ${#MISSING_PACKAGES[@]} -ne 0 ]; then
+        echo "📦 Installing missing packages: ${MISSING_PACKAGES[*]}"
+        sudo apt-get update
+        sudo apt-get install -y "${MISSING_PACKAGES[@]}"
+    fi
+    
+    echo "✅ System packages ready"
+else
+    echo "⚠️  Non-Linux system detected. This script is optimized for Ubuntu."
+fi
+
 # Check if Docker is installed
 if ! command -v docker &> /dev/null; then
-    echo "❌ Docker is not installed. Please install Docker first."
-    exit 1
+    echo "❌ Docker is not installed."
+    if [[ "$OSTYPE" == "linux-gnu"* ]] && command -v apt-get &> /dev/null; then
+        echo "🐳 Installing Docker for Ubuntu..."
+        curl -fsSL https://get.docker.com -o get-docker.sh
+        sudo sh get-docker.sh
+        sudo usermod -aG docker $USER
+        echo "✅ Docker installed. Please log out and back in, then re-run this script."
+        exit 1
+    else
+        echo "Please install Docker manually from: https://docs.docker.com/get-docker/"
+        exit 1
+    fi
+fi
+
+# Verify Docker is running
+if ! docker info &> /dev/null; then
+    echo "🔄 Starting Docker service..."
+    if [[ "$OSTYPE" == "linux-gnu"* ]]; then
+        sudo systemctl start docker
+        sudo systemctl enable docker
+        sleep 5
+    else
+        echo "❌ Docker daemon is not running. Please start Docker."
+        exit 1
+    fi
 fi
 
 # Check Docker Compose
@@ -25,7 +94,15 @@ elif docker compose version &> /dev/null; then
     COMPOSE_CMD="docker compose"
 else
     echo "❌ Docker Compose is not available."
-    exit 1
+    if [[ "$OSTYPE" == "linux-gnu"* ]]; then
+        echo "📦 Installing Docker Compose..."
+        sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+        sudo chmod +x /usr/local/bin/docker-compose
+        COMPOSE_CMD="docker-compose"
+    else
+        echo "Please install Docker Compose manually."
+        exit 1
+    fi
 fi
 
 echo "✅ Using: $COMPOSE_CMD"
