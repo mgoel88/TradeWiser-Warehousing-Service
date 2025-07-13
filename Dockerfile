@@ -60,7 +60,7 @@ RUN npm ci --only=production && npm cache clean --force
 
 # Copy built application from builder stage
 COPY --from=builder /app/dist ./dist
-COPY --from=builder /app/client/dist ./client/dist
+# Note: Client assets are served by the Express server, no separate client/dist needed
 
 # Copy necessary runtime files
 COPY server ./server
@@ -71,8 +71,12 @@ COPY db ./db
 RUN mkdir -p uploads logs
 
 # Copy and set permissions for entry point
-COPY docker-entrypoint.sh /docker-entrypoint.sh
+COPY --from=builder /app/docker-entrypoint.sh /docker-entrypoint.sh
 RUN chmod +x /docker-entrypoint.sh
+
+# Change ownership to non-root user
+RUN chown -R tradewiser:nodejs /app
+USER tradewiser
 
 # Expose port
 EXPOSE 5000

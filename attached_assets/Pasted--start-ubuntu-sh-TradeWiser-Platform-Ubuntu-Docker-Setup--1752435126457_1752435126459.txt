@@ -1,0 +1,74 @@
+./start-ubuntu.sh 
+🚀 TradeWiser Platform - Ubuntu Docker Setup
+=============================================
+✅ Detected Linux system (Ubuntu compatible)
+📋 System: Ubuntu 22.04
+✅ Docker is installed and running
+✅ Using docker compose (plugin)
+✅ .env file already exists.
+💡 If you're having issues, you can reset it with: cp .env.docker .env
+🔍 Validating environment configuration...
+✅ Environment configuration looks good.
+📁 Creating necessary directories...
+🔧 Applying Ubuntu optimizations...
+[sudo] password for codetrade: 
+vm.overcommit_memory = 1
+🛑 Stopping existing containers...
+[+] Running 4/4
+ ✔ Container wizstore-app-1       Removed                                                                                                 8.5s 
+ ✔ Container wizstore-redis-1     Removed                                                                                                 0.3s 
+ ✔ Container wizstore-database-1  Removed                                                                                                 0.3s 
+ ✔ Network wizstore_default       Removed                                                                                                 0.2s 
+🧹 Cleaning up old containers...
+Deleted build cache objects:
+bubkpocyi2d4jw2d9gm0kf5h2
+q1u3j0xec9rn0cob1772cme7w
+mrwyo2hawod3kxjijw54cxr5v
+cz961c0icezi9e9drrlfwn1f1
+ag4mu41ldu21ibdygdqbhbe07
+vmsl2zvygvvsy8lx0l0rjjods
+5plhkcsmbklwh2qe9oacl25ak
+kvc89v9o80yy52e4vo67e8v80
+lb4kdg6dw5yqpb77wsw6lu18b
+ivry7zbff3yitasyyxvhsv4g3
+mejytpib8y5wfat12y6dxrqb2
+gtgowpid7vs0dp5qdxzx56bv3
+ww9inoplzurzownuxwcd41uu9
+uqmf55vtmm7gqa9a6qndwttee
+
+Total reclaimed space: 1.289GB
+📦 Pulling latest images...
+[+] Pulling 3/3
+ ✔ app Skipped - No image to be pulled                                                                                                    0.0s 
+ ✔ redis Pulled                                                                                                                           2.1s 
+ ✔ database Pulled                                                                                                                        2.1s 
+🏗️ Building and starting services...
+Compose can now delegate builds to bake for better performance.
+ To do so, set COMPOSE_BAKE=true.
+[+] Building 57.5s (19/25)                                                                                                      docker:default
+ => [app internal] load build definition from Dockerfile                                                                                  0.1s
+ => => transferring dockerfile: 1.88kB                                                                                                    0.0s
+ => [app internal] load metadata for docker.io/library/node:20-alpine                                                                     1.7s
+ => [app internal] load .dockerignore                                                                                                     0.1s
+ => => transferring context: 786B                                                                                                         0.0s
+ => [app internal] load build context                                                                                                     0.5s
+ => => transferring context: 21.14MB                                                                                                      0.4s
+ => CACHED [app builder 1/8] FROM docker.io/library/node:20-alpine@sha256:fa316946c0cb1f041fe46dda150f3085b71168555e5706ec0c7466a5bae122  0.0s
+ => [app builder 2/8] RUN apk add --no-cache     python3     make     g++     curl     bash     postgresql-client                        19.5s
+ => [app production  2/14] RUN apk add --no-cache     postgresql-client     curl     bash     ca-certificates     tzdata     && update-c  3.5s
+ => [app production  3/14] RUN addgroup -g 1001 -S nodejs &&     adduser -S tradewiser -u 1001 -G nodejs                                  0.4s
+ => [app production  4/14] WORKDIR /app                                                                                                   0.1s
+ => [app production  5/14] COPY package*.json ./                                                                                          0.1s
+ => [app production  6/14] RUN npm ci --only=production && npm cache clean --force                                                       16.3s
+ => [app builder 3/8] WORKDIR /app                                                                                                        0.1s
+ => [app builder 4/8] COPY package*.json ./                                                                                               0.1s
+ => [app builder 5/8] RUN npm ci                                                                                                         15.9s 
+ => [app builder 6/8] COPY . .                                                                                                            0.2s 
+ => [app builder 7/8] RUN mkdir -p uploads                                                                                                0.4s 
+ => [app builder 8/8] RUN npm run build                                                                                                  17.3s 
+ => CACHED [app production  7/14] COPY --from=builder /app/dist ./dist                                                                    0.0s 
+ => ERROR [app production  8/14] COPY --from=builder /app/client/dist ./client/dist                                                       0.0s 
+------                                                                                                                                         
+ > [app production  8/14] COPY --from=builder /app/client/dist ./client/dist:                                                                  
+------                                                                                                                                         
+failed to solve: failed to compute cache key: failed to calculate checksum of ref 7c349be8-8c6b-47de-a6f4-77b61f863240::2alq5c5u1n864eb6rcw3j25cc: "/app/client/dist": not found
