@@ -158,6 +158,114 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Process routes (for deposits and workflows)
+  apiRouter.get("/processes", async (req: Request, res: Response) => {
+    try {
+      if (!req.session?.userId) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+      
+      const processes = await storage.listProcessesByUser(req.session.userId);
+      res.json(processes);
+    } catch (error) {
+      console.error("Error fetching processes:", error);
+      res.status(500).json({ message: "Failed to fetch processes" });
+    }
+  });
+
+  apiRouter.get("/processes/:id", async (req: Request, res: Response) => {
+    try {
+      if (!req.session?.userId) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+      
+      const id = parseInt(req.params.id);
+      const process = await storage.getProcess(id);
+      
+      if (!process) {
+        return res.status(404).json({ message: "Process not found" });
+      }
+      
+      res.json(process);
+    } catch (error) {
+      console.error("Error fetching process:", error);
+      res.status(500).json({ message: "Failed to fetch process" });
+    }
+  });
+
+  apiRouter.post("/processes", async (req: Request, res: Response) => {
+    try {
+      if (!req.session?.userId) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+
+      console.log("Creating new deposit process:", req.body);
+      
+      const { 
+        type,
+        commodityName,
+        commodityType,
+        quantity,
+        warehouseId,
+        deliveryMethod,
+        scheduledDate,
+        scheduledTime,
+        pickupAddress,
+        estimatedValue 
+      } = req.body;
+
+      // Validate required fields
+      if (!commodityName || !commodityType || !quantity || !warehouseId) {
+        return res.status(400).json({ 
+          message: "Missing required fields: commodityName, commodityType, quantity, warehouseId" 
+        });
+      }
+
+      // First create the commodity record
+      const commodity = await storage.createCommodity({
+        name: commodityName,
+        type: commodityType,
+        quantity: quantity.toString(),
+        measurementUnit: "MT",
+        qualityParameters: {},
+        gradeAssigned: "pending",
+        warehouseId: parseInt(warehouseId),
+        ownerId: req.session.userId,
+        status: "pending_deposit",
+        channelType: "green",
+        valuation: estimatedValue?.toString() || "0"
+      });
+
+      // Then create the process
+      const processData = {
+        type: type || "deposit",
+        userId: req.session.userId,
+        commodityId: commodity.id,
+        warehouseId: parseInt(warehouseId),
+        status: "initiated",
+        currentStage: "pickup_scheduled",
+        progress: 10,
+        estimatedCompletion: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days from now
+        metadata: {
+          deliveryMethod,
+          scheduledDate,
+          scheduledTime,
+          pickupAddress,
+          estimatedValue
+        }
+      };
+
+      const process = await storage.createProcess(processData);
+      
+      console.log("Created process:", process.id);
+      
+      res.status(201).json(process);
+    } catch (error) {
+      console.error("Error creating process:", error);
+      res.status(500).json({ message: "Failed to create deposit process" });
+    }
+  });
+
   // Test endpoint
   apiRouter.get("/test", (req: Request, res: Response) => {
     res.json({ message: "API is working", timestamp: new Date().toISOString() });
