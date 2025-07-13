@@ -1,0 +1,27 @@
+docker compose up --build
+Compose can now delegate builds to bake for better performance.
+ To do so, set COMPOSE_BAKE=true.
+[+] Building 17.7s (11/11) FINISHED                                                                                             docker:default
+ => [app internal] load build definition from Dockerfile                                                                                  0.0s
+ => => transferring dockerfile: 571B                                                                                                      0.0s
+ => [app internal] load metadata for docker.io/library/node:20-alpine                                                                     1.5s
+ => [app internal] load .dockerignore                                                                                                     0.0s
+ => => transferring context: 786B                                                                                                         0.0s
+ => [app 1/7] FROM docker.io/library/node:20-alpine@sha256:fa316946c0cb1f041fe46dda150f3085b71168555e5706ec0c7466a5bae12244               0.0s
+ => [app internal] load build context                                                                                                     0.1s
+ => => transferring context: 257.46kB                                                                                                     0.0s
+ => CACHED [app 2/7] WORKDIR /app                                                                                                         0.0s
+ => [app 3/7] COPY package*.json ./                                                                                                       0.1s
+ => [app 4/7] RUN npm ci --only=production                                                                                               14.4s
+ => [app 5/7] COPY . .                                                                                                                    0.4s 
+ => [app 6/7] RUN mkdir -p uploads                                                                                                        0.5s 
+ => ERROR [app 7/7] RUN npm run build                                                                                                     0.6s 
+------                                                                                                                                         
+ > [app 7/7] RUN npm run build:                                                                                                                
+0.537                                                                                                                                          
+0.537 > rest-express@1.0.0 build
+0.537 > vite build && esbuild server/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist
+0.537 
+0.542 sh: vite: not found
+------
+failed to solve: process "/bin/sh -c npm run build" did not complete successfully: exit code: 127

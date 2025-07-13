@@ -17,24 +17,46 @@ cp .env.docker .env
 
 ### 2. Start with Docker Compose
 ```bash
-# Build and start all services
-docker-compose up -d
+# Option 1: Use provided scripts (recommended)
+./start.sh              # Linux/Mac
+start.bat               # Windows
 
-# View logs
-docker-compose logs -f
-
-# Stop services
-docker-compose down
+# Option 2: Manual Docker commands
+docker-compose up --build -d    # or: docker compose up --build -d
 ```
 
-### 3. Access the Application
+### 3. Wait for Services (2-3 minutes)
+```bash
+# Monitor startup progress
+docker-compose logs -f
+
+# Check service status
+docker-compose ps
+
+# Test when ready
+curl http://localhost:5000/api/test
+```
+
+### 4. Access the Application
 - **Web App**: http://localhost:5000
 - **Database**: localhost:5432
 - **Redis**: localhost:6379
 
-### 4. Default Login Credentials
+### 5. Default Login Credentials
 - **Username**: `testuser`
 - **Password**: `password123`
+
+### 6. Troubleshooting
+If you encounter issues:
+```bash
+# Run comprehensive test
+./docker-test-complete.sh
+
+# Or check individual components
+docker-compose logs app
+docker-compose logs database
+docker-compose exec database pg_isready -U tradewiser
+```
 
 ## 📋 Manual Setup (Alternative)
 
