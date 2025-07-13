@@ -1,0 +1,101 @@
+docker compose logs -f
+database-1  | 
+database-1  | PostgreSQL Database directory appears to contain a database; Skipping initialization
+database-1  | 
+database-1  | 2025-07-13 20:07:43.858 UTC [1] LOG:  starting PostgreSQL 15.13 on x86_64-pc-linux-musl, compiled by gcc (Alpine 14.2.0) 14.2.0, 64-bit
+database-1  | 2025-07-13 20:07:43.858 UTC [1] LOG:  listening on IPv4 address "0.0.0.0", port 5432
+database-1  | 2025-07-13 20:07:43.858 UTC [1] LOG:  listening on IPv6 address "::", port 5432
+database-1  | 2025-07-13 20:07:43.864 UTC [1] LOG:  listening on Unix socket "/var/run/postgresql/.s.PGSQL.5432"
+database-1  | 2025-07-13 20:07:43.873 UTC [29] LOG:  database system was shut down at 2025-07-13 19:30:48 UTC
+database-1  | 2025-07-13 20:07:43.884 UTC [1] LOG:  database system is ready to accept connections
+database-1  | 2025-07-13 20:12:43.973 UTC [27] LOG:  checkpoint starting: time
+database-1  | 2025-07-13 20:12:44.002 UTC [27] LOG:  checkpoint complete: wrote 3 buffers (0.0%); 0 WAL file(s) added, 0 removed, 0 recycled; write=0.007 s, sync=0.005 s, total=0.030 s; sync files=2, longest=0.003 s, average=0.003 s; distance=0 kB, estimate=0 kB
+redis-1     | 1:C 13 Jul 2025 20:07:43.750 * oO0OoO0OoO0Oo Redis is starting oO0OoO0OoO0Oo
+redis-1     | 1:C 13 Jul 2025 20:07:43.750 * Redis version=7.4.5, bits=64, commit=00000000, modified=0, pid=1, just started
+redis-1     | 1:C 13 Jul 2025 20:07:43.750 * Configuration loaded
+redis-1     | 1:M 13 Jul 2025 20:07:43.750 * monotonic clock: POSIX clock_gettime
+redis-1     | 1:M 13 Jul 2025 20:07:43.751 * Running mode=standalone, port=6379.
+redis-1     | 1:M 13 Jul 2025 20:07:43.751 * Server initialized
+redis-1     | 1:M 13 Jul 2025 20:07:43.752 * Reading RDB base file on AOF loading...
+redis-1     | 1:M 13 Jul 2025 20:07:43.752 * Loading RDB produced by version 7.4.5
+redis-1     | 1:M 13 Jul 2025 20:07:43.752 * RDB age 3090 seconds
+redis-1     | 1:M 13 Jul 2025 20:07:43.752 * RDB memory usage when created 0.90 Mb
+redis-1     | 1:M 13 Jul 2025 20:07:43.752 * RDB is base AOF
+redis-1     | 1:M 13 Jul 2025 20:07:43.752 * Done loading RDB, keys loaded: 0, keys expired: 0.
+redis-1     | 1:M 13 Jul 2025 20:07:43.752 * DB loaded from base file appendonly.aof.1.base.rdb: 0.000 seconds
+redis-1     | 1:M 13 Jul 2025 20:07:43.752 * DB loaded from append only file: 0.000 seconds
+redis-1     | 1:M 13 Jul 2025 20:07:43.752 * Opening AOF incr file appendonly.aof.1.incr.aof on server start
+redis-1     | 1:M 13 Jul 2025 20:07:43.752 * Ready to accept connections tcp
+app-1       | 🚀 Starting TradeWiser Platform...
+app-1       | ===================================
+app-1       | ⏳ Waiting for database to be ready...
+app-1       | Checking database connection... (attempt 1/30)
+app-1       | ✅ Database is ready!
+app-1       | 📊 Setting up database schema...
+app-1       | 
+app-1       | > rest-express@1.0.0 db:push
+app-1       | > drizzle-kit push
+app-1       | 
+app-1       | sh: drizzle-kit: not found
+app-1       | ⚠️  Database schema setup failed, continuing...
+app-1       | 🌐 Starting application server...
+app-1       | 
+app-1       | > rest-express@1.0.0 dev
+app-1       | > tsx server/index.ts
+app-1       | 
+app-1       | sh: tsx: not found
+app-1       | 🚀 Starting TradeWiser Platform...
+app-1       | ===================================
+app-1       | ⏳ Waiting for database to be ready...
+app-1       | Checking database connection... (attempt 1/30)
+app-1       | ✅ Database is ready!
+app-1       | 📊 Setting up database schema...
+app-1       | 
+app-1       | > rest-express@1.0.0 db:push
+app-1       | > drizzle-kit push
+app-1       | 
+app-1       | sh: drizzle-kit: not found
+app-1       | ⚠️  Database schema setup failed, continuing...
+app-1       | 🌐 Starting application server...
+app-1       | 
+app-1       | > rest-express@1.0.0 dev
+app-1       | > tsx server/index.ts
+app-1       | 
+app-1       | sh: tsx: not found
+app-1       | 🚀 Starting TradeWiser Platform...
+app-1       | ===================================
+app-1       | ⏳ Waiting for database to be ready...
+app-1       | Checking database connection... (attempt 1/30)
+app-1       | ✅ Database is ready!
+app-1       | 📊 Setting up database schema...
+app-1       | 
+app-1       | > rest-express@1.0.0 db:push
+app-1       | > drizzle-kit push
+app-1       | 
+app-1       | sh: drizzle-kit: not found
+app-1       | ⚠️  Database schema setup failed, continuing...
+app-1       | 🌐 Starting application server...
+app-1       | 
+app-1       | > rest-express@1.0.0 dev
+app-1       | > tsx server/index.ts
+app-1       | 
+app-1       | sh: tsx: not found
+app-1       | 🚀 Starting TradeWiser Platform...
+app-1       | ===================================
+app-1       | ⏳ Waiting for database to be ready...
+app-1       | Checking database connection... (attempt 1/30)
+app-1       | ✅ Database is ready!
+app-1       | 📊 Setting up database schema...
+app-1       | 
+app-1       | > rest-express@1.0.0 db:push
+app-1       | > drizzle-kit push
+app-1       | 
+app-1       | sh: drizzle-kit: not found
+app-1       | ⚠️  Database schema setup failed, continuing...
+app-1       | 🌐 Starting application server...
+app-1       | 
+app-1       | > rest-express@1.0.0 dev
+app-1       | > tsx server/index.ts
+app-1       | 
+app-1       | sh: tsx: not found
+app-1       | 🚀 Starting TradeWiser Platform...

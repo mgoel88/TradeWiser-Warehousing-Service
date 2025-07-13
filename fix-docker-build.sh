@@ -31,3 +31,7 @@ docker compose up -d
 echo ""
 echo "🎉 Docker build fix completed!"
 echo "🌐 Check: http://localhost:5000"
+echo "👤 Login with: testuser / password123"
+echo ""
+echo "📊 To see logs: docker compose logs -f"
+echo "🛑 To stop: docker compose down"

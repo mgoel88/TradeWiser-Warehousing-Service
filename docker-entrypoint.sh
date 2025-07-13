@@ -46,8 +46,12 @@ wait_for_database
 
 # Run database migrations/schema push
 echo "📊 Setting up database schema..."
-npm run db:push || echo "⚠️  Database schema setup failed, continuing..."
+npx drizzle-kit push || echo "⚠️  Database schema setup failed, continuing..."
 
 # Start the application
 echo "🌐 Starting application server..."
-exec npm run dev
+if [ "$NODE_ENV" = "production" ]; then
+    exec node dist/index.js
+else
+    exec npx tsx server/index.ts
+fi

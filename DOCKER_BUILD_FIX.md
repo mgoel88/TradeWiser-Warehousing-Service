@@ -7,29 +7,46 @@ failed to solve: failed to compute cache key: "/app/client/dist": not found
 ```
 
 ## Root Cause
-The original Dockerfile assumed a separate client build output directory, but this project structure uses a unified build process where client assets are built into `dist/public` via Vite.
+Two main issues were identified:
+1. **Missing client/dist directory**: The Dockerfile tried to copy a non-existent `client/dist` directory
+2. **Missing development dependencies**: The container was missing `drizzle-kit` and `tsx` needed for database setup and development
 
 ## Fix Applied
-I've updated the Dockerfile to:
+I've updated the Dockerfile and docker-entrypoint.sh to:
 
 1. **Removed incorrect client/dist copy**:
    ```dockerfile
-   # OLD - This was causing the error:
+   # OLD - This was causing the build error:
    COPY --from=builder /app/client/dist ./client/dist
    
    # NEW - Removed since client assets are in dist/public:
    # Note: Client assets are served by the Express server
    ```
 
-2. **Enhanced multi-stage build**:
+2. **Fixed dependency installation**:
+   ```dockerfile
+   # OLD - Only production dependencies:
+   RUN npm ci --only=production && npm cache clean --force
+   
+   # NEW - All dependencies including dev tools:
+   RUN npm ci && npm cache clean --force
+   ```
+
+3. **Updated entry point script**:
+   ```bash
+   # OLD - npm commands that weren't available:
+   npm run db:push
+   exec npm run dev
+   
+   # NEW - Direct npx commands:
+   npx drizzle-kit push
+   exec npx tsx server/index.ts
+   ```
+
+4. **Enhanced multi-stage build**:
    - Properly copy build artifacts from builder stage
    - Include all necessary runtime files
    - Added security improvements with non-root user
-
-3. **Ubuntu compatibility improvements**:
-   - Added required system packages
-   - Enhanced security with proper user permissions
-   - Optimized for Ubuntu production deployment
 
 ## Updated Files
 - `Dockerfile` - Fixed build paths and enhanced Ubuntu compatibility
