@@ -1,0 +1,61 @@
+ ./start.sh
+🚀 TradeWiser Platform - Docker Setup
+======================================
+✅ .env file already exists.
+💡 If you're having issues, you can reset it with: cp .env.docker .env
+🔍 Validating environment configuration...
+✅ Environment configuration looks good.
+📁 Creating necessary directories...
+🛑 Stopping existing containers...
+📦 Pulling latest images...
+[+] Pulling 3/3
+ ✔ app Skipped - No image to be pulled                                                                                                    0.0s 
+ ✔ database Pulled                                                                                                                        2.2s 
+ ✔ redis Pulled                                                                                                                           2.2s 
+🏗️  Building and starting services...
+[+] Running 6/6
+ ✔ Network wizstore_default         Created                                                                                               0.1s 
+ ✔ Volume "wizstore_redis_data"     Created                                                                                               0.0s 
+ ✔ Volume "wizstore_postgres_data"  Created                                                                                               0.0s 
+ ✔ Container wizstore-database-1    Healthy                                                                                              31.9s 
+ ✔ Container wizstore-redis-1       Started                                                                                               1.3s 
+ ✔ Container wizstore-app-1         Started                                                                                              31.6s 
+⏳ Waiting for services to be ready...
+🔍 Checking service health...
+NAME                  IMAGE                COMMAND                  SERVICE    CREATED          STATUS                             PORTS
+wizstore-app-1        wizstore-app         "/docker-entrypoint.…"   app        42 seconds ago   Up 10 seconds (health: starting)   0.0.0.0:5000->5000/tcp, [::]:5000->5000/tcp
+wizstore-database-1   postgres:15-alpine   "docker-entrypoint.s…"   database   42 seconds ago   Up 41 seconds (healthy)            0.0.0.0:5432->5432/tcp, [::]:5432->5432/tcp
+wizstore-redis-1      redis:7-alpine       "docker-entrypoint.s…"   redis      42 seconds ago   Up 41 seconds (healthy)            0.0.0.0:6379->6379/tcp, [::]:6379->6379/tcp
+📋 Service logs:
+database-1  | 
+database-1  | 
+database-1  | waiting for server to shut down...2025-07-13 19:16:20.857 UTC [41] LOG:  received fast shutdown request
+database-1  | .2025-07-13 19:16:20.861 UTC [41] LOG:  aborting any active transactions
+database-1  | 2025-07-13 19:16:20.864 UTC [41] LOG:  background worker "logical replication launcher" (PID 47) exited with exit code 1
+database-1  | 2025-07-13 19:16:20.866 UTC [42] LOG:  shutting down
+database-1  | 2025-07-13 19:16:20.869 UTC [42] LOG:  checkpoint starting: shutdown immediate
+database-1  | 2025-07-13 19:16:21.554 UTC [42] LOG:  checkpoint complete: wrote 921 buffers (5.6%); 0 WAL file(s) added, 0 removed, 0 recycled; write=0.026 s, sync=0.641 s, total=0.689 s; sync files=301, longest=0.004 s, average=0.003 s; distance=4249 kB, estimate=4249 kB
+database-1  | 2025-07-13 19:16:21.579 UTC [41] LOG:  database system is shut down
+database-1  |  done
+database-1  | server stopped
+database-1  | 
+database-1  | PostgreSQL init process complete; ready for start up.
+database-1  | 
+database-1  | 2025-07-13 19:16:21.721 UTC [1] LOG:  starting PostgreSQL 15.13 on x86_64-pc-linux-musl, compiled by gcc (Alpine 14.2.0) 14.2.0, 64-bit
+database-1  | 2025-07-13 19:16:21.721 UTC [1] LOG:  listening on IPv4 address "0.0.0.0", port 5432
+database-1  | 2025-07-13 19:16:21.721 UTC [1] LOG:  listening on IPv6 address "::", port 5432
+database-1  | 2025-07-13 19:16:21.728 UTC [1] LOG:  listening on Unix socket "/var/run/postgresql/.s.PGSQL.5432"
+database-1  | 2025-07-13 19:16:21.736 UTC [59] LOG:  database system was shut down at 2025-07-13 19:16:21 UTC
+database-1  | 2025-07-13 19:16:21.745 UTC [1] LOG:  database system is ready to accept connections
+redis-1     | 1:C 13 Jul 2025 19:16:13.439 # WARNING Memory overcommit must be enabled! Without it, a background save or replication may fail under low memory condition. Being disabled, it can also cause failures without low memory condition, see https://github.com/jemalloc/jemalloc/issues/1328. To fix this issue add 'vm.overcommit_memory = 1' to /etc/sysctl.conf and then reboot or run the command 'sysctl vm.overcommit_memory=1' for this to take effect.
+redis-1     | 1:C 13 Jul 2025 19:16:13.439 * oO0OoO0OoO0Oo Redis is starting oO0OoO0OoO0Oo
+redis-1     | 1:C 13 Jul 2025 19:16:13.439 * Redis version=7.4.5, bits=64, commit=00000000, modified=0, pid=1, just started
+redis-1     | 1:C 13 Jul 2025 19:16:13.439 * Configuration loaded
+redis-1     | 1:M 13 Jul 2025 19:16:13.439 * monotonic clock: POSIX clock_gettime
+redis-1     | 1:M 13 Jul 2025 19:16:13.440 * Running mode=standalone, port=6379.
+redis-1     | 1:M 13 Jul 2025 19:16:13.441 * Server initialized
+redis-1     | 1:M 13 Jul 2025 19:16:13.472 * Creating AOF base file appendonly.aof.1.base.rdb on server start
+redis-1     | 1:M 13 Jul 2025 19:16:13.510 * Creating AOF incr file appendonly.aof.1.incr.aof on server start
+redis-1     | 1:M 13 Jul 2025 19:16:13.510 * Ready to accept connections tcp
+app-1       | Waiting for database to be ready...
+app-1       | Database not ready, waiting... (attempt 1/30)
