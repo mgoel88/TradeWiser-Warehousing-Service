@@ -61,6 +61,9 @@ RUN npm ci && npm cache clean --force
 # Copy built application from builder stage
 COPY --from=builder /app/dist ./dist
 
+# Create server/public directory and copy built files there for production serving
+RUN mkdir -p server/public && cp -r dist/public/* server/public/
+
 # Copy necessary runtime files from builder stage
 COPY --from=builder /app/server ./server
 COPY --from=builder /app/shared ./shared
