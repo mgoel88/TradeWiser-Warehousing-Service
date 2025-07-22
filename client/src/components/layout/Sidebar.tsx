@@ -17,7 +17,7 @@ export default function Sidebar() {
           <img 
             src={tradewiserLogo} 
             alt="TradeWiser" 
-            className="h-8 w-auto object-contain"
+            className="h-12 w-auto object-contain"
           />
         </div>
       </div>
