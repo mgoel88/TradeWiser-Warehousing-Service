@@ -34,48 +34,79 @@ export function WarehouseSelector({ warehouses, selectedWarehouse, onSelect }: W
   const [open, setOpen] = useState(false);
   const [searchValue, setSearchValue] = useState("");
 
-  // Function to calculate warehouse relevance score
+  // Function to calculate warehouse relevance score (enhanced)
   const calculateRelevanceScore = (warehouse: Warehouse): number => {
     let score = 0;
     
-    // Capacity utilization (prefer warehouses with good availability)
+    // Capacity utilization analysis (40 points max)
     const capacity = parseFloat(warehouse.capacity);
     const available = parseFloat(warehouse.availableSpace);
     const utilizationRate = (capacity - available) / capacity;
     
-    // Optimal utilization between 20-80% gets higher score
-    if (utilizationRate >= 0.2 && utilizationRate <= 0.8) {
-      score += 30;
+    // Premium utilization rates (not too empty, not too full)
+    if (utilizationRate >= 0.3 && utilizationRate <= 0.7) {
+      score += 40; // Sweet spot for active warehouses
+    } else if (utilizationRate >= 0.2 && utilizationRate <= 0.8) {
+      score += 30; // Good utilization
     } else if (utilizationRate < 0.9) {
-      score += 15;
+      score += 15; // Available but maybe underutilized
     }
     
-    // Large capacity gets preference
-    if (capacity >= 10000) score += 25;
-    else if (capacity >= 5000) score += 15;
-    else if (capacity >= 1000) score += 5;
+    // Capacity scale bonus (30 points max)
+    if (capacity >= 20000) score += 30; // Mega warehouses
+    else if (capacity >= 15000) score += 25; // Large scale
+    else if (capacity >= 10000) score += 20; // Good size
+    else if (capacity >= 5000) score += 15; // Medium size
+    else if (capacity >= 2000) score += 10; // Small-medium
+    else if (capacity >= 1000) score += 5; // Minimum viable
     
-    // Facility quality bonuses
-    if (warehouse.hasGodownFacilities) score += 10;
-    if (warehouse.hasColdStorage) score += 15;
-    if (warehouse.hasGradingFacility) score += 10;
+    // Advanced facility scoring (35 points max)
+    let facilityScore = 0;
+    if (warehouse.hasGodownFacilities) facilityScore += 15; // Essential
+    if (warehouse.hasColdStorage) facilityScore += 20; // Premium feature
+    if (warehouse.hasGradingFacility) facilityScore += 15; // Quality control
+    score += Math.min(facilityScore, 35); // Cap at 35
     
-    // Railway connectivity bonus
+    // Strategic location scoring (25 points max)
     if (warehouse.nearestRailwayStation && warehouse.railwayDistance) {
-      const distance = parseFloat(warehouse.railwayDistance.replace('km', ''));
-      if (distance <= 2) score += 20;
-      else if (distance <= 5) score += 10;
-      else if (distance <= 10) score += 5;
+      const distStr = warehouse.railwayDistance.replace(/[^\d.]/g, '');
+      const distance = parseFloat(distStr) || 999;
+      if (distance <= 1) score += 25; // Prime connectivity
+      else if (distance <= 2) score += 20; // Excellent connectivity
+      else if (distance <= 3) score += 15; // Good connectivity
+      else if (distance <= 5) score += 10; // Decent connectivity
+      else if (distance <= 10) score += 5; // Basic connectivity
     }
     
-    // Mandi-based warehouses get preference
-    if (warehouse.mandiName) score += 15;
+    // Market integration bonus (20 points max)
+    if (warehouse.mandiName) {
+      score += 20; // Authentic mandi integration
+      // Extra bonus for major mandi centers
+      const premiumMandis = ['Karnal', 'Ludhiana', 'Sirsa', 'Hisar', 'Panipat'];
+      if (premiumMandis.some(mandi => warehouse.mandiName?.includes(mandi))) {
+        score += 5;
+      }
+    }
     
-    // Major agricultural states get bonus
-    const majorStates = ['Haryana', 'Punjab', 'Uttar Pradesh', 'Maharashtra', 'Karnataka', 'Andhra Pradesh'];
-    if (majorStates.includes(warehouse.state)) score += 10;
+    // Agricultural hub states (15 points max)
+    const premiumStates = ['Haryana', 'Punjab', 'Uttar Pradesh']; // Top 3
+    const majorStates = ['Maharashtra', 'Karnataka', 'Andhra Pradesh', 'Gujarat']; // Major
+    if (premiumStates.includes(warehouse.state)) score += 15;
+    else if (majorStates.includes(warehouse.state)) score += 10;
+    else score += 5; // All states get base points
     
-    return score;
+    // Regulation compliance bonus (10 points max)
+    if (warehouse.regulationStatus === 'fci_approved') score += 10;
+    else if (warehouse.regulationStatus === 'wdra_registered') score += 8;
+    else if (warehouse.regulationStatus === 'state_licensed') score += 5;
+    
+    // Available space adequacy (bonus system)
+    if (available >= 5000) score += 10; // Plenty of space
+    else if (available >= 2000) score += 7; // Good space
+    else if (available >= 1000) score += 5; // Adequate space
+    else if (available >= 500) score += 2; // Limited space
+    
+    return Math.round(score);
   };
 
   // Enhanced filtering and sorting for warehouses

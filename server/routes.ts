@@ -529,7 +529,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // FIXED: Ensure valuation defaults to Rs 50/kg if not provided (1 MT = 1000 kg)
       const { quantity, valuation, ...rest } = req.body;
-      const calculatedValuation = valuation || (parseFloat(quantity) * 1000 * 50).toString();
+      const calculatedValuation = (valuation && parseFloat(valuation) > 0) 
+        ? valuation 
+        : (parseFloat(quantity) * 1000 * 50).toString();
       
       const receiptData = {
         ...rest,
@@ -871,6 +873,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Generate unique receipt number
       const receiptNumber = `eWR-${Date.now()}-${process.commodityId}`;
       
+      // FIXED: Ensure proper valuation calculation (1 MT = 1000 kg × Rs 50/kg)
+      const calculatedValuation = commodity.valuation && parseFloat(commodity.valuation) > 0 
+        ? commodity.valuation 
+        : (parseFloat(commodity.quantity) * 1000 * 50).toString();
+
       // Create warehouse receipt
       const receipt = await storage.createWarehouseReceipt({
         receiptNumber,
@@ -881,7 +888,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         measurementUnit: commodity.measurementUnit,
         status: "active",
         blockchainHash: `0x${Math.random().toString(16).substring(2, 18)}`,
-        valuation: commodity.valuation,
+        valuation: calculatedValuation,
         warehouseName: warehouse.name,
         metadata: JSON.stringify({
           type: 'quality_certificate',
