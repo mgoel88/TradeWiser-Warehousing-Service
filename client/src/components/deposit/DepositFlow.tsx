@@ -26,6 +26,8 @@ import LocationPicker from "./LocationPicker";
 import ContextualTooltip from "../help/ContextualTooltip";
 import HelpButton from "../help/HelpButton";
 import HelpOverlay from "../help/HelpOverlay";
+import { CommoditySelector, type Commodity } from '@/components/ui/commodity-selector';
+import commoditiesData from '@shared/commodities.json';
 
 // Create schema for the deposit form
 const depositCommoditySchema = z.object({
@@ -90,6 +92,32 @@ export default function DepositFlow({
     foreignMatter: "",
     brokenGrains: ""
   });
+
+  const commodities = commoditiesData as Commodity[];
+
+  // Handle commodity selection and auto-populate type
+  const handleCommodityChange = (commodityName: string) => {
+    form.setValue("name", commodityName);
+    
+    // Find the commodity to auto-populate type
+    const selectedCommodity = commodities.find(c => 
+      `${c.english} (${c.hindi})` === commodityName || c.english === commodityName
+    );
+    
+    if (selectedCommodity) {
+      // Map category to form type values
+      const categoryTypeMap: Record<string, string> = {
+        'Grains': 'Grain',
+        'Pulses': 'Pulses',
+        'Spices': 'Spices',
+        'Oilseeds': 'Oilseeds',
+        'Fibres': 'Other'
+      };
+      
+      const typeValue = categoryTypeMap[selectedCommodity.category] || 'Other';
+      form.setValue("type", typeValue);
+    }
+  };
 
   // Initialize form
   const form = useForm<DepositCommodityFormValues>({
@@ -533,18 +561,23 @@ export default function DepositFlow({
                         <FormLabel>
                           <ContextualTooltip
                             title="Commodity Name"
-                            description="The specific agricultural product you want to store. This should match standard commodity classifications."
+                            description="Smart bilingual commodity selector with standard agricultural products. Select from predefined commodities or enter custom names."
                             tips={[
-                              "Use standard names like 'Wheat', 'Rice', 'Maize', 'Barley'",
-                              "Avoid brand names or local varieties",
-                              "This helps in accurate quality assessment and pricing"
+                              "Search in English or Hindi: 'Wheat' or 'गेहूं'",
+                              "Categories include: Grains, Pulses, Spices, Oilseeds, Fibres",
+                              "Custom commodities allowed if not in predefined list",
+                              "Bilingual display helps with local documentation"
                             ]}
                           >
                             Commodity Name
                           </ContextualTooltip>
                         </FormLabel>
                         <FormControl>
-                          <Input placeholder="e.g. Wheat" {...field} />
+                          <CommoditySelector
+                            value={field.value}
+                            onChange={handleCommodityChange}
+                            placeholder="Search commodities..."
+                          />
                         </FormControl>
                         <FormMessage />
                       </FormItem>

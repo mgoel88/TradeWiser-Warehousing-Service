@@ -1,0 +1,122 @@
+[
+  {
+    "category": "Grains",
+    "english": "Wheat",
+    "hindi": "गेहूं"
+  },
+  {
+    "category": "Grains",
+    "english": "Rice",
+    "hindi": "चावल"
+  },
+  {
+    "category": "Grains",
+    "english": "Maize",
+    "hindi": "मक्का"
+  },
+  {
+    "category": "Grains",
+    "english": "Sorghum",
+    "hindi": "ज्वार"
+  },
+  {
+    "category": "Grains",
+    "english": "Barley",
+    "hindi": "जौ"
+  },
+  {
+    "category": "Grains",
+    "english": "Rye",
+    "hindi": "राई"
+  },
+  {
+    "category": "Pulses",
+    "english": "Chana",
+    "hindi": "चना"
+  },
+  {
+    "category": "Pulses",
+    "english": "Arhar",
+    "hindi": "अरहर"
+  },
+  {
+    "category": "Pulses",
+    "english": "Masoor",
+    "hindi": "मसूर"
+  },
+  {
+    "category": "Pulses",
+    "english": "Moong",
+    "hindi": "मूंग"
+  },
+  {
+    "category": "Pulses",
+    "english": "Urad",
+    "hindi": "उड़द"
+  },
+  {
+    "category": "Spices",
+    "english": "Cumin",
+    "hindi": "जीरा"
+  },
+  {
+    "category": "Spices",
+    "english": "Coriander",
+    "hindi": "धनिया"
+  },
+  {
+    "category": "Spices",
+    "english": "Ajwain",
+    "hindi": "अजवाइन"
+  },
+  {
+    "category": "Spices",
+    "english": "Asafoetida",
+    "hindi": "हींग"
+  },
+  {
+    "category": "Spices",
+    "english": "Red Chili",
+    "hindi": "लाल मिर्च"
+  },
+  {
+    "category": "Spices",
+    "english": "Turmeric",
+    "hindi": "हल्दी"
+  },
+  {
+    "category": "Spices",
+    "english": "Cardamom",
+    "hindi": "इलायची"
+  },
+  {
+    "category": "Oilseeds",
+    "english": "Mustard",
+    "hindi": "सरसों"
+  },
+  {
+    "category": "Oilseeds",
+    "english": "Groundnut",
+    "hindi": "मूंगफली"
+  },
+  {
+    "category": "Oilseeds",
+    "english": "Soybean",
+    "hindi": "सोयाबीन"
+  },
+  {
+    "category": "Oilseeds",
+    "english": "Castor Seed",
+    "hindi": "अरंडी का बीज"
+  },
+  {
+    "category": "Fibres",
+    "english": "Cotton",
+    "hindi": "रुई"
+  },
+  {
+    "category": "Fibres",
+    "english": "Jute",
+    "hindi": "पटसन"
+  }
+]

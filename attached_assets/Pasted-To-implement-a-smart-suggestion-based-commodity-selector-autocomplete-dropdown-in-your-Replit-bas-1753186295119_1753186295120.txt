@@ -1,0 +1,68 @@
+To implement a smart, suggestion-based commodity selector (autocomplete/dropdown) in your Replit-based TradeWiser app with bilingual (English + Hindi) commodity names and persist them in the system:
+
+✅ What You Want:
+Predefined standard commodity list – grains, pulses, spices, seeds, cotton, etc.
+
+Autocomplete/suggestion dropdown on the "Commodity Name" field.
+
+Display both English and Hindi names (e.g., Wheat (गेहूं)).
+
+Long-term persistence, so the list is not lost on logout.
+
+Clean, scalable code structure that can expand to new categories later.
+
+🛠 Implementation Prompt (for Replit Agent / Developer):
+You can copy-paste this into your Replit agent or pass it to a developer:
+
+📋 Prompt for Replit Agent
+python
+Copy
+Edit
+# TASK: Add a smart commodity selector to the TradeWiser app with bilingual autocomplete suggestions.
+
+# ✅ Requirements:
+# 1. Use a structured commodity list with both English and Hindi names.
+# 2. Implement a suggestion-based autocomplete component for "Commodity Name".
+# 3. Format dropdown items as: "Wheat (गेहूं)", "Moong (मूंग)", etc.
+# 4. Add a fallback if the commodity is not listed (free text allowed).
+# 5. The commodity list must persist (hardcoded JSON or stored in DB, not session-based).
+# 6. Categories: Grains, Pulses, Spices, Seeds, Fibres.
+# 7. Add commonly traded long-shelf-life agri commodities like cotton, soyabean, castor, mustard, etc.
+
+# ✅ Suggested Data Structure:
+commodities = [
+    {"category": "Grains", "english": "Wheat", "hindi": "Gehu"},
+    {"category": "Grains", "english": "Rice", "hindi": "Chawal"},
+    {"category": "Pulses", "english": "Moong", "hindi": "Moong"},
+    {"category": "Spices", "english": "Cardamom", "hindi": "Elachi"},
+    {"category": "Fibres", "english": "Cotton", "hindi": "Rui"},
+    {"category": "Seeds", "english": "Mustard Seed", "hindi": "Sarson"},
+    # Add more from the Excel provided...
+]
+
+# ✅ UI Logic:
+# - Use a select input or searchable dropdown (e.g., React Select with filtering).
+# - Show suggestions as user types: match against both English and Hindi names.
+# - Upon selection, populate the Commodity Name field with the value: "Wheat (Gehu)".
+# - Optional: store separate values internally (e.g., english_name + hindi_name).
+
+# ✅ Storage:
+# - Store the commodity list in a `commodities.json` file or DB collection.
+# - On app load, load this list into the selector component.
+# - Ensure this is not tied to session/login/logout (i.e., globally available).
+
+# ✅ Optional Enhancements:
+# - Add filtering by Category: dropdown to first select “Grains”, “Spices”, etc.
+# - Add icons/colors per category if needed later.
+📦 Bonus: Additional Commodities to Include
+Here's a sample of commonly traded shelf-stable agri commodities you can add:
+
+Grains: Wheat, Rice, Maize, Sorghum, Barley, Rye
+
+Pulses: Chana, Arhar, Masoor, Moong, Urad
+
+Spices: Jeera, Dhania, Ajwain, Heeng, Red Chilies, Haldi, Elaichi
+
+Oilseeds: Mustard, Groundnut, Soybean, Castor Seed
+
+Fibres: Cotton, Jute
