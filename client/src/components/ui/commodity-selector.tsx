@@ -26,6 +26,9 @@ export function CommoditySelector({ value, onChange, onCategorySelect, placehold
 
   const commodities = commoditiesData as Commodity[];
 
+  // Debug log
+  console.log('CommoditySelector: Total commodities loaded:', commodities.length);
+
   // Group commodities by category
   const categorizedCommodities = useMemo(() => {
     const categories: Record<string, Commodity[]> = {};
@@ -35,12 +38,16 @@ export function CommoditySelector({ value, onChange, onCategorySelect, placehold
       }
       categories[commodity.category].push(commodity);
     });
+    console.log('CommoditySelector: Categorized commodities:', categories);
     return categories;
   }, [commodities]);
 
   // Advanced filter commodities based on search with fuzzy matching
   const filteredCommodities = useMemo(() => {
-    if (!searchValue.trim()) return categorizedCommodities;
+    if (!searchValue.trim()) {
+      console.log('CommoditySelector: No search value, showing all categories:', Object.keys(categorizedCommodities));
+      return categorizedCommodities;
+    }
     
     const searchLower = searchValue.toLowerCase().trim();
     const filtered: Record<string, Commodity[]> = {};
@@ -137,9 +144,11 @@ export function CommoditySelector({ value, onChange, onCategorySelect, placehold
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-[400px] p-0" align="start">
-        <Command shouldFilter={false} value={searchValue} onValueChange={setSearchValue}>
+        <Command shouldFilter={false}>
           <CommandInput 
             placeholder="Type to search commodities..." 
+            value={searchValue}
+            onValueChange={setSearchValue}
           />
           <CommandList className="max-h-[300px] overflow-y-auto">
             <CommandEmpty>
@@ -152,6 +161,7 @@ export function CommoditySelector({ value, onChange, onCategorySelect, placehold
                     onClick={() => {
                       onChange(searchValue.trim());
                       setOpen(false);
+                      setSearchValue('');
                     }}
                   >
                     Add "{searchValue.trim()}" as custom commodity
@@ -166,6 +176,7 @@ export function CommoditySelector({ value, onChange, onCategorySelect, placehold
                   <span className={`px-2 py-1 text-xs rounded-md ${getCategoryColor(category)}`}>
                     {category}
                   </span>
+                  <span className="text-xs text-muted-foreground">({items.length})</span>
                 </div>
               }>
                 {items.map((commodity) => {

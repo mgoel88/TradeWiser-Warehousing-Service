@@ -593,8 +593,11 @@ export default function DepositFlow({
                         <FormControl>
                           <CommoditySelector
                             value={field.value}
-                            onChange={handleCommodityChange}
-                            onCategorySelect={handleCategorySelect}
+                            onChange={field.onChange}
+                            onCategorySelect={(category) => {
+                              // Auto-populate the commodity type based on selected category
+                              form.setValue("type", category);
+                            }}
                             placeholder="Search commodities in English or Hindi..."
                           />
                         </FormControl>
@@ -611,7 +614,7 @@ export default function DepositFlow({
                         <FormLabel>Commodity Type</FormLabel>
                         <Select 
                           onValueChange={field.onChange} 
-                          defaultValue={field.value}
+                          value={field.value}
                         >
                           <FormControl>
                             <SelectTrigger>
@@ -619,13 +622,13 @@ export default function DepositFlow({
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
-                            <SelectItem value="Grain">Grain</SelectItem>
+                            <SelectItem value="Grains">Grains</SelectItem>
                             <SelectItem value="Pulses">Pulses</SelectItem>
                             <SelectItem value="Oilseeds">Oilseeds</SelectItem>
                             <SelectItem value="Spices">Spices</SelectItem>
-                            <SelectItem value="Fruits">Fruits</SelectItem>
-                            <SelectItem value="Vegetables">Vegetables</SelectItem>
-                            <SelectItem value="Other">Other</SelectItem>
+                            <SelectItem value="Fibres">Fibres</SelectItem>
+                            <SelectItem value="Cash Crops">Cash Crops</SelectItem>
+                            <SelectItem value="Nuts">Nuts</SelectItem>
                           </SelectContent>
                         </Select>
                         <FormMessage />
