@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useLocation } from 'wouter';
-import { useAuth } from '@/hooks/useAuth';
+import { useContext } from 'react';
+import { AuthContext } from '@/context/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -28,7 +29,7 @@ import tradewiserLogo from '@assets/TradeWiser Logo_1753185456298.png';
 
 export default function LandingPage() {
   const [, setLocation] = useLocation();
-  const { user } = useAuth();
+  const { user, login } = useContext(AuthContext);
   const [loginData, setLoginData] = useState({ username: '', password: '' });
   const [loginError, setLoginError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -46,18 +47,11 @@ export default function LandingPage() {
     setLoginError('');
 
     try {
-      const response = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(loginData),
-        credentials: 'include'
-      });
-
-      if (response.ok) {
+      const success = await login(loginData.username, loginData.password);
+      if (success) {
         setLocation('/dashboard');
       } else {
-        const errorData = await response.json();
-        setLoginError(errorData.message || 'Login failed');
+        setLoginError('Invalid credentials. Please try again.');
       }
     } catch (error) {
       setLoginError('Network error. Please try again.');
