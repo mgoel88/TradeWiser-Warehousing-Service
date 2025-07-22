@@ -403,7 +403,76 @@ export async function registerRoutes(app: Express): Promise<Server> {
     };
   };
 
-  // Bypass route: Complete quality assessment and pricing flow
+  // Bypass route: Quality assessment (alias for complete-assessment)
+  apiRouter.post("/bypass/quality-assessment/:processId", async (req: Request, res: Response) => {
+    try {
+      if (!req.session?.userId) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+
+      const processId = parseInt(req.params.processId);
+      const process = await storage.getProcess(processId);
+      
+      if (!process) {
+        return res.status(404).json({ message: "Process not found" });
+      }
+
+      // Get commodity details
+      const commodity = await storage.getCommodity(process.commodityId!);
+      if (!commodity) {
+        return res.status(404).json({ message: "Commodity not found" });
+      }
+
+      // Generate mock quality assessment results
+      const qualityResults = generateMockQualityResults(commodity.type);
+      
+      // Calculate mock pricing
+      const pricingData = calculateMockPricing(commodity, qualityResults);
+      
+      // Update commodity with quality and pricing data
+      await storage.updateCommodity(commodity.id, {
+        qualityParameters: qualityResults,
+        gradeAssigned: qualityResults.grade,
+        valuation: pricingData.totalValue.toString(),
+        status: "processing"
+      });
+
+      // Update process to final stages
+      const updatedProcess = await storage.updateProcess(processId, {
+        status: "in_progress" as const,
+        currentStage: "ewr_generation",
+        stageProgress: {
+          pickup_scheduled: 'completed',
+          arrived_at_warehouse: 'completed',
+          weighing_complete: 'completed',
+          moisture_analysis: 'completed',
+          visual_ai_scan: 'completed',
+          qa_assessment_complete: 'completed',
+          pricing_calculated: 'completed',
+          ewr_generation: 'in_progress'
+        }
+      });
+
+      console.log(`Completed bypass assessment for process ${processId}`);
+      
+      res.setHeader('Content-Type', 'application/json');
+      res.json({
+        processId,
+        status: 'completed',
+        qualityAssessment: qualityResults,
+        pricing: pricingData,
+        process: updatedProcess,
+        message: 'Quality assessment and pricing completed using bypass demo service'
+      });
+
+    } catch (error) {
+      console.error("Error in bypass assessment:", error);
+      res.setHeader('Content-Type', 'application/json');
+      res.status(500).json({ message: "Failed to complete bypass assessment" });
+    }
+  });
+
+  // Bypass route: Complete quality assessment and pricing flow (legacy alias)
   apiRouter.post("/bypass/complete-assessment/:processId", async (req: Request, res: Response) => {
     try {
       if (!req.session?.userId) {
@@ -455,6 +524,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       console.log(`Completed bypass assessment for process ${processId}`);
       
+      res.setHeader('Content-Type', 'application/json');
       res.json({
         processId,
         status: 'completed',
@@ -466,6 +536,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
     } catch (error) {
       console.error("Error in bypass assessment:", error);
+      res.setHeader('Content-Type', 'application/json');
       res.status(500).json({ message: "Failed to complete bypass assessment" });
     }
   });
@@ -503,7 +574,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         quantity: commodity.quantity,
         measurementUnit: commodity.measurementUnit,
         status: "active",
-        gradeAssigned: commodity.gradeAssigned,
         storageLocation: `${warehouse.name}-${Math.floor(Math.random() * 100)}`,
         pledgeStatus: "available",
         marketValue: commodity.valuation,
@@ -535,6 +605,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       console.log(`Generated eWR ${receiptNumber} for process ${processId}`);
 
+      res.setHeader('Content-Type', 'application/json');
       res.json({
         receipt,
         process: await storage.getProcess(processId),
@@ -543,6 +614,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
     } catch (error) {
       console.error("Error generating eWR:", error);
+      res.setHeader('Content-Type', 'application/json');
       res.status(500).json({ message: "Failed to generate electronic warehouse receipt" });
     }
   });
@@ -554,8 +626,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.use("/api", apiRouter);
 
-  // Handle 404 for unknown API routes
-  app.use('/api/*', (req, res) => {
+  // Handle 404 for unknown API routes - this must be last
+  apiRouter.use('*', (req, res) => {
     res.status(404).json({ message: "API endpoint not found" });
   });
   

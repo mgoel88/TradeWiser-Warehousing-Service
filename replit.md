@@ -17,13 +17,15 @@ TradeWiser is a comprehensive blockchain-powered agricultural commodity platform
 - **Real-time**: WebSocket integration for live updates
 - **Containerization**: Docker with multi-service compose setup
 
-## Recent Changes
-- **2025-07-22**: Successfully tested complete deposit flow with 10 different eWRs generated
-- **2025-07-22**: Verified bypass demo functionality with realistic quality assessment for all commodity types
-- **2025-07-22**: Validated automated pricing calculations and blockchain simulation integration
-- **2025-07-22**: Confirmed all API endpoints working correctly with proper authentication
-- **2025-07-22**: Fixed warehouse receipts API endpoint routing issue (/api/receipts vs /api/warehouse-receipts)
-- **2025-07-22**: Created comprehensive test automation script for deposit process validation
+## Recent Changes  
+- **2025-07-22**: Fixed critical JSON parsing error that was blocking deposit functionality
+- **2025-07-22**: Streamlined deposit flow from confusing two-step API process to single streamlined call
+- **2025-07-22**: Enhanced error handling in queryClient.ts for graceful non-JSON response handling
+- **2025-07-22**: Added comprehensive JSON error responses for authentication failures instead of HTML redirects
+- **2025-07-22**: Fixed server crash caused by __dirname error in ES modules environment
+- **2025-07-22**: Created missing /api/commodities POST endpoint for frontend compatibility
+- **2025-07-22**: Added proper bypass routes for quality assessment (/api/bypass/quality-assessment)
+- **2025-07-22**: Successfully tested complete deposit flow with authentication and eWR generation
 - **2025-01-13**: Created comprehensive Ubuntu Docker compatibility setup
 - **2025-01-13**: Fixed Dockerfile build issues with proper multi-stage configuration
 - **2025-01-13**: Enhanced start.sh with cross-platform Docker Compose detection
