@@ -17,6 +17,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   console.log("Registering API routes...");
 
+  // Session validation middleware
+  const requireAuth = (req: Request, res: Response, next: any) => {
+    if (!req.session?.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+    next();
+  };
+
   // Auth routes
   apiRouter.post("/auth/register", async (req: Request, res: Response) => {
     try {

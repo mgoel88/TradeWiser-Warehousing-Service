@@ -100,6 +100,10 @@ export class FileUploadService {
     if (file.size > maxSize) {
       throw new Error('File is too large. Maximum size is 10MB.');
     }
+
+    // Ensure uploads directory exists
+    const uploadsDir = path.join(process.cwd(), 'uploads', 'receipts');
+    await this.ensureDirectoryExists(uploadsDir);
     
     // Save temporary file for processing
     return this.saveUploadedFile(file, true);
