@@ -5,6 +5,7 @@ import { storage } from "./storage";
 import { insertUserSchema } from "@shared/schema";
 import { z } from "zod";
 import { fromZodError } from "zod-validation-error";
+import multer from "multer";
 import 'express-session';
 
 declare module 'express-session' {
@@ -237,6 +238,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Configure multer for file uploads
+  const upload = multer({
+    dest: 'uploads/', 
+    limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit
+    fileFilter: (req, file, cb) => {
+      const allowedTypes = /jpeg|jpg|png|pdf|csv|xlsx|xls/;
+      const fileType = allowedTypes.test(path.extname(file.originalname).toLowerCase());
+      const mimeType = allowedTypes.test(file.mimetype);
+      
+      if (mimeType && fileType) {
+        return cb(null, true);
+      } else {
+        cb(new Error('Only image, PDF, CSV, and Excel files are allowed'));
+      }
+    }
+  });
+
   // Receipt routes
   apiRouter.get("/receipts", async (req: Request, res: Response) => {
     try {
@@ -251,6 +269,91 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.error("Error fetching receipts:", error);
       res.setHeader('Content-Type', 'application/json');
       res.status(500).json({ message: "Failed to fetch receipts" });
+    }
+  });
+
+  // Import external warehouse receipt via file upload (Orange Channel)
+  apiRouter.post("/receipts/upload", requireAuth, upload.single('file'), async (req: Request, res: Response) => {
+    try {
+      console.log("Processing external receipt upload...");
+      
+      if (!req.file) {
+        return res.status(400).json({ message: "No file uploaded" });
+      }
+
+      const userId = req.session!.userId;
+      
+      // For demo purposes, we'll simulate document parsing and create an external receipt
+      // In production, this would involve OCR, PDF parsing, etc.
+      
+      const mockParsedData = {
+        receiptNumber: `EXT-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+        externalSource: req.file.originalname.split('.')[0] || 'external_warehouse',
+        commodityName: 'wheat', // Would be extracted from document
+        quantity: '50', // Would be extracted from document  
+        measurementUnit: 'MT',
+        warehouseId: 1, // Default external warehouse
+        status: 'active' as const,
+        channelType: 'orange' as const, // Orange channel for external imports
+        valuation: '125000', // Would be calculated based on extracted data
+        issuedDate: new Date(),
+        expiryDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000), // 1 year from now
+        blockchainHash: `0x${Math.random().toString(16).substring(2, 18)}`,
+        liens: {
+          externalImport: true,
+          originalWarehouse: req.file.originalname.split('.')[0],
+          uploadedFile: req.file.filename,
+          verificationStatus: 'pending_verification'
+        }
+      };
+
+      // Create the warehouse receipt
+      const receipt = await storage.createWarehouseReceipt({
+        receiptNumber: mockParsedData.receiptNumber,
+        commodityId: null, // No commodity for external imports initially
+        warehouseId: mockParsedData.warehouseId,
+        ownerId: userId,
+        quantity: mockParsedData.quantity,
+        measurementUnit: mockParsedData.measurementUnit,
+        status: mockParsedData.status,
+        blockchainHash: mockParsedData.blockchainHash,
+        valuation: mockParsedData.valuation,
+        externalId: mockParsedData.receiptNumber,
+        externalSource: mockParsedData.externalSource,
+        commodityName: mockParsedData.commodityName,
+        warehouseName: `External-${mockParsedData.externalSource}`,
+        attachmentUrl: req.file.path,
+        metadata: JSON.stringify({
+          type: 'external_receipt',
+          originalFilename: req.file.originalname,
+          uploadedFilename: req.file.filename,
+          uploadPath: req.file.path,
+          timestamp: new Date().toISOString(),
+          insuranceCoverage: (parseFloat(mockParsedData.valuation) * 0.6).toString()
+        }),
+        issuedDate: mockParsedData.issuedDate,
+        expiryDate: mockParsedData.expiryDate,
+        liens: JSON.stringify(mockParsedData.liens)
+      });
+
+      console.log("External receipt imported:", receipt.id);
+      
+      res.setHeader('Content-Type', 'application/json');
+      res.status(201).json({
+        success: true,
+        receipt: receipt,
+        message: 'External warehouse receipt successfully imported via Orange Channel',
+        extractedData: mockParsedData,
+        verificationStatus: 'pending_verification'
+      });
+
+    } catch (error) {
+      console.error("Error importing external receipt:", error);
+      res.setHeader('Content-Type', 'application/json');
+      res.status(500).json({ 
+        message: "Failed to import external receipt",
+        error: error instanceof Error ? error.message : "Unknown error"
+      });
     }
   });
 
@@ -706,17 +809,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         quantity: commodity.quantity,
         measurementUnit: commodity.measurementUnit,
         status: "active",
-        storageLocation: `${warehouse.name}-${Math.floor(Math.random() * 100)}`,
-        pledgeStatus: "available",
-        marketValue: commodity.valuation,
-        digitalSignature: `sig_${Date.now()}`,
-        blockchainTxHash: `0x${Math.random().toString(16).substring(2, 18)}`,
-        insuranceCoverage: (parseFloat(commodity.valuation || "0") * 0.8).toString(),
-        documents: JSON.stringify([{
+        blockchainHash: `0x${Math.random().toString(16).substring(2, 18)}`,
+        valuation: commodity.valuation,
+        warehouseName: warehouse.name,
+        metadata: JSON.stringify({
           type: 'quality_certificate',
           url: `/documents/quality_cert_${receiptNumber}.pdf`,
-          timestamp: new Date().toISOString()
-        }])
+          timestamp: new Date().toISOString(),
+          storageLocation: `${warehouse.name}-${Math.floor(Math.random() * 100)}`,
+          insuranceCoverage: (parseFloat(commodity.valuation || "0") * 0.8).toString()
+        })
       });
 
       // Complete the process

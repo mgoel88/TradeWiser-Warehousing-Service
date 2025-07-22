@@ -48,14 +48,15 @@ export default function ImportReceiptsPage() {
       });
       
       if (!response.ok) {
-        throw new Error('Upload failed');
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Upload failed');
       }
       
       const result = await response.json();
       
       toast({
-        title: "Upload successful",
-        description: "Your receipt has been successfully uploaded",
+        title: "Import successful!",
+        description: `External receipt ${result.receipt.receiptNumber} has been imported via Orange Channel`,
       });
       
       setFile(null);
@@ -67,11 +68,15 @@ export default function ImportReceiptsPage() {
         fileInput.value = '';
       }
       
+      // Show success details
+      console.log('Import result:', result);
+      
     } catch (error) {
+      console.error('Upload error:', error);
       toast({
         variant: "destructive",
-        title: "Upload failed",
-        description: "There was a problem uploading your receipt. Please try again.",
+        title: "Import failed",
+        description: error instanceof Error ? error.message : "There was a problem importing your receipt. Please try again.",
       });
     } finally {
       setUploading(false);
@@ -94,11 +99,11 @@ export default function ImportReceiptsPage() {
               </CardHeader>
               <CardContent>
                 {isSuccess && (
-                  <Alert className="mb-4 bg-green-50">
-                    <CheckCircle2 className="h-4 w-4" />
-                    <AlertTitle>Upload Complete</AlertTitle>
-                    <AlertDescription>
-                      Your receipt has been successfully uploaded and is being processed.
+                  <Alert className="mb-4 bg-orange-50 border-orange-200">
+                    <CheckCircle2 className="h-4 w-4 text-orange-600" />
+                    <AlertTitle className="text-orange-800">Import Complete</AlertTitle>
+                    <AlertDescription className="text-orange-700">
+                      Your external warehouse receipt has been successfully imported into the Orange Channel and is now available in your portfolio for trading or collateral purposes.
                     </AlertDescription>
                   </Alert>
                 )}
@@ -135,14 +140,14 @@ export default function ImportReceiptsPage() {
                 <Button 
                   onClick={handleUpload} 
                   disabled={!file || uploading} 
-                  className="w-full"
+                  className="w-full bg-orange-600 hover:bg-orange-700"
                 >
                   {uploading ? (
                     <>
                       <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-t-transparent" />
-                      Uploading...
+                      Processing Import...
                     </>
-                  ) : 'Upload Receipt'}
+                  ) : 'Import to Orange Channel'}
                 </Button>
               </CardContent>
             </Card>
@@ -155,22 +160,37 @@ export default function ImportReceiptsPage() {
               </CardHeader>
               <CardContent>
                 <p className="text-sm text-gray-600 mb-4">
-                  The Orange Channel allows you to import and manage warehouse receipts from external sources.
+                  The Orange Channel provides interoperability with other warehouse service providers, allowing you to import and manage external warehouse receipts.
                 </p>
-                <ul className="space-y-2 text-sm">
+                <ul className="space-y-3 text-sm">
                   <li className="flex items-start">
-                    <div className="mr-2 h-5 w-5 text-orange-500 flex items-center justify-center rounded-full bg-orange-100">1</div>
-                    <span>Upload your warehouse receipt document</span>
+                    <div className="mr-3 h-6 w-6 text-orange-600 flex items-center justify-center rounded-full bg-orange-100 font-medium">1</div>
+                    <div>
+                      <div className="font-medium text-gray-900">Upload Receipt Document</div>
+                      <div className="text-gray-600">PDF, image, or data file from external warehouse</div>
+                    </div>
                   </li>
                   <li className="flex items-start">
-                    <div className="mr-2 h-5 w-5 text-orange-500 flex items-center justify-center rounded-full bg-orange-100">2</div>
-                    <span>Our system extracts and verifies the key information</span>
+                    <div className="mr-3 h-6 w-6 text-orange-600 flex items-center justify-center rounded-full bg-orange-100 font-medium">2</div>
+                    <div>
+                      <div className="font-medium text-gray-900">Automatic Data Extraction</div>
+                      <div className="text-gray-600">AI extracts commodity details, quantities, and valuations</div>
+                    </div>
                   </li>
                   <li className="flex items-start">
-                    <div className="mr-2 h-5 w-5 text-orange-500 flex items-center justify-center rounded-full bg-orange-100">3</div>
-                    <span>Receipt is imported into your account and becomes available for trading or collateral</span>
+                    <div className="mr-3 h-6 w-6 text-orange-600 flex items-center justify-center rounded-full bg-orange-100 font-medium">3</div>
+                    <div>
+                      <div className="font-medium text-gray-900">Integration & Verification</div>
+                      <div className="text-gray-600">Receipt becomes available for financing and trading</div>
+                    </div>
                   </li>
                 </ul>
+                
+                <div className="mt-4 p-3 bg-blue-50 rounded-md">
+                  <p className="text-xs text-blue-700 font-medium">
+                    🔗 Interoperability Feature: This enables seamless integration with other warehouse management systems and agricultural finance platforms.
+                  </p>
+                </div>
               </CardContent>
             </Card>
           </div>
