@@ -18,16 +18,15 @@ TradeWiser is a comprehensive blockchain-powered agricultural commodity platform
 - **Containerization**: Docker with multi-service compose setup
 
 ## Recent Changes  
+- **2025-07-22**: Implemented smart bilingual commodity selector with auto-complete and category-based filtering
+- **2025-07-22**: Created comprehensive commodities.json with 24 agricultural products across 5 categories (Grains, Pulses, Spices, Oilseeds, Fibres)
+- **2025-07-22**: Built CommoditySelector component with bilingual search supporting both English and Hindi
+- **2025-07-22**: Added intelligent auto-population of commodity type based on selected commodity category
+- **2025-07-22**: Enhanced deposit form with professional @radix-ui Command and Popover components
+- **2025-07-22**: Integrated custom commodity fallback for non-listed agricultural products
 - **2025-07-22**: Integrated official TradeWiser logo across entire platform for professional brand consistency
-- **2025-07-22**: Updated landing page header, footer, and sidebar with authentic logo branding
 - **2025-07-22**: Fixed authentication flow to preserve user data on logout and redirect to landing page (Facebook/Gmail style)
-- **2025-07-22**: Enhanced logout function to only clear session while preserving all user data in database
-- **2025-07-22**: Resolved React render warnings and improved session persistence across page refreshes
-- **2025-07-22**: Built complete modern companion website with TradeWiser branding and clean design
-- **2025-07-22**: Implemented professional landing page with hero section, services overview, and integrated login
 - **2025-07-22**: Created fully functional Orange Channel import receipt workflow for external warehouse interoperability
-- **2025-07-22**: Added `/api/receipts/upload` endpoint with multer file handling for receipt document processing
-- **2025-07-22**: Enhanced UI with Orange Channel branding, detailed workflow explanations, and proper error handling
 - **2025-01-13**: Created comprehensive Ubuntu Docker compatibility setup
 - **2025-01-13**: Fixed Dockerfile build issues with proper multi-stage configuration
 - **2025-01-13**: Enhanced start.sh with cross-platform Docker Compose detection

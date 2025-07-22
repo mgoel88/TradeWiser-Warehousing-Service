@@ -68,6 +68,7 @@ export function CommoditySelector({ value, onChange, placeholder = "Select commo
   const handleSelect = (commodity: Commodity) => {
     const formattedName = formatCommodityName(commodity);
     onChange(formattedName);
+    setSearchValue('');
     setOpen(false);
   };
 
@@ -104,28 +105,27 @@ export function CommoditySelector({ value, onChange, placeholder = "Select commo
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-full p-0" align="start">
-        <Command>
+      <PopoverContent className="w-[400px] p-0" align="start">
+        <Command shouldFilter={false} value={searchValue} onValueChange={setSearchValue}>
           <CommandInput 
-            placeholder="Search commodities..." 
-            value={searchValue}
-            onValueChange={setSearchValue}
+            placeholder="Type to search commodities..." 
           />
           <CommandList className="max-h-[300px] overflow-y-auto">
             <CommandEmpty>
               <div className="text-center py-4">
                 <p className="text-sm text-muted-foreground mb-2">No commodity found.</p>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    onChange(searchValue);
-                    setOpen(false);
-                  }}
-                  disabled={!searchValue.trim()}
-                >
-                  Use "{searchValue}" as custom commodity
-                </Button>
+                {searchValue.trim() && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      onChange(searchValue.trim());
+                      setOpen(false);
+                    }}
+                  >
+                    Add "{searchValue.trim()}" as custom commodity
+                  </Button>
+                )}
               </div>
             </CommandEmpty>
             
@@ -142,9 +142,9 @@ export function CommoditySelector({ value, onChange, placeholder = "Select commo
                   return (
                     <CommandItem
                       key={`${commodity.category}-${commodity.english}`}
-                      value={commodity.english}
+                      value={`${commodity.english} ${commodity.hindi}`}
                       onSelect={() => handleSelect(commodity)}
-                      className="flex items-center justify-between"
+                      className="flex items-center justify-between cursor-pointer"
                     >
                       <div className="flex items-center gap-2">
                         <Package className="h-4 w-4 text-muted-foreground" />
