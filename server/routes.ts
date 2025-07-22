@@ -107,6 +107,83 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   });
 
+  // User settings routes
+  apiRouter.get("/user/settings", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const userId = req.session!.userId as number;
+      const settings = await storage.getUserSettings(userId);
+      res.json(settings);
+    } catch (error) {
+      console.error("Error fetching user settings:", error);
+      // Return default settings if none exist
+      const defaultSettings = {
+        notifications: {
+          email: true,
+          sms: true,
+          push: true,
+          depositUpdates: true,
+          receiptGeneration: true,
+          loanAlerts: true,
+          priceAlerts: false
+        },
+        preferences: {
+          language: 'en-in',
+          currency: 'INR',
+          timezone: 'Asia/Kolkata',
+          theme: 'light',
+          dashboardLayout: 'default'
+        },
+        security: {
+          twoFactorEnabled: false,
+          sessionTimeout: 60,
+          loginNotifications: true
+        }
+      };
+      res.json(defaultSettings);
+    }
+  });
+
+  apiRouter.patch("/user/settings", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const userId = req.session!.userId as number;
+      const settingsUpdate = req.body;
+      
+      const updatedSettings = await storage.updateUserSettings(userId, settingsUpdate);
+      res.json(updatedSettings);
+    } catch (error) {
+      console.error("Error updating user settings:", error);
+      res.status(500).json({ message: "Failed to update settings" });
+    }
+  });
+
+  apiRouter.post("/user/change-password", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const userId = req.session!.userId as number;
+      const { currentPassword, newPassword } = req.body;
+
+      if (!currentPassword || !newPassword) {
+        return res.status(400).json({ message: "Current password and new password are required" });
+      }
+
+      if (newPassword.length < 8) {
+        return res.status(400).json({ message: "New password must be at least 8 characters long" });
+      }
+
+      // Get current user to verify password
+      const user = await storage.getUser(userId);
+      if (!user || user.password !== currentPassword) {
+        return res.status(400).json({ message: "Current password is incorrect" });
+      }
+
+      // Update password
+      await storage.updateUserPassword(userId, newPassword);
+      res.json({ message: "Password updated successfully" });
+    } catch (error) {
+      console.error("Error changing password:", error);
+      res.status(500).json({ message: "Failed to change password" });
+    }
+  });
+
   // Warehouse routes
   apiRouter.get("/warehouses", async (req: Request, res: Response) => {
     try {

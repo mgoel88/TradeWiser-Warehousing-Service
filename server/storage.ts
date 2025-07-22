@@ -51,6 +51,9 @@ export interface IStorage {
   createUser(user: InsertUser): Promise<User>;
   listUsers(): Promise<User[]>;
   updateUser(id: number, user: Partial<InsertUser>): Promise<User | undefined>;
+  getUserSettings(userId: number): Promise<any>;
+  updateUserSettings(userId: number, settings: any): Promise<any>;
+  updateUserPassword(userId: number, newPassword: string): Promise<void>;
   
   // Warehouse operations
   getWarehouse(id: number): Promise<Warehouse | undefined>;
@@ -540,6 +543,59 @@ export class MemStorage implements IStorage {
     const updatedUser: User = { ...user, ...userData };
     this.users.set(id, updatedUser);
     return updatedUser;
+  }
+  
+  // User Settings operations
+  private userSettings = new Map<number, any>();
+  
+  async getUserSettings(userId: number): Promise<any> {
+    const settings = this.userSettings.get(userId);
+    if (settings) {
+      return settings;
+    }
+    
+    // Return default settings if none exist
+    const defaultSettings = {
+      notifications: {
+        email: true,
+        sms: true,
+        push: true,
+        depositUpdates: true,
+        receiptGeneration: true,
+        loanAlerts: true,
+        priceAlerts: false
+      },
+      preferences: {
+        language: 'en-in',
+        currency: 'INR',
+        timezone: 'Asia/Kolkata',
+        theme: 'light',
+        dashboardLayout: 'default'
+      },
+      security: {
+        twoFactorEnabled: false,
+        sessionTimeout: 60,
+        loginNotifications: true
+      }
+    };
+    
+    this.userSettings.set(userId, defaultSettings);
+    return defaultSettings;
+  }
+  
+  async updateUserSettings(userId: number, settings: any): Promise<any> {
+    const currentSettings = await this.getUserSettings(userId);
+    const updatedSettings = { ...currentSettings, ...settings };
+    this.userSettings.set(userId, updatedSettings);
+    return updatedSettings;
+  }
+  
+  async updateUserPassword(userId: number, newPassword: string): Promise<void> {
+    const user = await this.getUser(userId);
+    if (user) {
+      const updatedUser: User = { ...user, password: newPassword };
+      this.users.set(userId, updatedUser);
+    }
   }
   
   // Warehouse operations

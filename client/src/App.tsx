@@ -25,6 +25,7 @@ import ReceiptSacksPage from "@/pages/ReceiptSacksPage";
 import SackDetailPage from "@/pages/SackDetailPage";
 import ImportReceiptsPage from "@/pages/ImportReceiptsPage";
 import PrivateStoragePage from "@/pages/PrivateStoragePage";
+import SettingsPage from "@/pages/SettingsPage";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -51,6 +52,7 @@ function Router() {
       <Route path="/commodity-sacks/:id/details" component={SackDetailPage} />
       <Route path="/import-receipts" component={ImportReceiptsPage} />
       <Route path="/private-storage" component={PrivateStoragePage} />
+      <Route path="/settings" component={SettingsPage} />
       <Route component={NotFound} />
     </Switch>
   );
