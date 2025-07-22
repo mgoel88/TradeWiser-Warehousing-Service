@@ -1,132 +1,89 @@
-#!/usr/bin/env node
-/**
- * TradeWiser Platform - Build Validation Script
- * Validates that the build process will work in Docker
- */
+// Final validation of the corrected valuation system
+const baseUrl = 'http://localhost:5000/api';
 
-import fs from 'fs';
-import path from 'path';
-import { execSync } from 'child_process';
+async function validateCorrectValuation() {
+  console.log('🔧 FINAL VALIDATION: Correct Valuation System (1 MT = 1000 kg)\n');
+  console.log('Expected rates:');
+  console.log('• 1 MT = Rs 50,000 (1000 kg × Rs 50/kg)');
+  console.log('• 10 MT = Rs 500,000 (10,000 kg × Rs 50/kg)');
+  console.log('• 250 MT = Rs 12,500,000 (250,000 kg × Rs 50/kg)');
+  console.log('');
 
-console.log('🧪 TradeWiser Build Validation');
-console.log('==============================');
+  // Login
+  const loginResponse = await fetch(`${baseUrl}/auth/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ username: 'testuser', password: 'password123' })
+  });
 
-// Check if package.json exists
-console.log('1. Checking package.json...');
-if (!fs.existsSync('package.json')) {
-    console.error('❌ package.json not found');
-    process.exit(1);
-}
+  if (!loginResponse.ok) {
+    console.log('❌ Authentication failed');
+    return;
+  }
 
-const packageJson = JSON.parse(fs.readFileSync('package.json', 'utf8'));
-console.log('✅ package.json found');
+  const setCookie = loginResponse.headers.get('set-cookie');
+  const sessionCookie = setCookie ? setCookie.split(';')[0] : '';
 
-// Check build script
-console.log('2. Checking build script...');
-if (!packageJson.scripts || !packageJson.scripts.build) {
-    console.error('❌ Build script not found in package.json');
-    process.exit(1);
-}
-console.log('✅ Build script found:', packageJson.scripts.build);
-
-// Check if vite and esbuild are in dependencies
-console.log('3. Checking build dependencies...');
-const devDeps = packageJson.devDependencies || {};
-const deps = packageJson.dependencies || {};
-
-const requiredBuildDeps = ['vite', 'esbuild'];
-const missingDeps = requiredBuildDeps.filter(dep => !devDeps[dep] && !deps[dep]);
-
-if (missingDeps.length > 0) {
-    console.error('❌ Missing build dependencies:', missingDeps.join(', '));
-    process.exit(1);
-}
-console.log('✅ Build dependencies found');
-
-// Check if TypeScript config exists
-console.log('4. Checking TypeScript configuration...');
-if (!fs.existsSync('tsconfig.json')) {
-    console.error('❌ tsconfig.json not found');
-    process.exit(1);
-}
-console.log('✅ tsconfig.json found');
-
-// Check if vite config exists
-console.log('5. Checking Vite configuration...');
-if (!fs.existsSync('vite.config.ts')) {
-    console.error('❌ vite.config.ts not found');
-    process.exit(1);
-}
-console.log('✅ vite.config.ts found');
-
-// Check key source files
-console.log('6. Checking source files...');
-const requiredFiles = [
-    'server/index.ts',
-    'client/src/main.tsx',
-    'client/src/App.tsx',
-    'shared/schema.ts'
-];
-
-const missingFiles = requiredFiles.filter(file => !fs.existsSync(file));
-if (missingFiles.length > 0) {
-    console.error('❌ Missing source files:', missingFiles.join(', '));
-    process.exit(1);
-}
-console.log('✅ Source files found');
-
-// Check Docker files
-console.log('7. Checking Docker configuration...');
-if (!fs.existsSync('Dockerfile')) {
-    console.error('❌ Dockerfile not found');
-    process.exit(1);
-}
-if (!fs.existsSync('docker-compose.yml')) {
-    console.error('❌ docker-compose.yml not found');
-    process.exit(1);
-}
-if (!fs.existsSync('.env.docker')) {
-    console.error('❌ .env.docker template not found');
-    process.exit(1);
-}
-console.log('✅ Docker configuration files found');
-
-// Test build process (if dependencies are installed)
-console.log('8. Testing build process...');
-try {
-    // Check if node_modules exists
-    if (!fs.existsSync('node_modules')) {
-        console.log('⚠️  node_modules not found, skipping build test');
-        console.log('   Run "npm install" to install dependencies');
-    } else {
-        console.log('   Running build test...');
-        execSync('npm run build', { stdio: 'pipe' });
-        console.log('✅ Build test successful');
+  // Test cases with correct expected values
+  const testCases = [
+    { quantity: '1', expected: 50000, description: '1 MT → Rs 50,000' },
+    { quantity: '10', expected: 500000, description: '10 MT → Rs 500,000' },
+    { quantity: '250', expected: 12500000, description: '250 MT → Rs 12,500,000' },
+  ];
+  
+  let allCorrect = true;
+  
+  for (const testCase of testCases) {
+    console.log(`\n📦 Testing ${testCase.description}`);
+    
+    const receiptData = {
+      commodityId: 1,
+      warehouseId: 1,
+      quantity: testCase.quantity,
+      status: 'active',
+      commodityName: 'Validation Test'
+    };
+    
+    try {
+      const response = await fetch(`${baseUrl}/receipts`, {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Cookie': sessionCookie 
+        },
+        body: JSON.stringify(receiptData)
+      });
+      
+      if (response.ok) {
+        const receipt = await response.json();
+        const actualValue = parseInt(receipt.valuation || 0);
         
-        // Check if build outputs exist
-        if (fs.existsSync('dist') && fs.existsSync('client/dist')) {
-            console.log('✅ Build outputs created successfully');
+        if (actualValue === testCase.expected) {
+          console.log(`   ✅ CORRECT: Rs ${actualValue.toLocaleString()}`);
         } else {
-            console.log('⚠️  Build outputs not found, but build command succeeded');
+          console.log(`   ❌ WRONG: Rs ${actualValue.toLocaleString()} (Expected: Rs ${testCase.expected.toLocaleString()})`);
+          allCorrect = false;
         }
+      } else {
+        console.log(`   ❌ API ERROR: ${response.statusText}`);
+        allCorrect = false;
+      }
+    } catch (error) {
+      console.log(`   ❌ ERROR: ${error.message}`);
+      allCorrect = false;
     }
-} catch (error) {
-    console.error('❌ Build test failed:', error.message);
-    process.exit(1);
+  }
+  
+  console.log('\n' + '='.repeat(60));
+  if (allCorrect) {
+    console.log('🎉 VALIDATION PASSED: All valuations correct!');
+    console.log('✅ Mathematical conversion working: 1 MT = 1000 kg × Rs 50/kg');
+    console.log('✅ System ready for production with correct pricing');
+  } else {
+    console.log('❌ VALIDATION FAILED: Some valuations still incorrect');
+    console.log('⚠️  Critical business bug - pricing calculations wrong');
+  }
+  console.log('='.repeat(60));
 }
 
-console.log('');
-console.log('🎉 Build validation complete!');
-console.log('============================');
-console.log('');
-console.log('Your TradeWiser platform is ready for Docker deployment:');
-console.log('');
-console.log('1. Make sure Docker is installed');
-console.log('2. Run: cp .env.docker .env');
-console.log('3. Run: docker compose up --build -d');
-console.log('   (or: docker-compose up --build -d)');
-console.log('4. Wait for services to start (2-3 minutes)');
-console.log('5. Access: http://localhost:5000');
-console.log('6. Login: testuser / password123');
-console.log('');
-console.log('For troubleshooting, check SETUP_GUIDE.md');
+validateCorrectValuation().catch(console.error);

@@ -273,7 +273,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ownerId: req.session.userId,
         status: "active" as const,
         channelType: "green" as const,
-        valuation: valuation?.toString() || (parseFloat(quantity) * 50).toString() // Rs 50 per kg default
+        valuation: valuation?.toString() || (parseFloat(quantity) * 1000 * 50).toString() // Rs 50 per kg default (MT to kg conversion)
       };
 
       const commodity = await storage.createCommodity(commodityData);
@@ -527,9 +527,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       console.log("Creating warehouse receipt:", req.body);
       
-      // FIXED: Ensure valuation defaults to Rs 50/kg if not provided
+      // FIXED: Ensure valuation defaults to Rs 50/kg if not provided (1 MT = 1000 kg)
       const { quantity, valuation, ...rest } = req.body;
-      const calculatedValuation = valuation || (parseFloat(quantity) * 50).toString();
+      const calculatedValuation = valuation || (parseFloat(quantity) * 1000 * 50).toString();
       
       const receiptData = {
         ...rest,
@@ -607,7 +607,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ownerId: req.session.userId,
         status: "active",
         channelType: "green",
-        valuation: estimatedValue?.toString() || (parseFloat(quantity) * 50).toString()
+        valuation: estimatedValue?.toString() || (parseFloat(quantity) * 1000 * 50).toString()
       });
 
       // Then create the process
@@ -888,7 +888,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           url: `/documents/quality_cert_${receiptNumber}.pdf`,
           timestamp: new Date().toISOString(),
           storageLocation: `${warehouse.name}-${Math.floor(Math.random() * 100)}`,
-          insuranceCoverage: (parseFloat(commodity.valuation || (parseFloat(commodity.quantity) * 50).toString()) * 0.8).toString()
+          insuranceCoverage: (parseFloat(commodity.valuation || (parseFloat(commodity.quantity) * 1000 * 50).toString()) * 0.8).toString()
         })
       });
 

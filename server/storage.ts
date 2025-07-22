@@ -709,9 +709,9 @@ export class MemStorage implements IStorage {
     const id = this.currentReceiptId++;
     const now = new Date();
     
-    // FIXED: Ensure valuation defaults to Rs 50/kg if not provided
+    // FIXED: Ensure valuation defaults to Rs 50/kg if not provided (1 MT = 1000 kg)
     const quantity = parseFloat(insertReceipt.quantity?.toString() || '0');
-    const defaultValuation = (quantity * 50).toString();
+    const defaultValuation = (quantity * 1000 * 50).toString();
     
     const receipt: WarehouseReceipt = { 
       ...insertReceipt, 

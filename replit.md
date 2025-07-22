@@ -18,7 +18,7 @@ TradeWiser is a comprehensive blockchain-powered agricultural commodity platform
 - **Containerization**: Docker with multi-service compose setup
 
 ## Recent Changes  
-- **2025-07-22**: CRITICAL VALUATION BUG FIXED - Successfully fixed warehouse receipt valuation system to default to Rs 50/kg when pricing API unavailable. Verified with complete deposit flow test showing Rs 12,500 for 250 MT Basmati Rice (exactly Rs 50/kg rate)
+- **2025-07-22**: CRITICAL VALUATION BUG FIXED - Successfully fixed warehouse receipt valuation system to default to Rs 50/kg when pricing API unavailable. Corrected MT to kg conversion (1 MT = 1000 kg). Verified with complete tests: 1 MT = Rs 50,000, 10 MT = Rs 500,000, 250 MT = Rs 12,500,000
 - **2025-07-22**: COMPLETED ENHANCED MANDI-BASED ROLLOUT - Comprehensive testing shows full system operational: 29 warehouses, smart Karnal warehouse selection for Haryana Basmati Rice, complete deposit-to-eWR workflow functional
 - **2025-07-22**: IMPLEMENTED COMPREHENSIVE MANDI-BASED WAREHOUSE SYSTEM - Successfully integrated 29 authentic Indian warehouses (26 mandi-based + 3 regular) with real data from provided PDF directory
 - **2025-07-22**: ENHANCED WAREHOUSE SELECTOR COMPONENT - Built professional bilingual warehouse selector with state grouping, railway connectivity info, and commodity-based filtering
