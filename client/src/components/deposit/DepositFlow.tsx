@@ -108,7 +108,7 @@ export default function DepositFlow({
       // Map category to form type values
       const categoryTypeMap: Record<string, string> = {
         'Grains': 'Grain',
-        'Pulses': 'Pulses',
+        'Pulses': 'Pulses', 
         'Spices': 'Spices',
         'Oilseeds': 'Oilseeds',
         'Fibres': 'Other'
@@ -117,6 +117,20 @@ export default function DepositFlow({
       const typeValue = categoryTypeMap[selectedCommodity.category] || 'Other';
       form.setValue("type", typeValue);
     }
+  };
+
+  // Handle category selection from commodity selector
+  const handleCategorySelect = (category: string) => {
+    const categoryTypeMap: Record<string, string> = {
+      'Grains': 'Grain',
+      'Pulses': 'Pulses',
+      'Spices': 'Spices', 
+      'Oilseeds': 'Oilseeds',
+      'Fibres': 'Other'
+    };
+    
+    const typeValue = categoryTypeMap[category] || 'Other';
+    form.setValue("type", typeValue);
   };
 
   // Initialize form
@@ -576,7 +590,8 @@ export default function DepositFlow({
                           <CommoditySelector
                             value={field.value}
                             onChange={handleCommodityChange}
-                            placeholder="Search commodities..."
+                            onCategorySelect={handleCategorySelect}
+                            placeholder="Search commodities in English or Hindi..."
                           />
                         </FormControl>
                         <FormMessage />

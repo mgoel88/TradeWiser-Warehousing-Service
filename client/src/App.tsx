@@ -7,8 +7,7 @@ import { WebSocketProvider } from "@/context/WebSocketContext";
 
 // Pages
 import LandingPage from "@/pages/LandingPage";
-import LoginPage from "@/pages/LoginPage";
-import RegisterPage from "@/pages/RegisterPage";
+
 import NewDashboardPage from "@/pages/NewDashboardPage";
 import WarehousePage from "@/pages/WarehousePage";
 import ReceiptsPage from "@/pages/ReceiptsPage";
@@ -31,8 +30,6 @@ import NotFound from "@/pages/not-found";
 function Router() {
   return (
     <Switch>
-      <Route path="/login" component={LoginPage} />
-      <Route path="/register" component={RegisterPage} />
       <Route path="/" component={LandingPage} />
       <Route path="/dashboard" component={NewDashboardPage} />
       <Route path="/warehouses" component={WarehousePage} />
@@ -49,10 +46,8 @@ function Router() {
       <Route path="/green-channel" component={GreenChannelPage} />
       <Route path="/orange-channel" component={OrangeChannelPage} />
       <Route path="/red-channel" component={RedChannelPage} />
-      {/* New sack management routes */}
       <Route path="/receipt/:id/sacks" component={ReceiptSacksPage} />
       <Route path="/commodity-sacks/:id/details" component={SackDetailPage} />
-      {/* Import and private storage routes */}
       <Route path="/import-receipts" component={ImportReceiptsPage} />
       <Route path="/private-storage" component={PrivateStoragePage} />
       <Route component={NotFound} />

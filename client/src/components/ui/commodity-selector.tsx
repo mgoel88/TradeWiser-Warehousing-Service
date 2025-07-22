@@ -15,11 +15,12 @@ export interface Commodity {
 interface CommoditySelectorProps {
   value?: string;
   onChange: (value: string) => void;
+  onCategorySelect?: (category: string) => void;
   placeholder?: string;
   disabled?: boolean;
 }
 
-export function CommoditySelector({ value, onChange, placeholder = "Select commodity...", disabled }: CommoditySelectorProps) {
+export function CommoditySelector({ value, onChange, onCategorySelect, placeholder = "Select commodity...", disabled }: CommoditySelectorProps) {
   const [open, setOpen] = useState(false);
   const [searchValue, setSearchValue] = useState('');
 
@@ -37,17 +38,35 @@ export function CommoditySelector({ value, onChange, placeholder = "Select commo
     return categories;
   }, [commodities]);
 
-  // Filter commodities based on search
+  // Advanced filter commodities based on search with fuzzy matching
   const filteredCommodities = useMemo(() => {
     if (!searchValue) return categorizedCommodities;
     
+    const searchLower = searchValue.toLowerCase().trim();
     const filtered: Record<string, Commodity[]> = {};
+    
     Object.entries(categorizedCommodities).forEach(([category, items]) => {
-      const matchingItems = items.filter(item => 
-        item.english.toLowerCase().includes(searchValue.toLowerCase()) ||
-        item.hindi.includes(searchValue) ||
-        category.toLowerCase().includes(searchValue.toLowerCase())
-      );
+      const matchingItems = items.filter(item => {
+        // Exact matches
+        if (item.english.toLowerCase().includes(searchLower) ||
+            item.hindi.includes(searchValue) ||
+            category.toLowerCase().includes(searchLower)) {
+          return true;
+        }
+        
+        // Fuzzy matching for common variations
+        const englishWords = item.english.toLowerCase().split(' ');
+        const searchWords = searchLower.split(' ');
+        
+        // Check if any search word matches any commodity word
+        return searchWords.some(searchWord => 
+          englishWords.some(commodityWord => 
+            commodityWord.startsWith(searchWord) || 
+            searchWord.startsWith(commodityWord)
+          )
+        );
+      });
+      
       if (matchingItems.length > 0) {
         filtered[category] = matchingItems;
       }
@@ -70,6 +89,11 @@ export function CommoditySelector({ value, onChange, placeholder = "Select commo
     onChange(formattedName);
     setSearchValue('');
     setOpen(false);
+    
+    // Call onCategorySelect if provided to auto-populate category
+    if (onCategorySelect) {
+      onCategorySelect(commodity.category);
+    }
   };
 
   // Category colors
