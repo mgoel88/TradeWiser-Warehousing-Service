@@ -8,7 +8,7 @@ import { WebSocketProvider } from "@/context/WebSocketContext";
 // Pages
 import LoginPage from "@/pages/LoginPage";
 import RegisterPage from "@/pages/RegisterPage";
-import DashboardPage from "@/pages/DashboardPage";
+import NewDashboardPage from "@/pages/NewDashboardPage";
 import WarehousePage from "@/pages/WarehousePage";
 import ReceiptsPage from "@/pages/ReceiptsPage";
 import LoansPage from "@/pages/LoansPage";
@@ -30,10 +30,10 @@ import NotFound from "@/pages/not-found";
 function Router() {
   return (
     <Switch>
-      <Route path="/" component={LoginPage} />
       <Route path="/login" component={LoginPage} />
       <Route path="/register" component={RegisterPage} />
-      <Route path="/dashboard" component={DashboardPage} />
+      <Route path="/" component={NewDashboardPage} />
+      <Route path="/dashboard" component={NewDashboardPage} />
       <Route path="/warehouses" component={WarehousePage} />
       <Route path="/receipts" component={ReceiptsPage} />
       <Route path="/loans" component={LoansPage} />

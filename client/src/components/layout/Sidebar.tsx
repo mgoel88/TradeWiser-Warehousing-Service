@@ -21,12 +21,12 @@ export default function Sidebar() {
       </div>
       
       <nav className="flex-grow p-4 overflow-y-auto">
-        <p className="text-xs font-medium uppercase text-gray-500 mb-2">Platforms</p>
+        <p className="text-xs font-medium uppercase text-gray-500 mb-2">Main</p>
         <ul className="mb-4">
           <li className="mb-2">
-            <Link href="/dashboard" className={cn(
+            <Link href="/" className={cn(
               "flex items-center p-2 rounded-md",
-              location === "/dashboard" 
+              (location === "/" || location === "/dashboard")
                 ? "bg-primary-50 text-primary-600 font-medium" 
                 : "text-gray-700 hover:bg-gray-100"
             )}>
@@ -46,18 +46,9 @@ export default function Sidebar() {
             <div className="ml-2 mb-2">
               <h3 className="font-medium text-sm text-emerald-600 flex items-center">
                 <span className="w-2 h-5 bg-emerald-500 rounded mr-2"></span>
-                Storage & Warehousing
+                Storage Services
               </h3>
             </div>
-            <Link href="/warehouses" className={cn(
-              "flex items-center p-2 pl-7 rounded-md text-sm",
-              location === "/warehouses" 
-                ? "bg-emerald-50 text-emerald-600 font-medium" 
-                : "text-gray-700 hover:bg-gray-100"
-            )}>
-              <Warehouse className="h-4 w-4 mr-2" />
-              Find Warehouses
-            </Link>
             <Link href="/deposit" className={cn(
               "flex items-center p-2 pl-7 rounded-md text-sm",
               location === "/deposit" 
@@ -67,13 +58,22 @@ export default function Sidebar() {
               <Package className="h-4 w-4 mr-2" />
               Store Commodities
             </Link>
+            <Link href="/warehouses" className={cn(
+              "flex items-center p-2 pl-7 rounded-md text-sm",
+              location === "/warehouses" 
+                ? "bg-emerald-50 text-emerald-600 font-medium" 
+                : "text-gray-700 hover:bg-gray-100"
+            )}>
+              <Warehouse className="h-4 w-4 mr-2" />
+              Find Warehouses
+            </Link>
           </li>
           
           <li className="mb-4">
             <div className="ml-2 mb-2">
               <h3 className="font-medium text-sm text-blue-600 flex items-center">
                 <span className="w-2 h-5 bg-blue-500 rounded mr-2"></span>
-                External Receipts
+                Other Options
               </h3>
             </div>
             <Link href="/import-receipts" className={cn(
@@ -83,25 +83,16 @@ export default function Sidebar() {
                 : "text-gray-700 hover:bg-gray-100"
             )}>
               <ExternalLink className="h-4 w-4 mr-2" />
-              Import External WRs
+              Import External Receipts
             </Link>
-          </li>
-          
-          <li className="mb-4">
-            <div className="ml-2 mb-2">
-              <h3 className="font-medium text-sm text-purple-600 flex items-center">
-                <span className="w-2 h-5 bg-purple-500 rounded mr-2"></span>
-                Private Storage
-              </h3>
-            </div>
             <Link href="/private-storage" className={cn(
               "flex items-center p-2 pl-7 rounded-md text-sm",
               location === "/private-storage" 
-                ? "bg-purple-50 text-purple-600 font-medium" 
+                ? "bg-blue-50 text-blue-600 font-medium" 
                 : "text-gray-700 hover:bg-gray-100"
             )}>
               <FileCheck className="h-4 w-4 mr-2" />
-              Self-Certification
+              Private Storage
             </Link>
           </li>
         </ul>
@@ -168,10 +159,16 @@ export default function Sidebar() {
             </Link>
           </li>
           <li className="mb-1">
-            <Link href="/logout" className="flex items-center p-2 rounded-md text-gray-700 hover:bg-gray-100">
+            <button 
+              onClick={() => {
+                fetch('/api/auth/logout', { method: 'POST' })
+                  .then(() => window.location.href = '/login');
+              }}
+              className="w-full flex items-center p-2 rounded-md text-gray-700 hover:bg-gray-100 text-left"
+            >
               <LogOut className="h-5 w-5 mr-3" />
               Logout
-            </Link>
+            </button>
           </li>
         </ul>
       </nav>

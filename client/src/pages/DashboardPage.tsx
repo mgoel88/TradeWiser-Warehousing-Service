@@ -13,16 +13,16 @@ import { Badge } from '@/components/ui/badge';
 
 export default function DashboardPage() {
   const [, navigate] = useLocation();
-  const { data: receipts = [], isLoading: receiptsLoading } = useQuery({
+  const { data: receipts = [], isLoading: receiptsLoading } = useQuery<any[]>({
     queryKey: ['/api/receipts'],
     retry: 1,
     staleTime: 60000
   });
 
   // Filter receipts by type
-  const verifiedReceipts = receipts.filter((r: any) => r.channelType === 'verified');
-  const externalReceipts = receipts.filter((r: any) => r.channelType === 'external');
-  const privateReceipts = receipts.filter((r: any) => r.channelType === 'private');
+  const verifiedReceipts = receipts.filter((r) => r.channelType === 'verified');
+  const externalReceipts = receipts.filter((r) => r.channelType === 'external');
+  const privateReceipts = receipts.filter((r) => r.channelType === 'private');
 
   return (
     <MainLayout>
@@ -127,7 +127,7 @@ export default function DashboardPage() {
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold">
-                  ₹{(receipts.reduce((total: number, r: any) => total + (parseFloat(r.valuation?.toString() || "0") * 0.8), 0)).toLocaleString('en-IN')}
+                  ₹{(receipts.reduce((total: number, r) => total + (parseFloat(r.valuation?.toString() || "0") * 0.8), 0)).toLocaleString('en-IN')}
                 </div>
                 <div className="text-xs text-muted-foreground mt-1">
                   Based on your warehouse receipts
@@ -193,7 +193,7 @@ export default function DashboardPage() {
                   </div>
                 ) : receipts.length > 0 ? (
                   <div className="space-y-4">
-                    {receipts.slice(0, 5).map((receipt: any) => (
+                    {receipts.slice(0, 5).map((receipt) => (
                       <div 
                         key={receipt.id} 
                         className="bg-white p-4 rounded-md shadow-sm border-l-4 border-l-primary-500 hover:bg-gray-50 cursor-pointer"
@@ -245,7 +245,7 @@ export default function DashboardPage() {
                   </div>
                 ) : verifiedReceipts.length > 0 ? (
                   <div className="space-y-4">
-                    {verifiedReceipts.slice(0, 5).map((receipt: any) => (
+                    {verifiedReceipts.slice(0, 5).map((receipt) => (
                       <div
                         key={receipt.id}
                         className="bg-white p-4 rounded-md shadow-sm border-l-4 border-l-emerald-500 hover:bg-gray-50 cursor-pointer"
@@ -294,7 +294,7 @@ export default function DashboardPage() {
                   </div>
                 ) : externalReceipts.length > 0 ? (
                   <div className="space-y-4">
-                    {externalReceipts.slice(0, 5).map((receipt: any) => (
+                    {externalReceipts.slice(0, 5).map((receipt) => (
                       <div
                         key={receipt.id}
                         className="bg-white p-4 rounded-md shadow-sm border-l-4 border-l-blue-500 hover:bg-gray-50 cursor-pointer"
@@ -343,7 +343,7 @@ export default function DashboardPage() {
                   </div>
                 ) : privateReceipts.length > 0 ? (
                   <div className="space-y-4">
-                    {privateReceipts.slice(0, 5).map((receipt: any) => (
+                    {privateReceipts.slice(0, 5).map((receipt) => (
                       <div
                         key={receipt.id}
                         className="bg-white p-4 rounded-md shadow-sm border-l-4 border-l-purple-500 hover:bg-gray-50 cursor-pointer"
