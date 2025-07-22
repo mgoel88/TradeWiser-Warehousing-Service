@@ -164,7 +164,7 @@ export default function Sidebar() {
             <button 
               onClick={() => {
                 fetch('/api/auth/logout', { method: 'POST' })
-                  .then(() => window.location.href = '/login');
+                  .then(() => window.location.replace('/'));
               }}
               className="w-full flex items-center p-2 rounded-md text-gray-700 hover:bg-gray-100 text-left"
             >

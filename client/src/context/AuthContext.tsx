@@ -101,7 +101,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setIsLoading(true);
       
       // Call logout API
-      const response = await fetch('/api/auth/logout', {
+      await fetch('/api/auth/logout', {
         method: 'POST',
         credentials: 'include',
         headers: {
@@ -124,17 +124,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         description: "You have been successfully logged out.",
       });
       
-      // Force redirect to landing page
-      window.location.href = '/';
-      
     } catch (error) {
       console.error("Logout error:", error);
-      // Even if logout fails on server, clear frontend state and redirect
+      // Even if logout fails on server, clear frontend state
       setUser(null);
       localStorage.clear();
-      window.location.href = '/';
     } finally {
       setIsLoading(false);
+      // Force page reload to landing page - this ensures clean state
+      window.location.replace('/');
     }
   };
 

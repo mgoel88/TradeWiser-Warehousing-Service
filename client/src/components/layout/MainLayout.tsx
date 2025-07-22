@@ -25,7 +25,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
   }
 
   if (!user) {
-    return <Redirect to="/login" />;
+    return <Redirect to="/" />;
   }
 
   return (
