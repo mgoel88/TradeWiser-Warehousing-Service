@@ -18,6 +18,11 @@ TradeWiser is a comprehensive blockchain-powered agricultural commodity platform
 - **Containerization**: Docker with multi-service compose setup
 
 ## Recent Changes  
+- **2025-07-22**: Fixed all receipt valuations to use Rs 50/kg standard rate instead of zero values
+- **2025-07-22**: Enhanced Orange Channel with professional external receipt import workflow including file upload, OCR simulation, and document verification
+- **2025-07-22**: Created comprehensive Red Channel dispute management system with priority-based filing, resolution tracking, and evidence management
+- **2025-07-22**: Fixed commodity selector filtering to show all 77 commodities properly with advanced fuzzy search and partial word matching
+- **2025-07-22**: Improved logout functionality with proper session clearing and forced redirect to landing page
 - **2025-07-22**: Fixed bilingual commodity database persistence - commodities now properly store full bilingual names like "Wheat (गेहूं)"
 - **2025-07-22**: Corrected authentication flow by fixing LandingPage to use AuthContext instead of direct fetch calls
 - **2025-07-22**: Enhanced commodity selector with intelligent auto-category population (selecting wheat automatically sets type to "Grain")

@@ -1,341 +1,331 @@
-import { useState } from 'react';
-import { useLocation } from 'wouter';
+import { useState, useRef } from 'react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Upload, FileText, AlertCircle, CheckCircle, Eye, Download } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import MainLayout from '@/components/layout/MainLayout';
-import { ExternalLink, AlertCircle, ArrowRight, Upload, FileSearch, ScanSearch } from 'lucide-react';
-import { useQuery } from '@tanstack/react-query';
-import UploadReceiptDialog from '@/components/receipts/UploadReceiptDialog';
-import WarehouseReceiptCard from '@/components/receipts/WarehouseReceiptCard';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { apiRequest } from '@/lib/queryClient';
+
+interface UploadedReceipt {
+  id: number;
+  receiptNumber: string;
+  commodityName: string;
+  quantity: string;
+  valuation: string;
+  status: string;
+  externalSource: string;
+  attachmentUrl?: string;
+  createdAt: string;
+}
 
 export default function OrangeChannelPage() {
-  const [, navigate] = useLocation();
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [uploadNotes, setUploadNotes] = useState('');
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
-  const [activeTab, setActiveTab] = useState('overview');
-  const [isUploadDialogOpen, setIsUploadDialogOpen] = useState(false);
+  const queryClient = useQueryClient();
 
-  // Fetch external source receipts data
-  const { data: receipts = [], isLoading: receiptsLoading } = useQuery({
-    queryKey: ['/api/receipts'],
-    retry: 1,
-    staleTime: 60000
-  });
-
-  // Filter to only show Orange Channel receipts
-  const orangeReceipts = (receipts as any[]).filter((receipt: any) => {
-    if (receipt.metadata && typeof receipt.metadata === 'object') {
-      return receipt.channelType === 'orange' || 
-             (receipt.metadata as any).channelType === 'orange' ||
-             receipt.externalSource;
+  // Query for existing external receipts
+  const { data: externalReceipts, isLoading: loadingReceipts } = useQuery<UploadedReceipt[]>({
+    queryKey: ['/api/receipts/external'],
+    queryFn: async () => {
+      const res = await apiRequest('GET', '/api/receipts/external');
+      return await res.json();
     }
-    return false;
   });
+
+  // Upload mutation
+  const uploadMutation = useMutation({
+    mutationFn: async (formData: FormData) => {
+      const res = await fetch('/api/receipts/upload', {
+        method: 'POST',
+        credentials: 'include',
+        body: formData,
+      });
+      if (!res.ok) throw new Error('Upload failed');
+      return await res.json();
+    },
+    onSuccess: (data) => {
+      toast({
+        title: "External Receipt Imported",
+        description: `Successfully imported receipt ${data.receipt.receiptNumber}`,
+      });
+      setSelectedFile(null);
+      setUploadNotes('');
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      queryClient.invalidateQueries({ queryKey: ['/api/receipts/external'] });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Upload Failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      // Validate file type
+      const allowedTypes = ['application/pdf', 'image/jpeg', 'image/png', 'image/jpg'];
+      if (!allowedTypes.includes(file.type)) {
+        toast({
+          title: "Invalid File Type",
+          description: "Please upload PDF, JPEG, or PNG files only",
+          variant: "destructive",
+        });
+        return;
+      }
+      
+      // Validate file size (10MB max)
+      if (file.size > 10 * 1024 * 1024) {
+        toast({
+          title: "File Too Large",
+          description: "Please upload files smaller than 10MB",
+          variant: "destructive",
+        });
+        return;
+      }
+      
+      setSelectedFile(file);
+    }
+  };
+
+  const handleUpload = async () => {
+    if (!selectedFile) return;
+
+    const formData = new FormData();
+    formData.append('file', selectedFile);
+    if (uploadNotes.trim()) {
+      formData.append('notes', uploadNotes.trim());
+    }
+
+    uploadMutation.mutate(formData);
+  };
+
+  const formatCurrency = (value: string) => {
+    return `₹${parseFloat(value).toLocaleString('en-IN')}`;
+  };
+
+  const getStatusColor = (status: string) => {
+    switch (status.toLowerCase()) {
+      case 'active': return 'text-green-600 bg-green-50';
+      case 'pending': return 'text-yellow-600 bg-yellow-50';
+      case 'expired': return 'text-red-600 bg-red-50';
+      default: return 'text-gray-600 bg-gray-50';
+    }
+  };
 
   return (
-    <MainLayout>
-      <div className="container mx-auto px-4 py-6">
-        <div className="mb-6">
-          <div className="flex flex-col md:flex-row justify-between items-start md:items-center">
-            <div>
-              <h1 className="text-2xl font-bold flex items-center text-orange-800">
-                <ExternalLink className="h-6 w-6 mr-2 text-orange-600" />
-                Orange Channel
-              </h1>
-              <p className="text-muted-foreground mt-1">
-                Import and manage third-party warehouse receipts for financing and trading
-              </p>
-            </div>
-            <div className="mt-4 md:mt-0 space-x-2">
-              <Button 
-                variant="default" 
-                onClick={() => setIsUploadDialogOpen(true)}
-                className="bg-orange-600 hover:bg-orange-700"
-              >
-                Upload External Receipt
-              </Button>
-            </div>
-          </div>
-          
-          <div className="mt-6 p-4 bg-orange-50 border-l-4 border-orange-500 rounded-md flex items-start">
-            <div className="mr-3 mt-1">
-              <ExternalLink className="h-5 w-5 text-orange-600" />
-            </div>
-            <div>
-              <h3 className="font-medium text-orange-800">Orange Channel Benefits</h3>
-              <p className="text-sm text-orange-700 mt-1">
-                Import receipts from third-party warehouses (WDRA, CMA, FCI, etc.) into a unified dashboard. 
-                Access financing and transfer options while keeping commodities in their current location.
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="mt-6">
-          <TabsList className="grid grid-cols-3 w-full md:w-[400px]">
-            <TabsTrigger value="overview">Overview</TabsTrigger>
-            <TabsTrigger value="receipts">My Receipts</TabsTrigger>
-            <TabsTrigger value="process">Process</TabsTrigger>
-          </TabsList>
-          
-          <TabsContent value="overview" className="mt-6">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-lg flex items-center">
-                    <Upload className="h-5 w-5 mr-2 text-orange-600" />
-                    Receipt Import
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-sm text-muted-foreground">
-                    Upload PDFs or images of third-party warehouse receipts for automatic extraction and processing
-                  </p>
-                </CardContent>
-                <CardFooter className="pt-0">
-                  <Button 
-                    variant="link" 
-                    size="sm" 
-                    className="p-0 h-auto text-orange-600" 
-                    onClick={() => setIsUploadDialogOpen(true)}
-                  >
-                    Upload now <ArrowRight className="h-4 w-4 ml-1" />
-                  </Button>
-                </CardFooter>
-              </Card>
-              
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-lg flex items-center">
-                    <ScanSearch className="h-5 w-5 mr-2 text-orange-600" />
-                    Data Extraction
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-sm text-muted-foreground">
-                    Our OCR technology recognizes and extracts key information from various receipt formats
-                  </p>
-                </CardContent>
-                <CardFooter className="pt-0">
-                  <Button 
-                    variant="link" 
-                    size="sm" 
-                    className="p-0 h-auto text-orange-600" 
-                    onClick={() => setActiveTab('process')}
-                  >
-                    Learn more <ArrowRight className="h-4 w-4 ml-1" />
-                  </Button>
-                </CardFooter>
-              </Card>
-              
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-lg flex items-center">
-                    <FileSearch className="h-5 w-5 mr-2 text-orange-600" />
-                    Manual Entry
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-sm text-muted-foreground">
-                    Manually input receipt details when automatic extraction isn't possible or for verification
-                  </p>
-                </CardContent>
-                <CardFooter className="pt-0">
-                  <Button 
-                    variant="link" 
-                    size="sm" 
-                    className="p-0 h-auto text-orange-600" 
-                    onClick={() => setIsUploadDialogOpen(true)}
-                  >
-                    Create receipt <ArrowRight className="h-4 w-4 ml-1" />
-                  </Button>
-                </CardFooter>
-              </Card>
-            </div>
-            
-            <div className="mt-8">
-              <h2 className="text-xl font-semibold mb-4">Get Started</h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <Button 
-                  onClick={() => setIsUploadDialogOpen(true)} 
-                  size="lg" 
-                  className="h-auto p-6 bg-orange-600 hover:bg-orange-700"
-                >
-                  <div className="text-left">
-                    <h3 className="text-lg font-medium">Upload External Receipt</h3>
-                    <p className="text-sm font-normal opacity-90 mt-1">
-                      Import a third-party warehouse receipt for integration with TradeWiser
-                    </p>
-                  </div>
-                  <ArrowRight className="h-5 w-5 ml-auto" />
-                </Button>
-                <Button 
-                  onClick={() => navigate('/receipts')} 
-                  size="lg" 
-                  variant="outline" 
-                  className="h-auto p-6 border-orange-200 bg-orange-50 hover:bg-orange-100 text-orange-800"
-                >
-                  <div className="text-left">
-                    <h3 className="text-lg font-medium">View Receipts</h3>
-                    <p className="text-sm font-normal opacity-90 mt-1">
-                      Check your existing Orange Channel receipts with special indicators
-                    </p>
-                  </div>
-                  <ArrowRight className="h-5 w-5 ml-auto text-orange-600" />
-                </Button>
-              </div>
-            </div>
-          </TabsContent>
-          
-          <TabsContent value="receipts" className="mt-6">
-            <div className="mb-4 flex justify-between items-center">
-              <h2 className="text-xl font-semibold">My Orange Channel Receipts</h2>
-              <Button 
-                variant="outline" 
-                onClick={() => setIsUploadDialogOpen(true)}
-                className="border-orange-300 text-orange-700 hover:bg-orange-50"
-              >
-                Upload New Receipt
-              </Button>
-            </div>
-            
-            {receiptsLoading ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {[1, 2, 3].map(i => (
-                  <Card key={i} className="animate-pulse">
-                    <CardHeader className="pb-2">
-                      <div className="h-6 bg-gray-200 rounded w-3/4"></div>
-                      <div className="h-4 bg-gray-200 rounded w-1/2 mt-2"></div>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="h-4 bg-gray-200 rounded w-full mb-2"></div>
-                      <div className="h-4 bg-gray-200 rounded w-full mb-2"></div>
-                      <div className="h-4 bg-gray-200 rounded w-3/4"></div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {orangeReceipts.length > 0 ? (
-                  orangeReceipts.map((receipt: any) => (
-                    <div key={receipt.id}>
-                      <WarehouseReceiptCard
-                        receipt={receipt}
-                        orangeChannelVariant={true}
-                        onView={(receipt: any) => navigate(`/receipts/${receipt.id}`)}
-                      />
-                    </div>
-                  ))
-                ) : (
-                  <div className="col-span-3 p-6 text-center border rounded-lg">
-                    <AlertCircle className="h-8 w-8 mb-2 mx-auto text-muted-foreground" />
-                    <h3 className="font-medium text-lg">No Orange Channel Receipts</h3>
-                    <p className="text-muted-foreground">
-                      You haven't imported any external warehouse receipts yet.
-                    </p>
-                    <Button 
-                      variant="outline" 
-                      className="mt-4 border-orange-300 text-orange-700 hover:bg-orange-50"
-                      onClick={() => setIsUploadDialogOpen(true)}
-                    >
-                      Upload External Receipt
-                    </Button>
-                  </div>
-                )}
-              </div>
-            )}
-          </TabsContent>
-          
-          <TabsContent value="process" className="mt-6">
-            <div className="bg-white p-6 rounded-lg border">
-              <h2 className="text-xl font-semibold mb-4">Orange Channel Import Process</h2>
-              
-              <div className="space-y-6">
-                <div className="flex">
-                  <div className="flex-shrink-0 w-10 h-10 rounded-full bg-orange-100 flex items-center justify-center">
-                    <span className="font-semibold text-orange-700">1</span>
-                  </div>
-                  <div className="ml-4">
-                    <h3 className="text-lg font-medium">Upload Receipt</h3>
-                    <p className="text-muted-foreground mt-1">
-                      Upload a PDF or image of your third-party warehouse receipt, or take a photo using your device's camera.
-                    </p>
-                  </div>
-                </div>
-                
-                <div className="flex">
-                  <div className="flex-shrink-0 w-10 h-10 rounded-full bg-orange-100 flex items-center justify-center">
-                    <span className="font-semibold text-orange-700">2</span>
-                  </div>
-                  <div className="ml-4">
-                    <h3 className="text-lg font-medium">Data Extraction</h3>
-                    <p className="text-muted-foreground mt-1">
-                      Our OCR technology analyzes the document and extracts key information such as receipt number, 
-                      commodity type, quantity, grade, and warehouse details.
-                    </p>
-                  </div>
-                </div>
-                
-                <div className="flex">
-                  <div className="flex-shrink-0 w-10 h-10 rounded-full bg-orange-100 flex items-center justify-center">
-                    <span className="font-semibold text-orange-700">3</span>
-                  </div>
-                  <div className="ml-4">
-                    <h3 className="text-lg font-medium">Verification & Processing</h3>
-                    <p className="text-muted-foreground mt-1">
-                      The system verifies the authenticity of the receipt using external APIs and source-specific validation rules.
-                      You can also manually verify and edit details if needed.
-                    </p>
-                  </div>
-                </div>
-                
-                <div className="flex">
-                  <div className="flex-shrink-0 w-10 h-10 rounded-full bg-orange-100 flex items-center justify-center">
-                    <span className="font-semibold text-orange-700">4</span>
-                  </div>
-                  <div className="ml-4">
-                    <h3 className="text-lg font-medium">Integration</h3>
-                    <p className="text-muted-foreground mt-1">
-                      The external receipt is imported into your TradeWiser dashboard with special Orange Channel indicators. 
-                      You maintain a clear distinction between TradeWiser-managed and external receipts.
-                    </p>
-                  </div>
-                </div>
-                
-                <div className="flex">
-                  <div className="flex-shrink-0 w-10 h-10 rounded-full bg-orange-100 flex items-center justify-center">
-                    <span className="font-semibold text-orange-700">5</span>
-                  </div>
-                  <div className="ml-4">
-                    <h3 className="text-lg font-medium">Access to Services</h3>
-                    <p className="text-muted-foreground mt-1">
-                      Use your imported receipt to access TradeWiser services like collateral-based loans, 
-                      ownership transfer, or trading on a single unified platform.
-                    </p>
-                  </div>
-                </div>
-              </div>
-              
-              <div className="mt-8 pt-6 border-t">
-                <Button 
-                  className="bg-orange-600 hover:bg-orange-700"
-                  onClick={() => setIsUploadDialogOpen(true)}
-                >
-                  Upload External Receipt
-                </Button>
-              </div>
-            </div>
-          </TabsContent>
-        </Tabs>
+    <div className="container mx-auto p-6 space-y-6">
+      <div className="mb-6">
+        <h1 className="text-3xl font-bold text-gray-900">Orange Channel - External Receipts</h1>
+        <p className="text-gray-600 mt-2">
+          Import and manage warehouse receipts from external warehouses and trading partners
+        </p>
       </div>
-      
-      {/* Upload Dialog */}
-      <UploadReceiptDialog 
-        isOpen={isUploadDialogOpen} 
-        onClose={() => setIsUploadDialogOpen(false)} 
-      />
-    </MainLayout>
+
+      {/* Upload Section */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Upload className="h-5 w-5 text-orange-600" />
+            Import External Receipt
+          </CardTitle>
+          <CardDescription>
+            Upload warehouse receipts, delivery orders, or quality certificates from external sources
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="receipt-file">Receipt Document</Label>
+            <div className="flex items-center gap-4">
+              <Input
+                id="receipt-file"
+                type="file"
+                ref={fileInputRef}
+                onChange={handleFileSelect}
+                accept=".pdf,.jpg,.jpeg,.png"
+                className="flex-1"
+              />
+              {selectedFile && (
+                <div className="flex items-center gap-2 text-sm text-gray-600">
+                  <FileText className="h-4 w-4" />
+                  {selectedFile.name}
+                </div>
+              )}
+            </div>
+            <p className="text-xs text-gray-500">
+              Supported formats: PDF, JPEG, PNG (Max 10MB)
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="upload-notes">Additional Notes (Optional)</Label>
+            <Textarea
+              id="upload-notes"
+              value={uploadNotes}
+              onChange={(e) => setUploadNotes(e.target.value)}
+              placeholder="Add any additional context or verification details..."
+              rows={3}
+            />
+          </div>
+
+          <Button
+            onClick={handleUpload}
+            disabled={!selectedFile || uploadMutation.isPending}
+            className="w-full bg-orange-600 hover:bg-orange-700"
+          >
+            {uploadMutation.isPending ? (
+              <>Processing...</>
+            ) : (
+              <>
+                <Upload className="h-4 w-4 mr-2" />
+                Import External Receipt
+              </>
+            )}
+          </Button>
+        </CardContent>
+      </Card>
+
+      {/* Existing External Receipts */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Imported External Receipts</CardTitle>
+          <CardDescription>
+            Manage your imported external warehouse receipts and trading documents
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {loadingReceipts ? (
+            <div className="text-center py-8">
+              <div className="animate-spin w-8 h-8 border-4 border-orange-200 border-t-orange-600 rounded-full mx-auto"></div>
+              <p className="text-gray-500 mt-4">Loading external receipts...</p>
+            </div>
+          ) : externalReceipts && externalReceipts.length > 0 ? (
+            <div className="space-y-4">
+              {externalReceipts.map((receipt) => (
+                <div
+                  key={receipt.id}
+                  className="border rounded-lg p-4 hover:bg-gray-50 transition-colors"
+                >
+                  <div className="flex items-start justify-between">
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-3">
+                        <FileText className="h-5 w-5 text-orange-600" />
+                        <span className="font-medium">{receipt.receiptNumber}</span>
+                        <span className={`px-2 py-1 text-xs rounded-md ${getStatusColor(receipt.status)}`}>
+                          {receipt.status}
+                        </span>
+                      </div>
+                      <div className="text-sm text-gray-600 space-y-1">
+                        <p><span className="font-medium">Commodity:</span> {receipt.commodityName}</p>
+                        <p><span className="font-medium">Quantity:</span> {receipt.quantity} MT</p>
+                        <p><span className="font-medium">Valuation:</span> {formatCurrency(receipt.valuation)}</p>
+                        <p><span className="font-medium">Source:</span> {receipt.externalSource}</p>
+                        <p><span className="font-medium">Imported:</span> {new Date(receipt.createdAt).toLocaleDateString()}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Button variant="outline" size="sm">
+                        <Eye className="h-4 w-4 mr-1" />
+                        View
+                      </Button>
+                      {receipt.attachmentUrl && (
+                        <Button variant="outline" size="sm">
+                          <Download className="h-4 w-4 mr-1" />
+                          Download
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-8">
+              <FileText className="h-12 w-12 text-gray-300 mx-auto mb-4" />
+              <p className="text-gray-500 mb-2">No external receipts imported yet</p>
+              <p className="text-sm text-gray-400">
+                Upload your first external warehouse receipt to get started
+              </p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Orange Channel Features */}
+      <div className="grid md:grid-cols-3 gap-6">
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">Document Verification</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              <div className="flex items-center gap-3">
+                <CheckCircle className="h-5 w-5 text-green-600" />
+                <span className="text-sm">OCR Processing</span>
+              </div>
+              <div className="flex items-center gap-3">
+                <CheckCircle className="h-5 w-5 text-green-600" />
+                <span className="text-sm">Data Extraction</span>
+              </div>
+              <div className="flex items-center gap-3">
+                <AlertCircle className="h-5 w-5 text-yellow-600" />
+                <span className="text-sm">Blockchain Verification</span>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">Integration Status</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              <div className="flex items-center gap-3">
+                <CheckCircle className="h-5 w-5 text-green-600" />
+                <span className="text-sm">File Upload Ready</span>
+              </div>
+              <div className="flex items-center gap-3">
+                <CheckCircle className="h-5 w-5 text-green-600" />
+                <span className="text-sm">Multi-format Support</span>
+              </div>
+              <div className="flex items-center gap-3">
+                <CheckCircle className="h-5 w-5 text-green-600" />
+                <span className="text-sm">Auto-valuation (₹50/kg)</span>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">Channel Benefits</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              <div className="flex items-center gap-3">
+                <CheckCircle className="h-5 w-5 text-green-600" />
+                <span className="text-sm">External Warehouse Integration</span>
+              </div>
+              <div className="flex items-center gap-3">
+                <CheckCircle className="h-5 w-5 text-green-600" />
+                <span className="text-sm">Cross-platform Interoperability</span>
+              </div>
+              <div className="flex items-center gap-3">
+                <CheckCircle className="h-5 w-5 text-green-600" />
+                <span className="text-sm">Unified Receipt Management</span>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    </div>
   );
 }

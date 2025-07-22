@@ -359,7 +359,7 @@ export default function DepositFlow({
         status: "processing", // Initial status
         channelType: "green", // Default channel
         quantity: quantityString, // Send as string to match API expectations
-        valuation: (quantityValue * 2100).toString(), // Also convert valuation to string
+        valuation: (quantityValue * 50).toString(), // Rs 50 per kg standard rate
         // Add pickup/delivery details
         depositDetails: {
           pickupDate,
@@ -383,7 +383,7 @@ export default function DepositFlow({
         scheduledDate: pickupDate,
         scheduledTime: useWarehouseDelivery ? null : pickupTime,
         pickupAddress: useWarehouseDelivery ? null : pickupAddress,
-        estimatedValue: quantityValue * 2100, // Estimated value calculation
+        estimatedValue: quantityValue * 50, // Rs 50 per kg standard rate
         qualityParameters: selectedQualityParams,
         notes: data.notes || ""
       };

@@ -40,29 +40,34 @@ export function CommoditySelector({ value, onChange, onCategorySelect, placehold
 
   // Advanced filter commodities based on search with fuzzy matching
   const filteredCommodities = useMemo(() => {
-    if (!searchValue) return categorizedCommodities;
+    if (!searchValue.trim()) return categorizedCommodities;
     
     const searchLower = searchValue.toLowerCase().trim();
     const filtered: Record<string, Commodity[]> = {};
     
     Object.entries(categorizedCommodities).forEach(([category, items]) => {
       const matchingItems = items.filter(item => {
-        // Exact matches
+        // Full name matches
+        const fullName = `${item.english} (${item.hindi})`.toLowerCase();
+        if (fullName.includes(searchLower)) return true;
+        
+        // Individual field matches
         if (item.english.toLowerCase().includes(searchLower) ||
             item.hindi.includes(searchValue) ||
             category.toLowerCase().includes(searchLower)) {
           return true;
         }
         
-        // Fuzzy matching for common variations
-        const englishWords = item.english.toLowerCase().split(' ');
-        const searchWords = searchLower.split(' ');
+        // Word-based fuzzy matching
+        const englishWords = item.english.toLowerCase().split(/\s+/);
+        const searchWords = searchLower.split(/\s+/).filter(w => w.length > 0);
         
-        // Check if any search word matches any commodity word
+        // Check if search matches start of any word or vice versa
         return searchWords.some(searchWord => 
           englishWords.some(commodityWord => 
-            commodityWord.startsWith(searchWord) || 
-            searchWord.startsWith(commodityWord)
+            (searchWord.length >= 2 && commodityWord.startsWith(searchWord)) ||
+            (commodityWord.length >= 2 && searchWord.startsWith(commodityWord)) ||
+            commodityWord.includes(searchWord)
           )
         );
       });
