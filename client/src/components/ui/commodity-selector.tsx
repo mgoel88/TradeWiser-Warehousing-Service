@@ -58,10 +58,38 @@ export function CommoditySelector({ value, onChange, onCategorySelect, placehold
         const fullName = `${item.english} (${item.hindi})`.toLowerCase();
         if (fullName.includes(searchLower)) return true;
         
-        // Individual field matches
-        if (item.english.toLowerCase().includes(searchLower) ||
-            item.hindi.includes(searchValue) ||
-            category.toLowerCase().includes(searchLower)) {
+        // Enhanced search matching
+        const englishMatch = item.english.toLowerCase().includes(searchLower);
+        const hindiMatch = item.hindi.includes(searchValue);
+        const categoryMatch = category.toLowerCase().includes(searchLower);
+        
+        // Transliteration-like matching (basic phonetic matching)
+        const transliterationMatches = () => {
+          const transliterationMap: Record<string, string[]> = {
+            'rice': ['चावल', 'chawal'],
+            'wheat': ['गेहूं', 'gehun'],
+            'maize': ['मक्का', 'makka'],
+            'sorghum': ['ज्वार', 'jwar'],
+            'barley': ['जौ', 'jau'],
+            'chickpea': ['चना', 'chana'],
+            'turmeric': ['हल्दी', 'haldi'],
+            'cumin': ['जीरा', 'jeera'],
+            'coriander': ['धनिया', 'dhaniya'],
+            'mustard': ['सरसों', 'sarson'],
+            'cotton': ['कपास', 'kapas'],
+            'almond': ['बादाम', 'badam'],
+            'cashew': ['काजू', 'kaju']
+          };
+          
+          const searchKey = item.english.toLowerCase();
+          const variants = transliterationMap[searchKey] || [];
+          return variants.some(variant => 
+            variant.toLowerCase().includes(searchLower) || 
+            searchLower.includes(variant.toLowerCase())
+          );
+        };
+        
+        if (englishMatch || hindiMatch || categoryMatch || transliterationMatches()) {
           return true;
         }
         
@@ -69,7 +97,6 @@ export function CommoditySelector({ value, onChange, onCategorySelect, placehold
         const englishWords = item.english.toLowerCase().split(/\s+/);
         const searchWords = searchLower.split(/\s+/).filter(w => w.length > 0);
         
-        // Check if search matches start of any word or vice versa
         return searchWords.some(searchWord => 
           englishWords.some(commodityWord => 
             (searchWord.length >= 2 && commodityWord.startsWith(searchWord)) ||
@@ -83,6 +110,8 @@ export function CommoditySelector({ value, onChange, onCategorySelect, placehold
         filtered[category] = matchingItems;
       }
     });
+    
+    console.log(`CommoditySelector: Search "${searchValue}" found ${Object.values(filtered).flat().length} results`);
     return filtered;
   }, [categorizedCommodities, searchValue]);
 
@@ -98,6 +127,7 @@ export function CommoditySelector({ value, onChange, onCategorySelect, placehold
 
   const handleSelect = (commodity: Commodity) => {
     const formattedName = formatCommodityName(commodity);
+    console.log('CommoditySelector: Selected commodity:', formattedName, 'Category:', commodity.category);
     onChange(formattedName);
     setSearchValue('');
     setOpen(false);
@@ -144,15 +174,16 @@ export function CommoditySelector({ value, onChange, onCategorySelect, placehold
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-[400px] p-0" align="start">
-        <Command shouldFilter={false}>
+        <Command shouldFilter={false} className="overflow-hidden">
           <CommandInput 
             placeholder="Type to search commodities..." 
             value={searchValue}
             onValueChange={setSearchValue}
+            className="h-9"
           />
-          <CommandList className="max-h-[300px] overflow-y-auto">
+          <CommandList className="max-h-[300px] overflow-y-auto p-1">
             <CommandEmpty>
-              <div className="text-center py-4">
+              <div className="text-center py-6">
                 <p className="text-sm text-muted-foreground mb-2">No commodity found.</p>
                 {searchValue.trim() && (
                   <Button
@@ -171,36 +202,30 @@ export function CommoditySelector({ value, onChange, onCategorySelect, placehold
             </CommandEmpty>
             
             {Object.entries(filteredCommodities).map(([category, items]) => (
-              <CommandGroup key={category} heading={
-                <div className="flex items-center gap-2">
-                  <span className={`px-2 py-1 text-xs rounded-md ${getCategoryColor(category)}`}>
-                    {category}
-                  </span>
-                  <span className="text-xs text-muted-foreground">({items.length})</span>
-                </div>
-              }>
+              <CommandGroup 
+                key={category} 
+                heading={category}
+                className="[&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:py-1.5 [&_[cmdk-group-heading]]:text-xs [&_[cmdk-group-heading]]:font-medium [&_[cmdk-group-heading]]:text-muted-foreground"
+              >
                 {items.map((commodity) => {
                   const isSelected = selectedCommodity?.english === commodity.english;
                   return (
                     <CommandItem
                       key={`${commodity.category}-${commodity.english}`}
-                      value={`${commodity.english} ${commodity.hindi}`}
+                      value={`${commodity.english} ${commodity.hindi} ${commodity.category}`}
                       onSelect={() => handleSelect(commodity)}
-                      className="flex items-center justify-between cursor-pointer"
+                      className="flex items-center justify-between cursor-pointer hover:bg-accent hover:text-accent-foreground px-2 py-1.5"
                     >
-                      <div className="flex items-center gap-2">
-                        <Package className="h-4 w-4 text-muted-foreground" />
-                        <div className="flex flex-col">
-                          <span className="text-sm font-medium">{commodity.english}</span>
-                          <span className="text-xs text-muted-foreground">{commodity.hindi}</span>
+                      <div className="flex items-center gap-2 flex-1 min-w-0">
+                        <Package className="h-4 w-4 text-muted-foreground shrink-0" />
+                        <div className="flex flex-col min-w-0 flex-1">
+                          <span className="text-sm font-medium truncate">{commodity.english}</span>
+                          <span className="text-xs text-muted-foreground truncate">{commodity.hindi}</span>
                         </div>
                       </div>
-                      <Check
-                        className={cn(
-                          "ml-auto h-4 w-4",
-                          isSelected ? "opacity-100" : "opacity-0"
-                        )}
-                      />
+                      {isSelected && (
+                        <Check className="h-4 w-4 shrink-0" />
+                      )}
                     </CommandItem>
                   );
                 })}
