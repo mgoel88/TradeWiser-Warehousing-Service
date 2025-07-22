@@ -34,21 +34,70 @@ export function WarehouseSelector({ warehouses, selectedWarehouse, onSelect }: W
   const [open, setOpen] = useState(false);
   const [searchValue, setSearchValue] = useState("");
 
-  // Enhanced filtering for warehouses
-  const filteredWarehouses = warehouses.filter(warehouse => {
-    if (!searchValue.trim()) return true;
+  // Function to calculate warehouse relevance score
+  const calculateRelevanceScore = (warehouse: Warehouse): number => {
+    let score = 0;
     
-    const searchTerm = searchValue.toLowerCase();
-    return (
-      warehouse.name.toLowerCase().includes(searchTerm) ||
-      warehouse.mandiName?.toLowerCase().includes(searchTerm) ||
-      warehouse.city.toLowerCase().includes(searchTerm) ||
-      warehouse.district?.toLowerCase().includes(searchTerm) ||
-      warehouse.state.toLowerCase().includes(searchTerm) ||
-      warehouse.nearestRailwayStation?.toLowerCase().includes(searchTerm) ||
-      warehouse.primaryCommodities?.some(c => c.toLowerCase().includes(searchTerm))
-    );
-  });
+    // Capacity utilization (prefer warehouses with good availability)
+    const capacity = parseFloat(warehouse.capacity);
+    const available = parseFloat(warehouse.availableSpace);
+    const utilizationRate = (capacity - available) / capacity;
+    
+    // Optimal utilization between 20-80% gets higher score
+    if (utilizationRate >= 0.2 && utilizationRate <= 0.8) {
+      score += 30;
+    } else if (utilizationRate < 0.9) {
+      score += 15;
+    }
+    
+    // Large capacity gets preference
+    if (capacity >= 10000) score += 25;
+    else if (capacity >= 5000) score += 15;
+    else if (capacity >= 1000) score += 5;
+    
+    // Facility quality bonuses
+    if (warehouse.hasGodownFacilities) score += 10;
+    if (warehouse.hasColdStorage) score += 15;
+    if (warehouse.hasGradingFacility) score += 10;
+    
+    // Railway connectivity bonus
+    if (warehouse.nearestRailwayStation && warehouse.railwayDistance) {
+      const distance = parseFloat(warehouse.railwayDistance.replace('km', ''));
+      if (distance <= 2) score += 20;
+      else if (distance <= 5) score += 10;
+      else if (distance <= 10) score += 5;
+    }
+    
+    // Mandi-based warehouses get preference
+    if (warehouse.mandiName) score += 15;
+    
+    // Major agricultural states get bonus
+    const majorStates = ['Haryana', 'Punjab', 'Uttar Pradesh', 'Maharashtra', 'Karnataka', 'Andhra Pradesh'];
+    if (majorStates.includes(warehouse.state)) score += 10;
+    
+    return score;
+  };
+
+  // Enhanced filtering and sorting for warehouses
+  const filteredWarehouses = warehouses
+    .filter(warehouse => {
+      if (!searchValue.trim()) return true;
+      
+      const searchTerm = searchValue.toLowerCase();
+      return (
+        warehouse.name.toLowerCase().includes(searchTerm) ||
+        warehouse.mandiName?.toLowerCase().includes(searchTerm) ||
+        warehouse.city.toLowerCase().includes(searchTerm) ||
+        warehouse.district?.toLowerCase().includes(searchTerm) ||
+        warehouse.state.toLowerCase().includes(searchTerm) ||
+        warehouse.nearestRailwayStation?.toLowerCase().includes(searchTerm) ||
+        warehouse.primaryCommodities?.some(c => c.toLowerCase().includes(searchTerm))
+      );
+    })
+    .sort((a, b) => {
+      // Sort by relevance score (highest first)
+      return calculateRelevanceScore(b) - calculateRelevanceScore(a);
+    });
 
   // Group warehouses by state for better organization
   const warehousesByState = filteredWarehouses.reduce((groups, warehouse) => {
@@ -113,6 +162,20 @@ export function WarehouseSelector({ warehouses, selectedWarehouse, onSelect }: W
         </div>
         
         <div className="max-h-[400px] overflow-y-auto">
+          {!searchValue.trim() && filteredWarehouses.length > 0 && (
+            <div className="px-4 py-2 bg-blue-50 border-b">
+              <div className="flex items-center gap-2 text-sm text-blue-700">
+                <Building2 className="h-4 w-4" />
+                <span className="font-medium">
+                  Top {Math.min(filteredWarehouses.length, 10)} Recommended Warehouses
+                </span>
+              </div>
+              <p className="text-xs text-blue-600 mt-1">
+                Based on capacity, location, facilities, and connectivity
+              </p>
+            </div>
+          )}
+          
           {Object.keys(warehousesByState).length === 0 ? (
             <div className="p-4 text-center text-muted-foreground">
               No warehouses found matching your search.
@@ -120,93 +183,128 @@ export function WarehouseSelector({ warehouses, selectedWarehouse, onSelect }: W
           ) : (
             Object.entries(warehousesByState).map(([state, stateWarehouses]) => (
               <div key={state} className="border-b last:border-b-0">
-                <div className="px-4 py-2 bg-muted font-semibold text-sm">
-                  {state} ({stateWarehouses.length})
+                <div className="px-4 py-2 bg-muted font-semibold text-sm flex items-center justify-between">
+                  <span>{state} ({stateWarehouses.length})</span>
+                  {!searchValue.trim() && (
+                    <span className="text-xs font-normal text-muted-foreground">
+                      Sorted by relevance
+                    </span>
+                  )}
                 </div>
                 
-                {stateWarehouses.map((warehouse) => (
-                  <div 
-                    key={warehouse.id}
-                    className="p-4 hover:bg-muted cursor-pointer border-b last:border-b-0 transition-colors"
-                    onClick={() => {
-                      onSelect(warehouse);
-                      setOpen(false);
-                      setSearchValue("");
-                    }}
-                  >
-                    <div className="space-y-2">
-                      {/* Header */}
-                      <div className="flex justify-between items-start">
-                        <div>
-                          <h4 className="font-semibold">{warehouse.name}</h4>
-                          {warehouse.mandiName && warehouse.mandiName !== warehouse.city && (
-                            <p className="text-sm text-muted-foreground">
-                              Based on {warehouse.mandiName} Mandi
-                            </p>
+                {stateWarehouses.map((warehouse, index) => {
+                  const relevanceScore = calculateRelevanceScore(warehouse);
+                  const isHighRecommended = relevanceScore >= 80;
+                  const isRecommended = relevanceScore >= 60;
+                  
+                  return (
+                    <div 
+                      key={warehouse.id}
+                      className={`p-4 hover:bg-muted cursor-pointer border-b last:border-b-0 transition-colors ${
+                        isHighRecommended ? 'bg-green-50 hover:bg-green-100' : 
+                        isRecommended ? 'bg-blue-50 hover:bg-blue-100' : ''
+                      }`}
+                      onClick={() => {
+                        onSelect(warehouse);
+                        setOpen(false);
+                        setSearchValue("");
+                      }}
+                    >
+                      <div className="space-y-2">
+                        {/* Header */}
+                        <div className="flex justify-between items-start">
+                          <div className="flex items-start gap-2">
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <h4 className="font-semibold">{warehouse.name}</h4>
+                                {isHighRecommended && (
+                                  <Badge className="bg-green-100 text-green-700 text-xs">
+                                    ⭐ Top Choice
+                                  </Badge>
+                                )}
+                                {isRecommended && !isHighRecommended && (
+                                  <Badge className="bg-blue-100 text-blue-700 text-xs">
+                                    Recommended
+                                  </Badge>
+                                )}
+                              </div>
+                              {warehouse.mandiName && warehouse.mandiName !== warehouse.city && (
+                                <p className="text-sm text-muted-foreground">
+                                  Based on {warehouse.mandiName} Mandi
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                          <div className="flex flex-col items-end gap-1">
+                            <Badge className={getWarehouseTypeColor(warehouse.warehouseType)}>
+                              {formatWarehouseType(warehouse.warehouseType)}
+                            </Badge>
+                            {!searchValue.trim() && (
+                              <span className="text-xs text-muted-foreground">
+                                Score: {relevanceScore}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Location Info */}
+                        <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                          <div className="flex items-center gap-1">
+                            <MapPin className="h-3 w-3" />
+                            {warehouse.district && warehouse.district !== warehouse.city ? 
+                              `${warehouse.city}, ${warehouse.district}` : 
+                              warehouse.city
+                            }
+                          </div>
+                          
+                          {warehouse.nearestRailwayStation && (
+                            <div className="flex items-center gap-1">
+                              <Train className="h-3 w-3" />
+                              {warehouse.nearestRailwayStation} 
+                              {warehouse.railwayDistance && ` (${warehouse.railwayDistance})`}
+                            </div>
                           )}
                         </div>
-                        <Badge className={getWarehouseTypeColor(warehouse.warehouseType)}>
-                          {formatWarehouseType(warehouse.warehouseType)}
-                        </Badge>
-                      </div>
 
-                      {/* Location Info */}
-                      <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                        <div className="flex items-center gap-1">
-                          <MapPin className="h-3 w-3" />
-                          {warehouse.district && warehouse.district !== warehouse.city ? 
-                            `${warehouse.city}, ${warehouse.district}` : 
-                            warehouse.city
-                          }
-                        </div>
-                        
-                        {warehouse.nearestRailwayStation && (
+                        {/* Capacity and Facilities */}
+                        <div className="flex items-center justify-between">
                           <div className="flex items-center gap-1">
-                            <Train className="h-3 w-3" />
-                            {warehouse.nearestRailwayStation} 
-                            {warehouse.railwayDistance && ` (${warehouse.railwayDistance} km)`}
+                            <Building2 className="h-3 w-3" />
+                            <span className="text-sm">{getCapacityText(warehouse)}</span>
+                          </div>
+                          
+                          <div className="flex gap-1">
+                            {warehouse.hasGodownFacilities && (
+                              <Badge variant="outline" className="text-xs">Godown</Badge>
+                            )}
+                            {warehouse.hasColdStorage && (
+                              <Badge variant="outline" className="text-xs">Cold Storage</Badge>
+                            )}
+                            {warehouse.hasGradingFacility && (
+                              <Badge variant="outline" className="text-xs">Grading</Badge>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Primary Commodities */}
+                        {warehouse.primaryCommodities && warehouse.primaryCommodities.length > 0 && (
+                          <div className="flex flex-wrap gap-1">
+                            {warehouse.primaryCommodities.slice(0, 4).map((commodity, idx) => (
+                              <Badge key={idx} variant="secondary" className="text-xs">
+                                {commodity}
+                              </Badge>
+                            ))}
+                            {warehouse.primaryCommodities.length > 4 && (
+                              <Badge variant="secondary" className="text-xs">
+                                +{warehouse.primaryCommodities.length - 4} more
+                              </Badge>
+                            )}
                           </div>
                         )}
                       </div>
-
-                      {/* Capacity and Facilities */}
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-1">
-                          <Building2 className="h-3 w-3" />
-                          <span className="text-sm">{getCapacityText(warehouse)}</span>
-                        </div>
-                        
-                        <div className="flex gap-1">
-                          {warehouse.hasGodownFacilities && (
-                            <Badge variant="outline" className="text-xs">Godown</Badge>
-                          )}
-                          {warehouse.hasColdStorage && (
-                            <Badge variant="outline" className="text-xs">Cold Storage</Badge>
-                          )}
-                          {warehouse.hasGradingFacility && (
-                            <Badge variant="outline" className="text-xs">Grading</Badge>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Primary Commodities */}
-                      {warehouse.primaryCommodities && warehouse.primaryCommodities.length > 0 && (
-                        <div className="flex flex-wrap gap-1">
-                          {warehouse.primaryCommodities.slice(0, 4).map((commodity, index) => (
-                            <Badge key={index} variant="secondary" className="text-xs">
-                              {commodity}
-                            </Badge>
-                          ))}
-                          {warehouse.primaryCommodities.length > 4 && (
-                            <Badge variant="secondary" className="text-xs">
-                              +{warehouse.primaryCommodities.length - 4} more
-                            </Badge>
-                          )}
-                        </div>
-                      )}
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             ))
           )}
