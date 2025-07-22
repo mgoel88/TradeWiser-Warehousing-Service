@@ -6,6 +6,7 @@ import { AuthProvider } from "@/context/AuthContext";
 import { WebSocketProvider } from "@/context/WebSocketContext";
 
 // Pages
+import LandingPage from "@/pages/LandingPage";
 import LoginPage from "@/pages/LoginPage";
 import RegisterPage from "@/pages/RegisterPage";
 import NewDashboardPage from "@/pages/NewDashboardPage";
@@ -32,7 +33,7 @@ function Router() {
     <Switch>
       <Route path="/login" component={LoginPage} />
       <Route path="/register" component={RegisterPage} />
-      <Route path="/" component={NewDashboardPage} />
+      <Route path="/" component={LandingPage} />
       <Route path="/dashboard" component={NewDashboardPage} />
       <Route path="/warehouses" component={WarehousePage} />
       <Route path="/receipts" component={ReceiptsPage} />

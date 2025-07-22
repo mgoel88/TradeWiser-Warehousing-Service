@@ -18,16 +18,16 @@ TradeWiser is a comprehensive blockchain-powered agricultural commodity platform
 - **Containerization**: Docker with multi-service compose setup
 
 ## Recent Changes  
+- **2025-07-22**: Built complete modern companion website with TradeWiser branding and clean design
+- **2025-07-22**: Implemented professional landing page with hero section, services overview, and integrated login
+- **2025-07-22**: Created fully functional Orange Channel import receipt workflow for external warehouse interoperability
+- **2025-07-22**: Added `/api/receipts/upload` endpoint with multer file handling for receipt document processing
+- **2025-07-22**: Enhanced UI with Orange Channel branding, detailed workflow explanations, and proper error handling
+- **2025-07-22**: Fixed schema compatibility issues and updated warehouse receipt structure for external imports
 - **2025-07-22**: Implemented comprehensive contextual help overlay system for complex agricultural processes
 - **2025-07-22**: Created ProcessStatusVisualization component with intuitive stage progression indicators
 - **2025-07-22**: Added ProcessActions component for handling completed deposit workflows with clear next steps
 - **2025-07-22**: Built contextual tooltips for form fields with agricultural commodity best practices
-- **2025-07-22**: Integrated help buttons throughout the UI for easy access to process guidance
-- **2025-07-22**: Added detailed help content covering all 8 stages of the deposit workflow
-- **2025-07-22**: Enhanced user experience with non-intrusive help system and visual progress indicators
-- **2025-07-22**: Fixed critical JSON parsing error that was blocking deposit functionality
-- **2025-07-22**: Streamlined deposit flow from confusing two-step API process to single streamlined call
-- **2025-07-22**: Enhanced error handling in queryClient.ts for graceful non-JSON response handling
 - **2025-01-13**: Created comprehensive Ubuntu Docker compatibility setup
 - **2025-01-13**: Fixed Dockerfile build issues with proper multi-stage configuration
 - **2025-01-13**: Enhanced start.sh with cross-platform Docker Compose detection
