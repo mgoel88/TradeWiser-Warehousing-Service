@@ -5,11 +5,14 @@ import MainLayout from '@/components/layout/MainLayout';
 import DepositFlow from '@/components/deposit/DepositFlow';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Loader2 } from 'lucide-react';
+import HelpButton from '@/components/help/HelpButton';
+import HelpOverlay from '@/components/help/HelpOverlay';
 import { getQueryFn } from '@/lib/queryClient';
 import { Warehouse } from '@shared/schema';
 
 export default function DepositPage() {
   const [userLocation, setUserLocation] = useState<[number, number] | null>(null);
+  const [isHelpOpen, setIsHelpOpen] = useState(false);
   const [location] = useLocation();
   
   // Parse URL query parameters
@@ -75,7 +78,13 @@ export default function DepositPage() {
   return (
     <MainLayout>
       <div className="container mx-auto py-4">
-        <h1 className="text-2xl font-bold mb-6">Deposit Commodity</h1>
+        <div className="flex items-center justify-between mb-6">
+          <h1 className="text-2xl font-bold">Deposit Commodity</h1>
+          <HelpButton 
+            onClick={() => setIsHelpOpen(true)} 
+            showLabel={true}
+          />
+        </div>
         
         {warehouses && warehouses.length > 0 ? (
           <DepositFlow 
@@ -95,6 +104,14 @@ export default function DepositPage() {
             </CardHeader>
           </Card>
         )}
+        
+        {/* Help Overlay */}
+        <HelpOverlay
+          isOpen={isHelpOpen}
+          onClose={() => setIsHelpOpen(false)}
+          currentStage="deposit_overview"
+          processType="deposit"
+        />
       </div>
     </MainLayout>
   );

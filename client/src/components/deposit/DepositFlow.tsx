@@ -23,6 +23,9 @@ import {
 import { calculateDistance } from "@/lib/utils";
 import DepositProgress from "./DepositProgress";
 import LocationPicker from "./LocationPicker";
+import ContextualTooltip from "../help/ContextualTooltip";
+import HelpButton from "../help/HelpButton";
+import HelpOverlay from "../help/HelpOverlay";
 
 // Create schema for the deposit form
 const depositCommoditySchema = z.object({
@@ -74,6 +77,7 @@ export default function DepositFlow({
   const [_, setLocation] = useLocation();
   const [currentStep, setCurrentStep] = useState<DepositStep>(DepositStep.CommodityDetails);
   const [selectedWarehouse, setSelectedWarehouse] = useState<Warehouse | null>(null);
+  const [isHelpOpen, setIsHelpOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [pickupDate, setPickupDate] = useState<string>("");
   const [pickupTime, setPickupTime] = useState<string>("");
@@ -499,16 +503,22 @@ export default function DepositFlow({
         {currentStep === DepositStep.CommodityDetails && (
           <Card>
             <CardHeader>
-              <div className="flex items-center">
-                <Button variant="ghost" size="icon" onClick={handlePreviousStep} className="mr-2">
-                  <ArrowLeft className="h-4 w-4" />
-                </Button>
-                <div>
-                  <CardTitle>Commodity Details</CardTitle>
-                  <CardDescription>
-                    Provide information about the commodity you want to deposit
-                  </CardDescription>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center">
+                  <Button variant="ghost" size="icon" onClick={handlePreviousStep} className="mr-2">
+                    <ArrowLeft className="h-4 w-4" />
+                  </Button>
+                  <div>
+                    <CardTitle>Commodity Details</CardTitle>
+                    <CardDescription>
+                      Provide information about the commodity you want to deposit
+                    </CardDescription>
+                  </div>
                 </div>
+                <HelpButton 
+                  onClick={() => setIsHelpOpen(true)} 
+                  showLabel={true}
+                />
               </div>
             </CardHeader>
 
@@ -520,7 +530,19 @@ export default function DepositFlow({
                     name="name"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Commodity Name</FormLabel>
+                        <FormLabel>
+                          <ContextualTooltip
+                            title="Commodity Name"
+                            description="The specific agricultural product you want to store. This should match standard commodity classifications."
+                            tips={[
+                              "Use standard names like 'Wheat', 'Rice', 'Maize', 'Barley'",
+                              "Avoid brand names or local varieties",
+                              "This helps in accurate quality assessment and pricing"
+                            ]}
+                          >
+                            Commodity Name
+                          </ContextualTooltip>
+                        </FormLabel>
                         <FormControl>
                           <Input placeholder="e.g. Wheat" {...field} />
                         </FormControl>
@@ -565,7 +587,19 @@ export default function DepositFlow({
                       name="quantity"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Quantity</FormLabel>
+                          <FormLabel>
+                            <ContextualTooltip
+                              title="Quantity"
+                              description="The total weight of commodity you want to deposit. This will be verified during quality assessment."
+                              tips={[
+                                "Enter the approximate weight in metric tons (MT)",
+                                "Final weight will be confirmed during warehouse intake",
+                                "Minimum quantity is 0.1 MT for most commodities"
+                              ]}
+                            >
+                              Quantity
+                            </ContextualTooltip>
+                          </FormLabel>
                           <FormControl>
                             <Input 
                               type="number" 
@@ -963,6 +997,14 @@ export default function DepositFlow({
           </Card>
         )}
       </div>
+      
+      {/* Help Overlay */}
+      <HelpOverlay
+        isOpen={isHelpOpen}
+        onClose={() => setIsHelpOpen(false)}
+        currentStage="commodity_details"
+        processType="deposit_form"
+      />
     </div>
   );
 }

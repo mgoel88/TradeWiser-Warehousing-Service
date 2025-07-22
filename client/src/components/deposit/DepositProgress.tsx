@@ -13,6 +13,8 @@ import WarehouseProcessFlow from './WarehouseProcessFlow';
 import { BypassDemo } from './BypassDemo';
 import ProcessStatusVisualization from './ProcessStatusVisualization';
 import ProcessActions from './ProcessActions';
+import HelpOverlay from '../help/HelpOverlay';
+import HelpButton from '../help/HelpButton';
 
 interface DepositProgressProps {
   processId: number;
@@ -23,6 +25,7 @@ export default function DepositProgress({ processId }: DepositProgressProps) {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isLive, setIsLive] = useState(false);
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
+  const [isHelpOpen, setIsHelpOpen] = useState(false);
   const socketRef = useRef<WebSocket | null>(null);
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -332,16 +335,22 @@ export default function DepositProgress({ processId }: DepositProgressProps) {
               >
                 {process.status.replace('_', ' ').toUpperCase()}
               </Badge>
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                onClick={handleRefresh} 
-                disabled={isRefreshing}
-                className="h-7 px-2 text-xs"
-              >
-                <RefreshCw className={`h-3 w-3 mr-1 ${isRefreshing ? 'animate-spin' : ''}`} />
-                Refresh
-              </Button>
+              <div className="flex items-center space-x-2">
+                <HelpButton 
+                  onClick={() => setIsHelpOpen(true)}
+                  className="h-7 px-2 text-xs"
+                />
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={handleRefresh} 
+                  disabled={isRefreshing}
+                  className="h-7 px-2 text-xs"
+                >
+                  <RefreshCw className={`h-3 w-3 mr-1 ${isRefreshing ? 'animate-spin' : ''}`} />
+                  Refresh
+                </Button>
+              </div>
             </div>
           </div>
         </CardHeader>
@@ -504,6 +513,14 @@ export default function DepositProgress({ processId }: DepositProgressProps) {
         />
         </CardContent>
       </Card>
+      
+      {/* Help Overlay */}
+      <HelpOverlay
+        isOpen={isHelpOpen}
+        onClose={() => setIsHelpOpen(false)}
+        currentStage={process.currentStage}
+        processType={process.processType}
+      />
     </div>
   );
 }
