@@ -38,89 +38,110 @@ async function seedTestData() {
       console.log("Test user already exists:", testUser.username);
     }
 
-    // Create warehouses
-    const warehouseData = [
-      {
-        name: 'Delhi Central Warehouse',
-        address: 'Industrial Area, Phase 1',
-        city: 'Delhi',
-        state: 'Delhi',
-        pincode: '110001',
-        latitude: '28.6139',
-        longitude: '77.2090',
-        capacity: '10000',
-        availableSpace: '7500',
-        channelType: 'green',
-        specializations: ['grain', 'pulses'],
-        facilities: ['temperature_control', 'pest_control', 'security']
-      },
-      {
-        name: 'Mumbai Port Warehouse',
-        address: 'Dock Area, Mumbai Port',
-        city: 'Mumbai',
-        state: 'Maharashtra',
-        pincode: '400001',
-        latitude: '18.9442',
-        longitude: '72.8310',
-        capacity: '15000',
-        availableSpace: '8000',
-        channelType: 'green',
-        specializations: ['grain', 'oilseeds'],
-        facilities: ['loading_dock', 'security', 'pest_control']
-      },
-      {
-        name: 'Kolkata East Warehouse',
-        address: 'Eastern Metropolitan Bypass',
-        city: 'Kolkata',
-        state: 'West Bengal',
-        pincode: '700107',
-        latitude: '22.5726',
-        longitude: '88.3639',
-        capacity: '8000',
-        availableSpace: '4000',
-        channelType: 'green',
-        specializations: ['rice', 'jute'],
-        facilities: ['humidity_control', 'pest_control']
+    // Seed comprehensive mandi-based warehouses
+    console.log("Seeding mandi-based warehouses...");
+    const existingWarehouses = await storage.listWarehouses();
+    
+    let warehouses = [];
+    if (existingWarehouses.length < 10) { // Only seed if we don't have many warehouses
+      try {
+        const seededCount = await storage.seedMandiWarehouses();
+        console.log(`Seeded ${seededCount} mandi-based warehouses`);
+        warehouses = await storage.listWarehouses();
+      } catch (error) {
+        console.log("Error seeding mandi warehouses, falling back to basic warehouses");
+        
+        // Fallback to basic warehouses if seeding fails
+        const warehouseData = [
+          {
+            name: 'Delhi Central Warehouse',
+            address: 'Industrial Area, Phase 1',
+            city: 'Delhi',
+            district: 'New Delhi',
+            state: 'Delhi',
+            pincode: '110001',
+            latitude: '28.6139',
+            longitude: '77.2090',
+            capacity: '10000',
+            availableSpace: '7500',
+            channelType: 'green',
+            warehouseType: 'terminal_market',
+            regulationStatus: 'regulated',
+            primaryCommodities: ['grain', 'pulses'],
+            facilities: ['temperature_control', 'pest_control', 'security']
+          },
+          {
+            name: 'Mumbai Port Warehouse',
+            address: 'Dock Area, Mumbai Port',
+            city: 'Mumbai',
+            district: 'Mumbai',
+            state: 'Maharashtra',
+            pincode: '400001',
+            latitude: '18.9442',
+            longitude: '72.8310',
+            capacity: '15000',
+            availableSpace: '8000',
+            channelType: 'green',
+            warehouseType: 'terminal_market',
+            regulationStatus: 'regulated',
+            primaryCommodities: ['grain', 'oilseeds'],
+            facilities: ['loading_dock', 'security', 'pest_control']
+          },
+          {
+            name: 'Kolkata East Warehouse',
+            address: 'Eastern Metropolitan Bypass',
+            city: 'Kolkata',
+            district: 'Kolkata',
+            state: 'West Bengal',
+            pincode: '700107',
+            latitude: '22.5726',
+            longitude: '88.3639',
+            capacity: '8000',
+            availableSpace: '4000',
+            channelType: 'green',
+            warehouseType: 'primary_market',
+            regulationStatus: 'regulated',
+            primaryCommodities: ['rice', 'jute'],
+            facilities: ['humidity_control', 'pest_control']
+          }
+        ];
+
+        for (const data of warehouseData) {
+          const exists = existingWarehouses.some(w => w.name === data.name);
+          if (!exists) {
+            const warehouseInsertData: InsertWarehouse = {
+              name: data.name,
+              address: data.address,
+              city: data.city,
+              district: data.district,
+              state: data.state,
+              pincode: data.pincode,
+              latitude: data.latitude,
+              longitude: data.longitude,
+              capacity: data.capacity,
+              availableSpace: data.availableSpace,
+              channelType: data.channelType as 'green' | 'orange' | 'red',
+              warehouseType: data.warehouseType as any,
+              regulationStatus: data.regulationStatus as any,
+              primaryCommodities: data.primaryCommodities,
+              specializations: [],
+              facilities: data.facilities,
+              ownerId: testUser.id,
+              hasGodownFacilities: true,
+              hasColdStorage: false,
+              hasGradingFacility: false,
+              isActive: true,
+              verificationStatus: "verified"
+            };
+            const warehouse = await storage.createWarehouse(warehouseInsertData);
+            warehouses.push(warehouse);
+            console.log(`Created warehouse: ${warehouse.name}`);
+          }
+        }
       }
-    ];
-
-    const warehouses = [];
-    for (const data of warehouseData) {
-      // Check if warehouse already exists
-      const existingWarehouses = await storage.listWarehouses();
-      const exists = existingWarehouses.some(w => w.name === data.name);
-
-      if (!exists) {
-        const warehouseInsertData: InsertWarehouse = {
-          name: data.name,
-          address: data.address,
-          city: data.city,
-          state: data.state,
-          pincode: data.pincode,
-          latitude: data.latitude,
-          longitude: data.longitude,
-          capacity: data.capacity,
-          availableSpace: data.availableSpace,
-          channelType: data.channelType as 'green' | 'orange' | 'red',
-          ownerId: testUser.id,
-          specializations: data.specializations,
-          facilities: data.facilities
-        };
-        const warehouse = await storage.createWarehouse(warehouseInsertData);
-        warehouses.push(warehouse);
-        console.log(`Created warehouse: ${warehouse.name}`);
-      } else {
-        console.log(`Warehouse already exists: ${data.name}`);
-        // Add the existing warehouse to our array
-        const existingWarehouse = existingWarehouses.find(w => w.name === data.name);
-        if (existingWarehouse) warehouses.push(existingWarehouse);
-      }
-    }
-
-    // Get all warehouses (including previously created ones) if our array is empty
-    if (warehouses.length === 0) {
-      const allWarehouses = await storage.listWarehouses();
-      warehouses.push(...allWarehouses);
+    } else {
+      console.log(`Using existing ${existingWarehouses.length} warehouses`);
+      warehouses = existingWarehouses;
     }
 
     // Create commodity data for test user

@@ -117,22 +117,49 @@ export const users = pgTable('users', {
 });
 
 // Warehouse table
+export const warehouseTypeEnum = pgEnum('warehouse_type', ['primary_market', 'secondary_market', 'terminal_market', 'processing_unit']);
+export const regulationStatusEnum = pgEnum('regulation_status', ['regulated', 'non_regulated', 'private']);
+
 export const warehouses = pgTable('warehouses', {
   id: serial('id').primaryKey(),
   name: text('name').notNull(),
+  mandiName: text('mandi_name'), // Original mandi name from directory
   address: text('address').notNull(),
   city: text('city').notNull(),
+  district: text('district').notNull(),
   state: text('state').notNull(),
-  pincode: text('pincode').notNull(),
-  latitude: numeric('latitude', { precision: 10, scale: 6 }).notNull(),
-  longitude: numeric('longitude', { precision: 10, scale: 6 }).notNull(),
+  pincode: text('pincode'),
+  latitude: numeric('latitude', { precision: 10, scale: 6 }),
+  longitude: numeric('longitude', { precision: 10, scale: 6 }),
   capacity: numeric('capacity', { precision: 12, scale: 2 }).notNull(),
   availableSpace: numeric('available_space', { precision: 12, scale: 2 }).notNull(),
   channelType: channelTypeEnum('channel_type').notNull(),
+  warehouseType: warehouseTypeEnum('warehouse_type').notNull().default('primary_market'),
+  regulationStatus: regulationStatusEnum('regulation_status').notNull().default('regulated'),
+  
+  // Market infrastructure
+  nearestRailwayStation: text('nearest_railway_station'),
+  railwayDistance: numeric('railway_distance', { precision: 8, scale: 2 }), // in km
+  hasGodownFacilities: boolean('has_godown_facilities').default(false),
+  hasColdStorage: boolean('has_cold_storage').default(false),
+  hasGradingFacility: boolean('has_grading_facility').default(false),
+  
+  // Contact information
+  phoneNumber: text('phone_number'),
+  licenseNumber: text('license_number'),
+  
+  // Commodities handled
+  primaryCommodities: json('primary_commodities'), // Array of main commodities
+  specializations: json('specializations'), // Additional specializations
+  facilities: json('facilities'), // Additional facilities
+  
+  // Operational details
   ownerId: integer('owner_id').references(() => users.id),
-  specializations: json('specializations'),
-  facilities: json('facilities'),
+  isActive: boolean('is_active').default(true),
+  verificationStatus: text('verification_status').default('verified'),
+  
   createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
 });
 
 // Commodity table

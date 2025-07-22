@@ -138,6 +138,57 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Enhanced warehouse query endpoints - fix route ordering
+  apiRouter.get("/warehouses/by-state/:state", async (req: Request, res: Response) => {
+    try {
+      const state = req.params.state;
+      console.log(`Fetching warehouses for state: ${state}`);
+      const warehouses = await storage.getWarehousesByState(state);
+      console.log(`Found ${warehouses.length} warehouses in ${state}`);
+      res.json(warehouses);
+    } catch (error) {
+      console.error("Error fetching warehouses by state:", error);
+      res.status(500).json({ message: "Failed to fetch warehouses by state" });
+    }
+  });
+
+  apiRouter.get("/warehouses/by-district/:district", async (req: Request, res: Response) => {
+    try {
+      const district = req.params.district;
+      const warehouses = await storage.getWarehousesByDistrict(district);
+      res.json(warehouses);
+    } catch (error) {
+      console.error("Error fetching warehouses by district:", error);
+      res.status(500).json({ message: "Failed to fetch warehouses by district" });
+    }
+  });
+
+  apiRouter.get("/warehouses/by-commodity/:commodity", async (req: Request, res: Response) => {
+    try {
+      const commodity = req.params.commodity;
+      const warehouses = await storage.getWarehousesByCommodity(commodity);
+      res.json(warehouses);
+    } catch (error) {
+      console.error("Error fetching warehouses by commodity:", error);
+      res.status(500).json({ message: "Failed to fetch warehouses by commodity" });
+    }
+  });
+
+  // Seed mandi warehouses endpoint
+  apiRouter.post("/warehouses/seed-mandi-data", async (req: Request, res: Response) => {
+    try {
+      // Clear existing warehouses first (optional, can be removed if needed)
+      const seededCount = await storage.seedMandiWarehouses();
+      res.json({ 
+        message: `Successfully seeded ${seededCount} mandi-based warehouses`,
+        count: seededCount 
+      });
+    } catch (error) {
+      console.error("Error seeding mandi warehouses:", error);
+      res.status(500).json({ message: "Failed to seed mandi warehouses" });
+    }
+  });
+
   // Commodity routes
   apiRouter.get("/commodities", async (req: Request, res: Response) => {
     try {

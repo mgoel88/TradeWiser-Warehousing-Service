@@ -27,6 +27,7 @@ import ContextualTooltip from "../help/ContextualTooltip";
 import HelpButton from "../help/HelpButton";
 import HelpOverlay from "../help/HelpOverlay";
 import { CommoditySelector, type Commodity } from '@/components/ui/commodity-selector';
+import { WarehouseSelector } from '@/components/warehouse/WarehouseSelector';
 import commoditiesData from '@shared/commodities.json';
 
 // Create schema for the deposit form
@@ -459,90 +460,84 @@ export default function DepositFlow({
 
       <div className="mt-8">
         {currentStep === DepositStep.SelectWarehouse && (
-          <Card className="w-full">
+          <Card>
             <CardHeader>
-              <div className="flex items-center">
-                <Button variant="ghost" size="icon" onClick={handlePreviousStep} className="mr-2">
-                  <ArrowLeft className="h-4 w-4" />
-                </Button>
-                <div>
-                  <CardTitle>Select a Warehouse</CardTitle>
-                  <CardDescription>
-                    Choose a warehouse closest to you or based on your requirements
-                  </CardDescription>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center">
+                  <Button variant="ghost" size="icon" onClick={handlePreviousStep} className="mr-2">
+                    <ArrowLeft className="h-4 w-4" />
+                  </Button>
+                  <div>
+                    <CardTitle>Select Warehouse</CardTitle>
+                    <CardDescription>
+                      Choose from our network of authentic Indian mandi-based warehouse facilities
+                    </CardDescription>
+                  </div>
                 </div>
-              </div>
-
-              <div className="relative mt-4">
-                <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Search warehouses by name, city or state..."
-                  className="pl-8"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
+                <HelpButton 
+                  onClick={() => setIsHelpOpen(true)} 
+                  showLabel={true}
                 />
               </div>
             </CardHeader>
 
-            <CardContent>
-              <ScrollArea className="h-[400px] pr-4">
-                <div className="grid gap-4">
-                  {filteredWarehouses.length > 0 ? (
-                    filteredWarehouses.map((warehouse) => {
-                      // Calculate distance if user location is available
-                      let distanceText = "";
-                      if (userLocation) {
-                        const distance = calculateDistance(
-                          userLocation[0],
-                          userLocation[1],
-                          parseFloat(warehouse.latitude),
-                          parseFloat(warehouse.longitude)
-                        );
-                        distanceText = `${distance.toFixed(1)} km away`;
-                      }
-
-                      return (
-                        <Card
-                          key={warehouse.id}
-                          className="cursor-pointer hover:bg-accent/20 transition-colors"
-                          onClick={() => handleSelectWarehouse(warehouse)}
-                        >
-                          <CardContent className="p-4 flex items-start justify-between">
-                            <div>
-                              <div className="flex items-center mb-1">
-                                <div className={`h-3 w-3 rounded-full mr-2 ${getChannelClass(warehouse.channelType)}`} />
-                                <h3 className="font-medium">{warehouse.name}</h3>
-                              </div>
-                              <p className="text-sm text-muted-foreground">{formatAddress(warehouse)}</p>
-                              <div className="flex flex-wrap gap-1 mt-2">
-                                {Array.isArray((warehouse.specializations as any)?.crops) ? 
-                                  (warehouse.specializations as any).crops.map((crop: string, i: number) => (
-                                    <span key={i} className="bg-primary/10 text-primary text-xs px-2 py-0.5 rounded">
-                                      {crop}
-                                    </span>
-                                  ))
-                                : <span className="text-xs text-muted-foreground">No specializations</span>}
-                              </div>
-                            </div>
-                            <div className="text-right">
-                              <span className="text-sm text-muted-foreground">{distanceText}</span>
-                              <p className="text-sm mt-1">
-                                <span className="font-medium">{warehouse.availableSpace}</span>
-                                /{warehouse.capacity} MT
-                              </p>
-                            </div>
-                          </CardContent>
-                        </Card>
-                      );
-                    })
-                  ) : (
-                    <div className="text-center py-8">
-                      <p className="text-muted-foreground">No warehouses found matching your search criteria</p>
+            <CardContent className="space-y-6">
+              <div>
+                <label className="text-sm font-medium mb-2 block">Choose Warehouse</label>
+                <WarehouseSelector
+                  warehouses={warehouses}
+                  selectedWarehouse={selectedWarehouse}
+                  onSelect={handleSelectWarehouse}
+                />
+              </div>
+              
+              {selectedWarehouse && (
+                <Card className="border-2 border-primary/20 bg-primary/5">
+                  <CardContent className="p-4">
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <h3 className="font-semibold text-lg">{selectedWarehouse.name}</h3>
+                        {(selectedWarehouse as any).mandiName && (selectedWarehouse as any).mandiName !== selectedWarehouse.city && (
+                          <p className="text-sm text-muted-foreground">
+                            Based on {(selectedWarehouse as any).mandiName} Mandi
+                          </p>
+                        )}
+                        <div className="flex items-center gap-4 mt-2 text-sm text-muted-foreground">
+                          <div className="flex items-center gap-1">
+                            <MapPin className="h-3 w-3" />
+                            {(selectedWarehouse as any).district && (selectedWarehouse as any).district !== selectedWarehouse.city ? 
+                              `${selectedWarehouse.city}, ${(selectedWarehouse as any).district}` : 
+                              selectedWarehouse.city
+                            }
+                          </div>
+                          {userLocation && selectedWarehouse.latitude && selectedWarehouse.longitude && (
+                            <span>
+                              {calculateDistance(
+                                userLocation[0],
+                                userLocation[1],
+                                parseFloat(selectedWarehouse.latitude),
+                                parseFloat(selectedWarehouse.longitude)
+                              ).toFixed(1)} km away
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <Check className="h-6 w-6 text-primary" />
                     </div>
-                  )}
-                </div>
-              </ScrollArea>
+                  </CardContent>
+                </Card>
+              )}
             </CardContent>
+            
+            <CardFooter>
+              <Button 
+                className="w-full" 
+                onClick={handleNextStep}
+                disabled={!selectedWarehouse}
+              >
+                Continue to Pickup Schedule
+              </Button>
+            </CardFooter>
           </Card>
         )}
 

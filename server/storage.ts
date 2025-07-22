@@ -57,7 +57,11 @@ export interface IStorage {
   createWarehouse(warehouse: InsertWarehouse): Promise<Warehouse>;
   listWarehouses(): Promise<Warehouse[]>;
   listWarehousesByLocation(latitude: number, longitude: number, radius: number): Promise<Warehouse[]>;
+  getWarehousesByState(state: string): Promise<Warehouse[]>;
+  getWarehousesByDistrict(district: string): Promise<Warehouse[]>;
+  getWarehousesByCommodity(commodity: string): Promise<Warehouse[]>;
   updateWarehouse(id: number, warehouse: Partial<InsertWarehouse>): Promise<Warehouse | undefined>;
+  seedMandiWarehouses(): Promise<number>; // Seed database with mandi data
   
   // Lending Partner operations
   getLendingPartner(id: number): Promise<LendingPartner | undefined>;
@@ -575,6 +579,71 @@ export class MemStorage implements IStorage {
     const updatedWarehouse: Warehouse = { ...warehouse, ...warehouseData };
     this.warehouses.set(id, updatedWarehouse);
     return updatedWarehouse;
+  }
+
+  async getWarehousesByState(state: string): Promise<Warehouse[]> {
+    return Array.from(this.warehouses.values()).filter(
+      warehouse => warehouse.state.toLowerCase() === state.toLowerCase()
+    );
+  }
+
+  async getWarehousesByDistrict(district: string): Promise<Warehouse[]> {
+    return Array.from(this.warehouses.values()).filter(
+      warehouse => warehouse.district?.toLowerCase() === district.toLowerCase()
+    );
+  }
+
+  async getWarehousesByCommodity(commodity: string): Promise<Warehouse[]> {
+    return Array.from(this.warehouses.values()).filter(warehouse => {
+      const primaryCommodities = warehouse.primaryCommodities as string[] || [];
+      return primaryCommodities.some(c => 
+        c.toLowerCase().includes(commodity.toLowerCase())
+      );
+    });
+  }
+
+  async seedMandiWarehouses(): Promise<number> {
+    const { panIndiaMandiWarehouses } = await import('./data/mandi-warehouse-data');
+    
+    let seededCount = 0;
+    for (const mandiData of panIndiaMandiWarehouses) {
+      const warehouseName = `${mandiData.mandiName} TradeWiser Warehouse`;
+      const address = `Agricultural Market Complex, ${mandiData.mandiName}, ${mandiData.district}`;
+      
+      const insertWarehouse: InsertWarehouse = {
+        name: warehouseName,
+        mandiName: mandiData.mandiName,
+        address: address,
+        city: mandiData.mandiName,
+        district: mandiData.district,
+        state: mandiData.state,
+        pincode: mandiData.pincode || "000000",
+        latitude: mandiData.latitude?.toString() || "0",
+        longitude: mandiData.longitude?.toString() || "0",
+        capacity: mandiData.capacity.toString(),
+        availableSpace: (mandiData.capacity * 0.8).toString(), // 80% available initially
+        channelType: "green",
+        warehouseType: mandiData.warehouseType,
+        regulationStatus: mandiData.regulationStatus,
+        nearestRailwayStation: mandiData.nearestRailwayStation,
+        railwayDistance: mandiData.railwayDistance.toString(),
+        hasGodownFacilities: mandiData.hasGodownFacilities,
+        hasColdStorage: mandiData.hasColdStorage,
+        hasGradingFacility: false, // Default to false for now
+        phoneNumber: mandiData.phoneNumber,
+        primaryCommodities: mandiData.primaryCommodities,
+        specializations: [],
+        facilities: [],
+        ownerId: 1, // Default to test user
+        isActive: true,
+        verificationStatus: "verified"
+      };
+      
+      await this.createWarehouse(insertWarehouse);
+      seededCount++;
+    }
+    
+    return seededCount;
   }
   
   // Commodity operations
