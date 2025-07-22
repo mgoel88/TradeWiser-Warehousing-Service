@@ -113,10 +113,7 @@ export default function DepositFlow({
         'Oilseeds': 'Oilseeds',
         'Fibres': 'Fibres',
         'Cash Crops': 'Cash Crops',
-        'Vegetables': 'Vegetables',
-        'Fruits': 'Fruits',
-        'Nuts': 'Nuts',
-        'Fodder': 'Fodder'
+        'Nuts': 'Nuts'
       };
       
       const typeValue = categoryTypeMap[selectedCommodity.category] || 'Other';
@@ -133,10 +130,7 @@ export default function DepositFlow({
       'Oilseeds': 'Oilseeds',
       'Fibres': 'Fibres',
       'Cash Crops': 'Cash Crops',
-      'Vegetables': 'Vegetables',
-      'Fruits': 'Fruits',
-      'Nuts': 'Nuts',
-      'Fodder': 'Fodder'
+      'Nuts': 'Nuts'
     };
     
     const typeValue = categoryTypeMap[category] || 'Other';

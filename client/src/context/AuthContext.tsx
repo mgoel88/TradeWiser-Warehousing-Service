@@ -99,34 +99,40 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const logout = async (): Promise<void> => {
     try {
       setIsLoading(true);
-      await apiRequest("POST", "/api/auth/logout", {});
+      
+      // Call logout API
+      const response = await fetch('/api/auth/logout', {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+      
+      // Always clear user state regardless of API response
       setUser(null);
       
-      // Clear any persisted user data from localStorage (but keep non-sensitive UX data)
-      // Note: We preserve username for "Welcome back" UX if needed
+      // Clear localStorage
       const username = user?.username;
       localStorage.clear();
       if (username) {
         localStorage.setItem('lastUsername', username);
       }
       
-      // Redirect to landing page
-      window.location.href = '/';
-      
       toast({
         title: "Logged out",
         description: "You have been successfully logged out.",
       });
+      
+      // Force redirect to landing page
+      window.location.href = '/';
+      
     } catch (error) {
       console.error("Logout error:", error);
       // Even if logout fails on server, clear frontend state and redirect
       setUser(null);
+      localStorage.clear();
       window.location.href = '/';
-      toast({
-        title: "Logout failed",
-        description: "There was an issue logging out.",
-        variant: "destructive",
-      });
     } finally {
       setIsLoading(false);
     }
