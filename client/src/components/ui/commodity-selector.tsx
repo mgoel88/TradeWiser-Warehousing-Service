@@ -126,14 +126,20 @@ export function CommoditySelector({ value, onChange, onCategorySelect, placehold
   );
 
   const handleSelect = (commodity: Commodity) => {
+    console.log('CommoditySelector: handleSelect called with:', commodity);
     const formattedName = formatCommodityName(commodity);
     console.log('CommoditySelector: Selected commodity:', formattedName, 'Category:', commodity.category);
-    onChange(formattedName);
+    
+    // Clear search and close dropdown first
     setSearchValue('');
     setOpen(false);
     
+    // Then call onChange
+    onChange(formattedName);
+    
     // Call onCategorySelect if provided to auto-populate category
     if (onCategorySelect) {
+      console.log('CommoditySelector: Auto-populating category:', commodity.category);
       onCategorySelect(commodity.category);
     }
   };
@@ -213,10 +219,21 @@ export function CommoditySelector({ value, onChange, onCategorySelect, placehold
                     <CommandItem
                       key={`${commodity.category}-${commodity.english}`}
                       value={`${commodity.english} ${commodity.hindi} ${commodity.category}`}
-                      onSelect={() => handleSelect(commodity)}
+                      onSelect={(currentValue) => {
+                        console.log('CommandItem onSelect triggered with value:', currentValue);
+                        handleSelect(commodity);
+                      }}
                       className="flex items-center justify-between cursor-pointer hover:bg-accent hover:text-accent-foreground px-2 py-1.5"
                     >
-                      <div className="flex items-center gap-2 flex-1 min-w-0">
+                      <div 
+                        className="flex items-center gap-2 flex-1 min-w-0"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          console.log('Direct click on commodity:', commodity.english);
+                          handleSelect(commodity);
+                        }}
+                      >
                         <Package className="h-4 w-4 text-muted-foreground shrink-0" />
                         <div className="flex flex-col min-w-0 flex-1">
                           <span className="text-sm font-medium truncate">{commodity.english}</span>
