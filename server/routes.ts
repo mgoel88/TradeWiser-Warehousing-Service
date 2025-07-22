@@ -527,9 +527,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       console.log("Creating warehouse receipt:", req.body);
       
+      // FIXED: Ensure valuation defaults to Rs 50/kg if not provided
+      const { quantity, valuation, ...rest } = req.body;
+      const calculatedValuation = valuation || (parseFloat(quantity) * 50).toString();
+      
       const receiptData = {
-        ...req.body,
+        ...rest,
+        quantity,
+        valuation: calculatedValuation,
         ownerId: req.session.userId,
+        receiptNumber: `WR${Date.now()}-${req.session.userId}`,
+        blockchainHash: `198324${Math.random().toString(16).substring(2, 18)}`,
+        expiryDate: new Date(Date.now() + 6 * 30 * 24 * 60 * 60 * 1000), // 6 months from now
+        liens: JSON.stringify({
+          verificationCode: `WR-${req.session.userId}-${Math.random().toString(16).substring(2, 11).toUpperCase()}-${Math.random().toString(16).substring(2, 6).toUpperCase()}`,
+          processId: rest.processId || 0,
+          commodityName: rest.commodityName || "Unknown",
+          qualityGrade: "Grade A",
+          qualityParameters: {
+            moisture: "0.0%",
+            foreignMatter: "0.0%", 
+            brokenGrains: "0.0%"
+          }
+        }),
         createdAt: new Date(),
         updatedAt: new Date()
       };

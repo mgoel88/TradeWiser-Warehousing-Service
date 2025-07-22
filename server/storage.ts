@@ -708,13 +708,19 @@ export class MemStorage implements IStorage {
   async createWarehouseReceipt(insertReceipt: InsertWarehouseReceipt): Promise<WarehouseReceipt> {
     const id = this.currentReceiptId++;
     const now = new Date();
+    
+    // FIXED: Ensure valuation defaults to Rs 50/kg if not provided
+    const quantity = parseFloat(insertReceipt.quantity?.toString() || '0');
+    const defaultValuation = (quantity * 50).toString();
+    
     const receipt: WarehouseReceipt = { 
       ...insertReceipt, 
       id, 
       issuedDate: now,
       status: insertReceipt.status || 'active',
       ownerId: insertReceipt.ownerId || null,
-      measurementUnit: insertReceipt.measurementUnit || null 
+      measurementUnit: insertReceipt.measurementUnit || null,
+      valuation: insertReceipt.valuation || defaultValuation  // FIXED: Proper valuation handling
     };
     this.warehouseReceipts.set(id, receipt);
     return receipt;
