@@ -11,6 +11,11 @@
   },
   {
     "category": "Grains",
+    "english": "Basmati Rice",
+    "hindi": "बासमती चावल"
+  },
+  {
+    "category": "Grains",
     "english": "Maize",
     "hindi": "मक्का"
   },
@@ -21,8 +26,23 @@
   },
   {
     "category": "Grains",
+    "english": "Pearl Millet",
+    "hindi": "बाजरा"
+  },
+  {
+    "category": "Grains",
+    "english": "Finger Millet",
+    "hindi": "रागी"
+  },
+  {
+    "category": "Grains",
     "english": "Barley",
     "hindi": "जौ"
+  },
+  {
+    "category": "Grains",
+    "english": "Oats",
+    "hindi": "जई"
   },
   {
     "category": "Grains",
@@ -30,29 +50,84 @@
     "hindi": "राई"
   },
   {
+    "category": "Grains",
+    "english": "Quinoa",
+    "hindi": "क्विनोआ"
+  },
+  {
+    "category": "Grains",
+    "english": "Buckwheat",
+    "hindi": "कुट्टू"
+  },
+  {
     "category": "Pulses",
-    "english": "Chana",
+    "english": "Chickpea",
     "hindi": "चना"
   },
   {
     "category": "Pulses",
-    "english": "Arhar",
+    "english": "Pigeon Pea",
     "hindi": "अरहर"
   },
   {
     "category": "Pulses",
-    "english": "Masoor",
+    "english": "Red Lentil",
     "hindi": "मसूर"
   },
   {
     "category": "Pulses",
-    "english": "Moong",
+    "english": "Green Gram",
     "hindi": "मूंग"
   },
   {
     "category": "Pulses",
-    "english": "Urad",
+    "english": "Black Gram",
     "hindi": "उड़द"
+  },
+  {
+    "category": "Pulses",
+    "english": "Black Chickpea",
+    "hindi": "काला चना"
+  },
+  {
+    "category": "Pulses",
+    "english": "Field Pea",
+    "hindi": "मटर"
+  },
+  {
+    "category": "Pulses",
+    "english": "Kidney Bean",
+    "hindi": "राजमा"
+  },
+  {
+    "category": "Pulses",
+    "english": "Horse Gram",
+    "hindi": "कुलथी"
+  },
+  {
+    "category": "Pulses",
+    "english": "Cowpea",
+    "hindi": "लोबिया"
+  },
+  {
+    "category": "Pulses",
+    "english": "Moth Bean",
+    "hindi": "मोठ"
+  },
+  {
+    "category": "Pulses",
+    "english": "Lima Bean",
+    "hindi": "सेम"
+  },
+  {
+    "category": "Spices",
+    "english": "Turmeric",
+    "hindi": "हल्दी"
+  },
+  {
+    "category": "Spices",
+    "english": "Coriander",
+    "hindi": "धनिया"
   },
   {
     "category": "Spices",
@@ -61,8 +136,48 @@
   },
   {
     "category": "Spices",
-    "english": "Coriander",
-    "hindi": "धनिया"
+    "english": "Red Chili",
+    "hindi": "लाल मिर्च"
+  },
+  {
+    "category": "Spices",
+    "english": "Black Pepper",
+    "hindi": "काली मिर्च"
+  },
+  {
+    "category": "Spices",
+    "english": "Cardamom",
+    "hindi": "इलायची"
+  },
+  {
+    "category": "Spices",
+    "english": "Clove",
+    "hindi": "लौंग"
+  },
+  {
+    "category": "Spices",
+    "english": "Cinnamon",
+    "hindi": "दालचीनी"
+  },
+  {
+    "category": "Spices",
+    "english": "Fennel",
+    "hindi": "सौंफ"
+  },
+  {
+    "category": "Spices",
+    "english": "Fenugreek",
+    "hindi": "मेथी"
+  },
+  {
+    "category": "Spices",
+    "english": "Nutmeg",
+    "hindi": "जायफल"
+  },
+  {
+    "category": "Spices",
+    "english": "Mustard Seed",
+    "hindi": "राई के बीज"
   },
   {
     "category": "Spices",
@@ -76,23 +191,13 @@
   },
   {
     "category": "Spices",
-    "english": "Red Chili",
-    "hindi": "लाल मिर्च"
+    "english": "Star Anise",
+    "hindi": "चक्र फूल"
   },
   {
     "category": "Spices",
-    "english": "Turmeric",
-    "hindi": "हल्दी"
-  },
-  {
-    "category": "Spices",
-    "english": "Cardamom",
-    "hindi": "इलायची"
-  },
-  {
-    "category": "Oilseeds",
-    "english": "Mustard",
-    "hindi": "सरसों"
+    "english": "Bay Leaf",
+    "hindi": "तेज पत्ता"
   },
   {
     "category": "Oilseeds",
@@ -101,22 +206,242 @@
   },
   {
     "category": "Oilseeds",
+    "english": "Mustard",
+    "hindi": "सरसों"
+  },
+  {
+    "category": "Oilseeds",
     "english": "Soybean",
     "hindi": "सोयाबीन"
   },
   {
     "category": "Oilseeds",
-    "english": "Castor Seed",
-    "hindi": "अरंडी का बीज"
+    "english": "Sesame",
+    "hindi": "तिल"
+  },
+  {
+    "category": "Oilseeds",
+    "english": "Sunflower",
+    "hindi": "सूरजमुखी"
+  },
+  {
+    "category": "Oilseeds",
+    "english": "Safflower",
+    "hindi": "कुसुम"
+  },
+  {
+    "category": "Oilseeds",
+    "english": "Coconut",
+    "hindi": "नारियल"
+  },
+  {
+    "category": "Oilseeds",
+    "english": "Castor",
+    "hindi": "अरंडी"
+  },
+  {
+    "category": "Oilseeds",
+    "english": "Niger",
+    "hindi": "रामतिल"
+  },
+  {
+    "category": "Oilseeds",
+    "english": "Linseed",
+    "hindi": "अलसी"
   },
   {
     "category": "Fibres",
     "english": "Cotton",
-    "hindi": "रुई"
+    "hindi": "कपास"
   },
   {
     "category": "Fibres",
     "english": "Jute",
+    "hindi": "जूट"
+  },
+  {
+    "category": "Fibres",
+    "english": "Hemp",
+    "hindi": "भांग"
+  },
+  {
+    "category": "Fibres",
+    "english": "Flax",
     "hindi": "पटसन"
+  },
+  {
+    "category": "Fibres",
+    "english": "Ramie",
+    "hindi": "रेमी"
+  },
+  {
+    "category": "Cash Crops",
+    "english": "Sugarcane",
+    "hindi": "गन्ना"
+  },
+  {
+    "category": "Cash Crops",
+    "english": "Tea",
+    "hindi": "चाय"
+  },
+  {
+    "category": "Cash Crops",
+    "english": "Coffee",
+    "hindi": "कॉफी"
+  },
+  {
+    "category": "Cash Crops",
+    "english": "Tobacco",
+    "hindi": "तम्बाकू"
+  },
+  {
+    "category": "Cash Crops",
+    "english": "Rubber",
+    "hindi": "रबड़"
+  },
+  {
+    "category": "Vegetables",
+    "english": "Onion",
+    "hindi": "प्याज"
+  },
+  {
+    "category": "Vegetables",
+    "english": "Potato",
+    "hindi": "आलू"
+  },
+  {
+    "category": "Vegetables",
+    "english": "Tomato",
+    "hindi": "टमाटर"
+  },
+  {
+    "category": "Vegetables",
+    "english": "Brinjal",
+    "hindi": "बैंगन"
+  },
+  {
+    "category": "Vegetables",
+    "english": "Okra",
+    "hindi": "भिंडी"
+  },
+  {
+    "category": "Vegetables",
+    "english": "Cauliflower",
+    "hindi": "फूलगोभी"
+  },
+  {
+    "category": "Vegetables",
+    "english": "Cabbage",
+    "hindi": "पत्तागोभी"
+  },
+  {
+    "category": "Vegetables",
+    "english": "Carrot",
+    "hindi": "गाजर"
+  },
+  {
+    "category": "Vegetables",
+    "english": "Radish",
+    "hindi": "मूली"
+  },
+  {
+    "category": "Vegetables",
+    "english": "Sweet Potato",
+    "hindi": "शकरकंद"
+  },
+  {
+    "category": "Fruits",
+    "english": "Mango",
+    "hindi": "आम"
+  },
+  {
+    "category": "Fruits",
+    "english": "Banana",
+    "hindi": "केला"
+  },
+  {
+    "category": "Fruits",
+    "english": "Apple",
+    "hindi": "सेब"
+  },
+  {
+    "category": "Fruits",
+    "english": "Orange",
+    "hindi": "संतरा"
+  },
+  {
+    "category": "Fruits",
+    "english": "Grapes",
+    "hindi": "अंगूर"
+  },
+  {
+    "category": "Fruits",
+    "english": "Pomegranate",
+    "hindi": "अनार"
+  },
+  {
+    "category": "Fruits",
+    "english": "Papaya",
+    "hindi": "पपीता"
+  },
+  {
+    "category": "Fruits",
+    "english": "Guava",
+    "hindi": "अमरूद"
+  },
+  {
+    "category": "Fruits",
+    "english": "Watermelon",
+    "hindi": "तरबूज"
+  },
+  {
+    "category": "Fruits",
+    "english": "Muskmelon",
+    "hindi": "खरबूजा"
+  },
+  {
+    "category": "Nuts",
+    "english": "Almond",
+    "hindi": "बादाम"
+  },
+  {
+    "category": "Nuts",
+    "english": "Walnut",
+    "hindi": "अखरोट"
+  },
+  {
+    "category": "Nuts",
+    "english": "Cashew",
+    "hindi": "काजू"
+  },
+  {
+    "category": "Nuts",
+    "english": "Pistachio",
+    "hindi": "पिस्ता"
+  },
+  {
+    "category": "Nuts",
+    "english": "Dates",
+    "hindi": "खजूर"
+  },
+  {
+    "category": "Fodder",
+    "english": "Alfalfa",
+    "hindi": "रिजका"
+  },
+  {
+    "category": "Fodder",
+    "english": "Berseem",
+    "hindi": "बरसीम"
+  },
+  {
+    "category": "Fodder",
+    "english": "Maize Fodder",
+    "hindi": "मक्का चारा"
+  },
+  {
+    "category": "Fodder",
+    "english": "Sorghum Fodder",
+    "hindi": "ज्वार चारा"
   }
 ]

@@ -24,7 +24,7 @@ TradeWiser is a comprehensive blockchain-powered agricultural commodity platform
 - **2025-07-22**: Implemented advanced fuzzy search with partial word matching for better commodity discovery
 - **2025-07-22**: Eliminated separate login/register routes - landing page is now the default home with seamless authentication
 - **2025-07-22**: Implemented smart bilingual commodity selector with auto-complete and category-based filtering
-- **2025-07-22**: Created comprehensive commodities.json with 24 agricultural products across 5 categories (Grains, Pulses, Spices, Oilseeds, Fibres)
+- **2025-07-22**: Expanded commodities.json to comprehensive 104+ agricultural products across 10 major categories (Grains, Pulses, Spices, Oilseeds, Fibres, Cash Crops, Vegetables, Fruits, Nuts, Fodder)
 - **2025-07-22**: Built CommoditySelector component with bilingual search supporting both English and Hindi
 - **2025-07-22**: Enhanced deposit form with professional @radix-ui Command and Popover components
 - **2025-07-22**: Integrated custom commodity fallback for non-listed agricultural products

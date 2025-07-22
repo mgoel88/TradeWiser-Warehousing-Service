@@ -103,7 +103,12 @@ export function CommoditySelector({ value, onChange, onCategorySelect, placehold
       'Pulses': 'text-green-600 bg-green-50',
       'Spices': 'text-red-600 bg-red-50',
       'Oilseeds': 'text-blue-600 bg-blue-50',
-      'Fibres': 'text-purple-600 bg-purple-50'
+      'Fibres': 'text-purple-600 bg-purple-50',
+      'Cash Crops': 'text-emerald-600 bg-emerald-50',
+      'Vegetables': 'text-teal-600 bg-teal-50',
+      'Fruits': 'text-orange-600 bg-orange-50',
+      'Nuts': 'text-brown-600 bg-brown-50',
+      'Fodder': 'text-lime-600 bg-lime-50'
     };
     return colors[category as keyof typeof colors] || 'text-gray-600 bg-gray-50';
   };
