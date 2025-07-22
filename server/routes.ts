@@ -1,5 +1,6 @@
 import express, { type Express, Request, Response } from "express";
 import { createServer, type Server } from "http";
+import path from "path";
 import { storage } from "./storage";
 import { insertUserSchema } from "@shared/schema";
 import { z } from "zod";
@@ -144,10 +145,67 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       const commodities = await storage.listCommoditiesByOwner(req.session.userId);
+      res.setHeader('Content-Type', 'application/json');
       res.json(commodities);
     } catch (error) {
       console.error("Error fetching commodities:", error);
+      res.setHeader('Content-Type', 'application/json');
       res.status(500).json({ message: "Failed to fetch commodities" });
+    }
+  });
+
+  // Create new commodity
+  apiRouter.post("/commodities", async (req: Request, res: Response) => {
+    try {
+      if (!req.session?.userId) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+
+      console.log("Creating new commodity:", req.body);
+      
+      const {
+        name,
+        type,
+        quantity,
+        measurementUnit,
+        qualityParameters,
+        gradeAssigned,
+        warehouseId,
+        notes,
+        valuation
+      } = req.body;
+
+      // Validate required fields
+      if (!name || !type || !quantity || !warehouseId) {
+        return res.status(400).json({
+          message: "Missing required fields: name, type, quantity, warehouseId"
+        });
+      }
+
+      const commodityData = {
+        name,
+        type,
+        quantity: quantity.toString(),
+        measurementUnit: measurementUnit || "MT",
+        qualityParameters: qualityParameters || {},
+        gradeAssigned: gradeAssigned || "pending",
+        warehouseId: parseInt(warehouseId),
+        ownerId: req.session.userId,
+        status: "active" as const,
+        channelType: "green" as const,
+        valuation: valuation?.toString() || "0"
+      };
+
+      const commodity = await storage.createCommodity(commodityData);
+      
+      console.log("Commodity created:", commodity.id);
+      
+      res.setHeader('Content-Type', 'application/json');
+      res.status(201).json(commodity);
+    } catch (error) {
+      console.error("Error creating commodity:", error);
+      res.setHeader('Content-Type', 'application/json');
+      res.status(500).json({ message: "Failed to create commodity" });
     }
   });
 
@@ -174,9 +232,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       const processes = await storage.listProcessesByUser(req.session.userId);
+      res.setHeader('Content-Type', 'application/json');
       res.json(processes);
     } catch (error) {
       console.error("Error fetching processes:", error);
+      res.setHeader('Content-Type', 'application/json');
       res.status(500).json({ message: "Failed to fetch processes" });
     }
   });
@@ -267,9 +327,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       console.log("Created process:", process.id);
       
+      res.setHeader('Content-Type', 'application/json');
       res.status(201).json(process);
     } catch (error) {
       console.error("Error creating process:", error);
+      res.setHeader('Content-Type', 'application/json');
       res.status(500).json({ message: "Failed to create deposit process" });
     }
   });
@@ -441,7 +503,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         quantity: commodity.quantity,
         measurementUnit: commodity.measurementUnit,
         status: "active",
-        qualityParameters: commodity.qualityParameters,
         gradeAssigned: commodity.gradeAssigned,
         storageLocation: `${warehouse.name}-${Math.floor(Math.random() * 100)}`,
         pledgeStatus: "available",
@@ -492,6 +553,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   app.use("/api", apiRouter);
+
+  // Handle 404 for unknown API routes
+  app.use('/api/*', (req, res) => {
+    res.status(404).json({ message: "API endpoint not found" });
+  });
   
   console.log("API routes registered successfully");
   

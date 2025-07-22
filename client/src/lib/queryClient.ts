@@ -2,8 +2,24 @@ import { QueryClient, QueryFunction } from "@tanstack/react-query";
 
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
-    const text = (await res.text()) || res.statusText;
-    throw new Error(`${res.status}: ${text}`);
+    try {
+      // Try to parse as JSON first (for API error responses)
+      const contentType = res.headers.get("content-type");
+      if (contentType && contentType.includes("application/json")) {
+        const errorData = await res.json();
+        throw new Error(errorData.message || `HTTP ${res.status}: ${res.statusText}`);
+      } else {
+        // If not JSON, it might be HTML error page - extract meaningful message
+        const text = await res.text();
+        if (text.includes("<!DOCTYPE")) {
+          throw new Error(`Server error (${res.status}): The API returned an HTML page instead of JSON. Please check authentication or try again.`);
+        }
+        throw new Error(`HTTP ${res.status}: ${text || res.statusText}`);
+      }
+    } catch (parseError) {
+      // If parsing fails, use the original status
+      throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+    }
   }
 }
 
@@ -12,15 +28,28 @@ export async function apiRequest(
   url: string,
   data?: unknown | undefined,
 ): Promise<Response> {
-  const res = await fetch(url, {
-    method,
-    headers: data ? { "Content-Type": "application/json" } : {},
-    body: data ? JSON.stringify(data) : undefined,
-    credentials: "include",
-  });
+  try {
+    const headers: HeadersInit = {
+      "Accept": "application/json",
+    };
+    
+    if (data) {
+      headers["Content-Type"] = "application/json";
+    }
+    
+    const res = await fetch(url, {
+      method,
+      headers,
+      body: data ? JSON.stringify(data) : undefined,
+      credentials: "include",
+    });
 
-  await throwIfResNotOk(res);
-  return res;
+    await throwIfResNotOk(res);
+    return res;
+  } catch (error) {
+    console.error(`API Request failed: ${method} ${url}`, error);
+    throw error;
+  }
 }
 
 type UnauthorizedBehavior = "returnNull" | "throw";

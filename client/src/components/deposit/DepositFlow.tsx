@@ -322,71 +322,50 @@ export default function DepositFlow({
 
       console.log("Submitting commodity data:", formattedData);
 
-      // Call API to create a new commodity
-      const response = await apiRequest(
+      // Create deposit process directly (includes commodity creation)
+      const processPayload = {
+        type: "deposit",
+        commodityName: data.name,
+        commodityType: data.type,
+        quantity: quantityValue,
+        warehouseId: typeof selectedWarehouse.id === 'string' ? parseInt(selectedWarehouse.id) : selectedWarehouse.id,
+        deliveryMethod: useWarehouseDelivery ? "self_delivery" : "managed_pickup",
+        scheduledDate: pickupDate,
+        scheduledTime: useWarehouseDelivery ? null : pickupTime,
+        pickupAddress: useWarehouseDelivery ? null : pickupAddress,
+        estimatedValue: quantityValue * 2100, // Estimated value calculation
+        qualityParameters: selectedQualityParams,
+        notes: data.notes || ""
+      };
+
+      console.log("Creating deposit process:", processPayload);
+
+      const processResponse = await apiRequest(
         "POST",
-        "/api/commodities",
-        formattedData
+        "/api/processes",
+        processPayload
       );
 
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.message || "Failed to create commodity");
+      if (!processResponse.ok) {
+        const errorData = await processResponse.json().catch(() => ({}));
+        throw new Error(errorData.message || "Failed to create deposit process");
       }
 
-      const commodity = await response.json();
-      console.log("Commodity created:", commodity);
+      const processResult = await processResponse.json();
+      console.log("Process created:", processResult);
 
-      if (commodity && commodity.id) {
-        // Create a process for this deposit - make sure all IDs are numbers, not strings
-        const processData = {
-          commodityId: typeof commodity.id === 'string' ? parseInt(commodity.id) : commodity.id,
-          warehouseId: typeof selectedWarehouse.id === 'string' ? parseInt(selectedWarehouse.id) : selectedWarehouse.id,
-          userId: typeof userData.id === 'string' ? parseInt(userData.id) : userData.id,
-          processType: "deposit", // Using "deposit" as a more standard process type
-          status: "pending",
-          currentStage: "deposit_reception",
-          stageProgress: {
-            deposit_reception: "pending",
-            pre_cleaning: "pending",
-            quality_assessment: "pending",
-            receipt_generation: "pending"
-          },
-          // Send the date in ISO format for consistent handling
-          estimatedCompletionTime: new Date(new Date().setHours(new Date().getHours() + 48)).toISOString() // 48 hours estimate
-        };
+      if (processResult && processResult.id) {
+        setProcessId(processResult.id);
 
-        console.log("Creating process:", processData);
+        // Move to confirmation step
+        setCurrentStep(DepositStep.Confirmation);
 
-        const processResponse = await apiRequest(
-          "POST",
-          "/api/processes",
-          processData
-        );
-
-        if (!processResponse.ok) {
-          const errorData = await processResponse.json().catch(() => ({}));
-          throw new Error(errorData.message || "Failed to create process");
-        }
-
-        const processResult = await processResponse.json();
-        console.log("Process created:", processResult);
-
-        if (processResult && processResult.id) {
-          setProcessId(processResult.id);
-
-          // Move to confirmation step
-          setCurrentStep(DepositStep.Confirmation);
-
-          toast({
-            title: "Deposit initiated successfully",
-            description: "Your commodity deposit process has been started",
-          });
-        } else {
-          throw new Error("Process ID not returned from server");
-        }
+        toast({
+          title: "Deposit initiated successfully",
+          description: "Your commodity deposit process has been started",
+        });
       } else {
-        throw new Error("Commodity ID not returned from server");
+        throw new Error("Process ID not returned from server");
       }
     } catch (error) {
       console.error("Error creating deposit:", error);
