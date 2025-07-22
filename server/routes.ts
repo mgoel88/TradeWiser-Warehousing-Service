@@ -148,7 +148,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(warehouses);
     } catch (error) {
       console.error("Error fetching warehouses by state:", error);
-      res.status(500).json({ message: "Failed to fetch warehouses by state", error: error.message });
+      res.status(500).json({ message: "Failed to fetch warehouses by state", error: error instanceof Error ? error.message : String(error) });
     }
   });
 
