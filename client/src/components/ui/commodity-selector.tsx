@@ -198,6 +198,7 @@ export function CommoditySelector({ value, onChange, onCategorySelect, placehold
                     variant="outline"
                     size="sm"
                     onClick={() => {
+                      console.log('Adding custom commodity:', searchValue.trim());
                       onChange(searchValue.trim());
                       setOpen(false);
                       setSearchValue('');
