@@ -11,6 +11,8 @@ import { Truck, Package, FileCheck, ClipboardCheck, Clock, AlertTriangle, CheckC
 import { useToast } from '@/hooks/use-toast';
 import WarehouseProcessFlow from './WarehouseProcessFlow';
 import { BypassDemo } from './BypassDemo';
+import ProcessStatusVisualization from './ProcessStatusVisualization';
+import ProcessActions from './ProcessActions';
 
 interface DepositProgressProps {
   processId: number;
@@ -485,151 +487,21 @@ export default function DepositProgress({ processId }: DepositProgressProps) {
           </div>
         )}
         
-        {/* Stages timeline */}
-        <div className="space-y-4">
-          <h3 className="font-medium">Process Timeline</h3>
-          
-          <div className="space-y-4">
-            {/* Pickup scheduled */}
-            <div className="flex">
-              <div className="mr-3 flex flex-col items-center">
-                <div className={`rounded-full p-1 ${getStageStatus('pickup_scheduled') === 'completed' ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-400'}`}>
-                  <Package className="h-4 w-4" />
-                </div>
-                <div className="bg-border w-px h-full"></div>
-              </div>
-              <div className="pb-4 flex-1">
-                <div className="flex items-center justify-between">
-                  <h4 className="font-medium">Pickup Scheduled</h4>
-                  <Badge className={getBadgeStyle(getStageStatus('pickup_scheduled'))}>
-                    {getStatusIcon(getStageStatus('pickup_scheduled'))}
-                    <span className="ml-1 uppercase text-[10px]">{getStageStatus('pickup_scheduled')}</span>
-                  </Badge>
-                </div>
-                <p className="text-sm text-muted-foreground">Deposit request submitted and pickup scheduled</p>
-              </div>
-            </div>
-            
-            {/* Vehicle assigned */}
-            <div className="flex">
-              <div className="mr-3 flex flex-col items-center">
-                <div className={`rounded-full p-1 ${getStageStatus('pickup_assigned') === 'completed' ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-400'}`}>
-                  <Truck className="h-4 w-4" />
-                </div>
-                <div className="bg-border w-px h-full"></div>
-              </div>
-              <div className="pb-4 flex-1">
-                <div className="flex items-center justify-between">
-                  <h4 className="font-medium">Vehicle Assigned</h4>
-                  <Badge className={getBadgeStyle(getStageStatus('pickup_assigned'))}>
-                    {getStatusIcon(getStageStatus('pickup_assigned'))}
-                    <span className="ml-1 uppercase text-[10px]">{getStageStatus('pickup_assigned')}</span>
-                  </Badge>
-                </div>
-                <p className="text-sm text-muted-foreground">Transport vehicle has been assigned for pickup</p>
-              </div>
-            </div>
-            
-            {/* Pickup in progress */}
-            <div className="flex">
-              <div className="mr-3 flex flex-col items-center">
-                <div className={`rounded-full p-1 ${getStageStatus('pickup_in_progress') === 'completed' ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-400'}`}>
-                  <Truck className="h-4 w-4" />
-                </div>
-                <div className="bg-border w-px h-full"></div>
-              </div>
-              <div className="pb-4 flex-1">
-                <div className="flex items-center justify-between">
-                  <h4 className="font-medium">Pickup In Progress</h4>
-                  <Badge className={getBadgeStyle(getStageStatus('pickup_in_progress'))}>
-                    {getStatusIcon(getStageStatus('pickup_in_progress'))}
-                    <span className="ml-1 uppercase text-[10px]">{getStageStatus('pickup_in_progress')}</span>
-                  </Badge>
-                </div>
-                <p className="text-sm text-muted-foreground">Vehicle en route to your location for pickup</p>
-              </div>
-            </div>
-            
-            {/* Arrived at warehouse */}
-            <div className="flex">
-              <div className="mr-3 flex flex-col items-center">
-                <div className={`rounded-full p-1 ${getStageStatus('arrived_at_warehouse') === 'completed' ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-400'}`}>
-                  <Package className="h-4 w-4" />
-                </div>
-                <div className="bg-border w-px h-full"></div>
-              </div>
-              <div className="pb-4 flex-1">
-                <div className="flex items-center justify-between">
-                  <h4 className="font-medium">Arrived at Warehouse</h4>
-                  <Badge className={getBadgeStyle(getStageStatus('arrived_at_warehouse'))}>
-                    {getStatusIcon(getStageStatus('arrived_at_warehouse'))}
-                    <span className="ml-1 uppercase text-[10px]">{getStageStatus('arrived_at_warehouse')}</span>
-                  </Badge>
-                </div>
-                <p className="text-sm text-muted-foreground">Commodity delivered to warehouse facility</p>
-              </div>
-            </div>
-            
-            {/* Pre-cleaning */}
-            <div className="flex">
-              <div className="mr-3 flex flex-col items-center">
-                <div className={`rounded-full p-1 ${getStageStatus('pre_cleaning') === 'completed' ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-400'}`}>
-                  <FileCheck className="h-4 w-4" />
-                </div>
-                <div className="bg-border w-px h-full"></div>
-              </div>
-              <div className="pb-4 flex-1">
-                <div className="flex items-center justify-between">
-                  <h4 className="font-medium">Pre-cleaning & Processing</h4>
-                  <Badge className={getBadgeStyle(getStageStatus('pre_cleaning'))}>
-                    {getStatusIcon(getStageStatus('pre_cleaning'))}
-                    <span className="ml-1 uppercase text-[10px]">{getStageStatus('pre_cleaning')}</span>
-                  </Badge>
-                </div>
-                <p className="text-sm text-muted-foreground">Initial cleaning and processing of commodity</p>
-              </div>
-            </div>
-            
-            {/* Quality assessment */}
-            <div className="flex">
-              <div className="mr-3 flex flex-col items-center">
-                <div className={`rounded-full p-1 ${getStageStatus('quality_assessment') === 'completed' ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-400'}`}>
-                  <ClipboardCheck className="h-4 w-4" />
-                </div>
-                <div className="bg-border w-px h-full"></div>
-              </div>
-              <div className="pb-4 flex-1">
-                <div className="flex items-center justify-between">
-                  <h4 className="font-medium">Quality Assessment</h4>
-                  <Badge className={getBadgeStyle(getStageStatus('quality_assessment'))}>
-                    {getStatusIcon(getStageStatus('quality_assessment'))}
-                    <span className="ml-1 uppercase text-[10px]">{getStageStatus('quality_assessment')}</span>
-                  </Badge>
-                </div>
-                <p className="text-sm text-muted-foreground">Comprehensive quality parameters assessment</p>
-              </div>
-            </div>
-            
-            {/* EWR generation */}
-            <div className="flex">
-              <div className="mr-3 flex flex-col items-center">
-                <div className={`rounded-full p-1 ${getStageStatus('ewr_generation') === 'completed' ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-400'}`}>
-                  <ClipboardCheck className="h-4 w-4" />
-                </div>
-              </div>
-              <div className="flex-1">
-                <div className="flex items-center justify-between">
-                  <h4 className="font-medium">eWR Generation</h4>
-                  <Badge className={getBadgeStyle(getStageStatus('ewr_generation'))}>
-                    {getStatusIcon(getStageStatus('ewr_generation'))}
-                    <span className="ml-1 uppercase text-[10px]">{getStageStatus('ewr_generation')}</span>
-                  </Badge>
-                </div>
-                <p className="text-sm text-muted-foreground">Electronic Warehouse Receipt issuance</p>
-              </div>
-            </div>
-          </div>
-        </div>
+        {/* New Intuitive Process Status Visualization */}
+        <ProcessStatusVisualization 
+          currentStage={process.currentStage}
+          stageProgress={process.stageProgress}
+          status={process.status}
+          processType={process.processType}
+        />
+        
+        {/* Process Actions */}
+        <ProcessActions
+          status={process.status}
+          currentStage={process.currentStage}
+          processId={processId}
+          onStartNew={() => window.location.href = '/deposit'}
+        />
         </CardContent>
       </Card>
     </div>
