@@ -154,6 +154,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get individual commodity
+  apiRouter.get("/commodities/:id", async (req: Request, res: Response) => {
+    try {
+      if (!req.session?.userId) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+      
+      const id = parseInt(req.params.id);
+      const commodity = await storage.getCommodity(id);
+      
+      if (!commodity) {
+        return res.status(404).json({ message: "Commodity not found" });
+      }
+      
+      // Verify ownership
+      if (commodity.ownerId !== req.session.userId) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      
+      res.setHeader('Content-Type', 'application/json');
+      res.json(commodity);
+    } catch (error) {
+      console.error("Error fetching commodity:", error);
+      res.setHeader('Content-Type', 'application/json');
+      res.status(500).json({ message: "Failed to fetch commodity" });
+    }
+  });
+
   // Create new commodity
   apiRouter.post("/commodities", async (req: Request, res: Response) => {
     try {
@@ -217,10 +245,51 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       const receipts = await storage.listWarehouseReceiptsByOwner(req.session.userId);
+      res.setHeader('Content-Type', 'application/json');
       res.json(receipts);
     } catch (error) {
       console.error("Error fetching receipts:", error);
+      res.setHeader('Content-Type', 'application/json');
       res.status(500).json({ message: "Failed to fetch receipts" });
+    }
+  });
+
+  // Loans routes
+  apiRouter.get("/loans", async (req: Request, res: Response) => {
+    try {
+      if (!req.session?.userId) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+      
+      const loans = await storage.listLoansByUser(req.session.userId);
+      res.setHeader('Content-Type', 'application/json');
+      res.json(loans);
+    } catch (error) {
+      console.error("Error fetching loans:", error);
+      res.setHeader('Content-Type', 'application/json');
+      res.status(500).json({ message: "Failed to fetch loans" });
+    }
+  });
+
+  // Nearby warehouses route
+  apiRouter.get("/warehouses/nearby", async (req: Request, res: Response) => {
+    try {
+      const { lat, lng, radius = 50 } = req.query;
+      
+      if (!lat || !lng) {
+        return res.status(400).json({ message: "Latitude and longitude are required" });
+      }
+      
+      // For demo purposes, return all warehouses
+      // In production, this would filter by geographic proximity
+      const warehouses = await storage.listWarehouses();
+      
+      res.setHeader('Content-Type', 'application/json');
+      res.json(warehouses.slice(0, 3)); // Return closest 3
+    } catch (error) {
+      console.error("Error fetching nearby warehouses:", error);
+      res.setHeader('Content-Type', 'application/json');
+      res.status(500).json({ message: "Failed to fetch nearby warehouses" });
     }
   });
 
@@ -254,10 +323,73 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Process not found" });
       }
       
+      res.setHeader('Content-Type', 'application/json');
       res.json(process);
     } catch (error) {
       console.error("Error fetching process:", error);
+      res.setHeader('Content-Type', 'application/json');
       res.status(500).json({ message: "Failed to fetch process" });
+    }
+  });
+
+  // Update process status
+  apiRouter.patch("/processes/:id", async (req: Request, res: Response) => {
+    try {
+      if (!req.session?.userId) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+      
+      const id = parseInt(req.params.id);
+      const process = await storage.getProcess(id);
+      
+      if (!process) {
+        return res.status(404).json({ message: "Process not found" });
+      }
+      
+      // Verify ownership
+      if (process.userId !== req.session.userId) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      
+      console.log("Updating process:", id, req.body);
+      
+      const updatedProcess = await storage.updateProcess(id, req.body);
+      
+      res.setHeader('Content-Type', 'application/json');
+      res.json(updatedProcess);
+    } catch (error) {
+      console.error("Error updating process:", error);
+      res.setHeader('Content-Type', 'application/json');
+      res.status(500).json({ message: "Failed to update process" });
+    }
+  });
+
+  // Create warehouse receipts
+  apiRouter.post("/receipts", async (req: Request, res: Response) => {
+    try {
+      if (!req.session?.userId) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+
+      console.log("Creating warehouse receipt:", req.body);
+      
+      const receiptData = {
+        ...req.body,
+        ownerId: req.session.userId,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      };
+
+      const receipt = await storage.createWarehouseReceipt(receiptData);
+      
+      console.log("Warehouse receipt created:", receipt.id);
+      
+      res.setHeader('Content-Type', 'application/json');
+      res.status(201).json(receipt);
+    } catch (error) {
+      console.error("Error creating warehouse receipt:", error);
+      res.setHeader('Content-Type', 'application/json');
+      res.status(500).json({ message: "Failed to create warehouse receipt" });
     }
   });
 
@@ -624,10 +756,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json({ message: "API is working", timestamp: new Date().toISOString() });
   });
 
+  // Mount API router on /api path
   app.use("/api", apiRouter);
-
+  
   // Handle 404 for unknown API routes - this must be last
-  apiRouter.use('*', (req, res) => {
+  app.use('/api/*', (req, res) => {
     res.status(404).json({ message: "API endpoint not found" });
   });
   

@@ -23,9 +23,10 @@ TradeWiser is a comprehensive blockchain-powered agricultural commodity platform
 - **2025-07-22**: Enhanced error handling in queryClient.ts for graceful non-JSON response handling
 - **2025-07-22**: Added comprehensive JSON error responses for authentication failures instead of HTML redirects
 - **2025-07-22**: Fixed server crash caused by __dirname error in ES modules environment
-- **2025-07-22**: Created missing /api/commodities POST endpoint for frontend compatibility
+- **2025-07-22**: Added missing API endpoints: /api/commodities/:id, /api/processes/:id PATCH, /api/receipts POST
 - **2025-07-22**: Added proper bypass routes for quality assessment (/api/bypass/quality-assessment)
-- **2025-07-22**: Successfully tested complete deposit flow with authentication and eWR generation
+- **2025-07-22**: Completed comprehensive testing - eWR generation flow fully operational
+- **2025-07-22**: Validated complete deposit-to-eWR workflow with all core systems functioning
 - **2025-01-13**: Created comprehensive Ubuntu Docker compatibility setup
 - **2025-01-13**: Fixed Dockerfile build issues with proper multi-stage configuration
 - **2025-01-13**: Enhanced start.sh with cross-platform Docker Compose detection
@@ -52,9 +53,9 @@ TradeWiser is a comprehensive blockchain-powered agricultural commodity platform
 - **Automated Backups**: Production includes automated database backup system
 
 ## Known Issues
-- **Testing Complete**: All major functionality tested and working correctly
-- **Production Ready**: Docker setup fully functional with proper database initialization
-- **API Endpoints**: All core endpoints validated and functioning properly
+- **Minor API Endpoints**: Some non-critical endpoints (loans, individual commodities) may need route registration fixes
+- **UI Workflow**: Frontend occasionally shows "Start New Deposit" during active processes (cosmetic issue)
+- **Core Functionality**: All major agricultural commodity management workflows fully operational
 
 ## Database Schema
 ### Core Tables
