@@ -101,12 +101,27 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setIsLoading(true);
       await apiRequest("POST", "/api/auth/logout", {});
       setUser(null);
+      
+      // Clear any persisted user data from localStorage (but keep non-sensitive UX data)
+      // Note: We preserve username for "Welcome back" UX if needed
+      const username = user?.username;
+      localStorage.clear();
+      if (username) {
+        localStorage.setItem('lastUsername', username);
+      }
+      
+      // Redirect to landing page
+      window.location.href = '/';
+      
       toast({
         title: "Logged out",
         description: "You have been successfully logged out.",
       });
     } catch (error) {
       console.error("Logout error:", error);
+      // Even if logout fails on server, clear frontend state and redirect
+      setUser(null);
+      window.location.href = '/';
       toast({
         title: "Logout failed",
         description: "There was an issue logging out.",

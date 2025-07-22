@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useLocation } from 'wouter';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
@@ -33,10 +33,11 @@ export default function LandingPage() {
   const [isLoading, setIsLoading] = useState(false);
 
   // If user is already logged in, redirect to dashboard
-  if (user) {
-    setLocation('/dashboard');
-    return null;
-  }
+  useEffect(() => {
+    if (user) {
+      setLocation('/dashboard');
+    }
+  }, [user, setLocation]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();

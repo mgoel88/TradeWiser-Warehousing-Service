@@ -329,10 +329,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           uploadedFilename: req.file.filename,
           uploadPath: req.file.path,
           timestamp: new Date().toISOString(),
-          insuranceCoverage: (parseFloat(mockParsedData.valuation) * 0.6).toString()
+          insuranceCoverage: (parseFloat(mockParsedData.valuation) * 0.6).toString(),
+          issuedDate: mockParsedData.issuedDate,
+          expiryDate: mockParsedData.expiryDate
         }),
-        issuedDate: mockParsedData.issuedDate,
-        expiryDate: mockParsedData.expiryDate,
         liens: JSON.stringify(mockParsedData.liens)
       });
 

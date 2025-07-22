@@ -1,0 +1,68 @@
+What Should Happen (Like Facebook, Gmail, etc.)
+🔒 Login:
+Authenticates user via JWT or session cookie.
+
+Loads user-specific data (dashboard, history, warehousing receipts, etc.) from backend or cached storage.
+
+🔓 Logout:
+Only destroys session or token.
+
+User data remains intact in the database.
+
+Frontend should clear auth state, but user info may remain in memory or localStorage for UX (e.g., showing "Welcome back" after next login).
+
+Redirects back to a landing/companion site, not a blank login page.
+
+❌ What Should NOT Happen:
+Logging out must not delete user profile, receipts, stored metadata, or uploaded receipts.
+
+Backend must not clear DB entries on logout.
+
+Frontend must not wipe persistent identifiers unless instructed.
+
+✅ Updated Prompt to Replit Agent
+Here’s a bulletproof prompt you can send:
+
+👋 Hey! I’m building TradeWiser, a warehousing-as-a-service app (like Uber for agri commodities).
+
+I need your help to fix the login/logout + data persistence logic. Please follow this strictly:
+
+🔄 Expected Behavior:
+1. Persistent User Data:
+
+User data (profile, uploaded receipts, inspection history, storage balances) must be stored permanently in the database.
+
+Logging out should not delete any of this.
+
+Please ensure the logout function only clears the session/token and not any stored data.
+
+2. Session Persistence:
+
+Login should create a secure session (JWT in localStorage or HttpOnly cookie).
+
+On page refresh, user should remain logged in unless token expires or is invalidated.
+
+3. Companion Site Flow:
+
+I’ve built a companion landing page with info + login.
+
+After logout, the user should be redirected to this landing page (/home or /landing).
+
+Not just dumped on the login screen.
+
+4. Frontend Handling:
+
+Frontend should clear the session token on logout.
+
+But if helpful for UX, you may keep non-sensitive user data (like username or ID) in localStorage for personalized messaging.
+
+🛠️ What to Fix:
+Update the logout controller so it does not modify or delete any user or receipt data.
+
+Ensure login persists session securely.
+
+Add redirect to the landing/companion page on logout.
+
+Keep user data safe, persistent, and untouched on logout.
+
+Let me know if anything is unclear. Thanks!
