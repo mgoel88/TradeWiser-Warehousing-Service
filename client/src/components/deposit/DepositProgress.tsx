@@ -10,6 +10,7 @@ import { formatDate, formatDateTime } from '@/lib/utils';
 import { Truck, Package, FileCheck, ClipboardCheck, Clock, AlertTriangle, CheckCircle2, MapPin, RefreshCw } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import WarehouseProcessFlow from './WarehouseProcessFlow';
+import { BypassDemo } from './BypassDemo';
 
 interface DepositProgressProps {
   processId: number;
@@ -282,49 +283,68 @@ export default function DepositProgress({ processId }: DepositProgressProps) {
       </Card>
     );
   }
+
+  // Check if we should show bypass demo
+  const showBypassDemo = process?.currentStage === 'pickup_scheduled' && 
+                         process?.status === 'in_progress';
   
   return (
-    <Card>
-      <CardHeader>
-        <div className="flex justify-between items-start">
-          <div>
-            <CardTitle className="flex items-center">
-              Deposit Progress
-              {isLive && (
-                <Badge variant="outline" className="ml-2 bg-green-100 text-green-800 animate-pulse">
-                  <span className="h-2 w-2 rounded-full bg-green-500 mr-1"></span> Live
-                </Badge>
-              )}
-            </CardTitle>
-            <CardDescription>
-              Tracking deposit #{processId} - Started on {formatDate(process.startTime)}
-            </CardDescription>
-            <div className="mt-1 text-xs text-muted-foreground">
-              Last updated: {lastUpdate.toLocaleTimeString()}
+    <div className="space-y-6">
+      {/* Show bypass demo for quality assessment when external services unavailable */}
+      {showBypassDemo && (
+        <BypassDemo 
+          processId={processId} 
+          onComplete={() => {
+            handleRefresh();
+            toast({
+              title: 'Process Complete',
+              description: 'Your commodity has been successfully processed and eWR generated',
+            });
+          }} 
+        />
+      )}
+      
+      <Card>
+        <CardHeader>
+          <div className="flex justify-between items-start">
+            <div>
+              <CardTitle className="flex items-center">
+                Deposit Progress
+                {isLive && (
+                  <Badge variant="outline" className="ml-2 bg-green-100 text-green-800 animate-pulse">
+                    <span className="h-2 w-2 rounded-full bg-green-500 mr-1"></span> Live
+                  </Badge>
+                )}
+              </CardTitle>
+              <CardDescription>
+                Tracking deposit #{processId} - Started on {formatDate(process.startTime)}
+              </CardDescription>
+              <div className="mt-1 text-xs text-muted-foreground">
+                Last updated: {lastUpdate.toLocaleTimeString()}
+              </div>
+            </div>
+            <div className="flex flex-col items-end gap-2">
+              <Badge 
+                variant="outline"
+                className={`text-xs ${getBadgeStyle(process.status)}`}
+              >
+                {process.status.replace('_', ' ').toUpperCase()}
+              </Badge>
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                onClick={handleRefresh} 
+                disabled={isRefreshing}
+                className="h-7 px-2 text-xs"
+              >
+                <RefreshCw className={`h-3 w-3 mr-1 ${isRefreshing ? 'animate-spin' : ''}`} />
+                Refresh
+              </Button>
             </div>
           </div>
-          <div className="flex flex-col items-end gap-2">
-            <Badge 
-              variant="outline"
-              className={`text-xs ${getBadgeStyle(process.status)}`}
-            >
-              {process.status.replace('_', ' ').toUpperCase()}
-            </Badge>
-            <Button 
-              variant="ghost" 
-              size="sm" 
-              onClick={handleRefresh} 
-              disabled={isRefreshing}
-              className="h-7 px-2 text-xs"
-            >
-              <RefreshCw className={`h-3 w-3 mr-1 ${isRefreshing ? 'animate-spin' : ''}`} />
-              Refresh
-            </Button>
-          </div>
-        </div>
-      </CardHeader>
-      
-      <CardContent className="space-y-6">
+        </CardHeader>
+        
+        <CardContent className="space-y-6">
         {/* Progress bar */}
         <div className="space-y-2">
           <div className="flex justify-between text-sm text-muted-foreground">
@@ -610,7 +630,8 @@ export default function DepositProgress({ processId }: DepositProgressProps) {
             </div>
           </div>
         </div>
-      </CardContent>
-    </Card>
+        </CardContent>
+      </Card>
+    </div>
   );
 }

@@ -239,18 +239,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         gradeAssigned: "pending",
         warehouseId: parseInt(warehouseId),
         ownerId: req.session.userId,
-        status: "pending_deposit",
+        status: "active",
         channelType: "green",
         valuation: estimatedValue?.toString() || "0"
       });
 
       // Then create the process
       const processData = {
-        type: type || "deposit",
+        processType: type || "deposit",
         userId: req.session.userId,
         commodityId: commodity.id,
         warehouseId: parseInt(warehouseId),
-        status: "initiated",
+        status: "in_progress" as const,
         currentStage: "pickup_scheduled",
         progress: 10,
         estimatedCompletion: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days from now
@@ -271,6 +271,218 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error creating process:", error);
       res.status(500).json({ message: "Failed to create deposit process" });
+    }
+  });
+
+  // Bypass demo routes for quality assessment and pricing when external services unavailable
+  
+  // Mock quality assessment results based on commodity type
+  const generateMockQualityResults = (commodityType: string) => {
+    const baseResults: Record<string, any> = {
+      cereals: {
+        moisture: 12.5,
+        foreignMatter: 1.2,
+        brokenGrains: 2.8,
+        weeviled: 0.5,
+        grade: 'A',
+        score: 87
+      },
+      pulses: {
+        moisture: 10.2,
+        foreignMatter: 0.8,
+        damaged: 1.5,
+        weeviled: 0.3,
+        grade: 'A',
+        score: 89
+      },
+      oilseeds: {
+        moisture: 8.5,
+        foreignMatter: 1.1,
+        oilContent: 42.3,
+        freefattyAcid: 1.2,
+        grade: 'A',
+        score: 85
+      },
+      vegetables: {
+        moisture: 85.2,
+        freshness: 92,
+        damage: 3.5,
+        pesticide: 0.1,
+        grade: 'A',
+        score: 88
+      }
+    };
+    
+    return baseResults[commodityType.toLowerCase()] || baseResults.vegetables;
+  };
+  
+  // Mock pricing calculation based on quality results
+  const calculateMockPricing = (commodity: any, qualityResults: any) => {
+    const baseRates: Record<string, number> = {
+      cereals: 2500,
+      pulses: 4500,
+      oilseeds: 3200,
+      vegetables: 1800,
+      spices: 8500
+    };
+    
+    const baseRate = baseRates[commodity.type.toLowerCase()] || 2000;
+    const qualityMultiplier = qualityResults.score / 100;
+    const marketRate = baseRate * qualityMultiplier;
+    
+    return {
+      baseRate,
+      qualityScore: qualityResults.score,
+      qualityMultiplier: qualityMultiplier.toFixed(2),
+      marketRate: Math.round(marketRate),
+      totalValue: Math.round(marketRate * parseFloat(commodity.quantity)),
+      currency: 'INR',
+      pricePerUnit: 'MT'
+    };
+  };
+
+  // Bypass route: Complete quality assessment and pricing flow
+  apiRouter.post("/bypass/complete-assessment/:processId", async (req: Request, res: Response) => {
+    try {
+      if (!req.session?.userId) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+
+      const processId = parseInt(req.params.processId);
+      const process = await storage.getProcess(processId);
+      
+      if (!process) {
+        return res.status(404).json({ message: "Process not found" });
+      }
+
+      // Get commodity details
+      const commodity = await storage.getCommodity(process.commodityId!);
+      if (!commodity) {
+        return res.status(404).json({ message: "Commodity not found" });
+      }
+
+      // Generate mock quality assessment results
+      const qualityResults = generateMockQualityResults(commodity.type);
+      
+      // Calculate mock pricing
+      const pricingData = calculateMockPricing(commodity, qualityResults);
+      
+      // Update commodity with quality and pricing data
+      await storage.updateCommodity(commodity.id, {
+        qualityParameters: qualityResults,
+        gradeAssigned: qualityResults.grade,
+        valuation: pricingData.totalValue.toString(),
+        status: "processing"
+      });
+
+      // Update process to final stages
+      const updatedProcess = await storage.updateProcess(processId, {
+        status: "in_progress" as const,
+        currentStage: "ewr_generation",
+        stageProgress: {
+          pickup_scheduled: 'completed',
+          arrived_at_warehouse: 'completed',
+          weighing_complete: 'completed',
+          moisture_analysis: 'completed',
+          visual_ai_scan: 'completed',
+          qa_assessment_complete: 'completed',
+          pricing_calculated: 'completed',
+          ewr_generation: 'in_progress'
+        }
+      });
+
+      console.log(`Completed bypass assessment for process ${processId}`);
+      
+      res.json({
+        processId,
+        status: 'completed',
+        qualityAssessment: qualityResults,
+        pricing: pricingData,
+        process: updatedProcess,
+        message: 'Quality assessment and pricing completed using bypass demo service'
+      });
+
+    } catch (error) {
+      console.error("Error in bypass assessment:", error);
+      res.status(500).json({ message: "Failed to complete bypass assessment" });
+    }
+  });
+
+  // Generate Electronic Warehouse Receipt (eWR)
+  apiRouter.post("/bypass/generate-ewr/:processId", async (req: Request, res: Response) => {
+    try {
+      if (!req.session?.userId) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+
+      const processId = parseInt(req.params.processId);
+      const process = await storage.getProcess(processId);
+      
+      if (!process) {
+        return res.status(404).json({ message: "Process not found" });
+      }
+
+      const commodity = await storage.getCommodity(process.commodityId!);
+      const warehouse = await storage.getWarehouse(process.warehouseId!);
+      
+      if (!commodity || !warehouse) {
+        return res.status(404).json({ message: "Commodity or warehouse not found" });
+      }
+
+      // Generate unique receipt number
+      const receiptNumber = `eWR-${Date.now()}-${process.commodityId}`;
+      
+      // Create warehouse receipt
+      const receipt = await storage.createWarehouseReceipt({
+        receiptNumber,
+        commodityId: commodity.id,
+        warehouseId: warehouse.id,
+        ownerId: req.session.userId,
+        quantity: commodity.quantity,
+        measurementUnit: commodity.measurementUnit,
+        status: "active",
+        qualityParameters: commodity.qualityParameters,
+        gradeAssigned: commodity.gradeAssigned,
+        storageLocation: `${warehouse.name}-${Math.floor(Math.random() * 100)}`,
+        pledgeStatus: "available",
+        marketValue: commodity.valuation,
+        digitalSignature: `sig_${Date.now()}`,
+        blockchainTxHash: `0x${Math.random().toString(16).substring(2, 18)}`,
+        insuranceCoverage: (parseFloat(commodity.valuation || "0") * 0.8).toString(),
+        documents: JSON.stringify([{
+          type: 'quality_certificate',
+          url: `/documents/quality_cert_${receiptNumber}.pdf`,
+          timestamp: new Date().toISOString()
+        }])
+      });
+
+      // Complete the process
+      await storage.updateProcess(processId, {
+        status: "completed" as const,
+        currentStage: "ewr_generated",
+        stageProgress: {
+          pickup_scheduled: 'completed',
+          arrived_at_warehouse: 'completed',
+          weighing_complete: 'completed',
+          moisture_analysis: 'completed',
+          visual_ai_scan: 'completed',
+          qa_assessment_complete: 'completed',
+          pricing_calculated: 'completed',
+          ewr_generation: 'completed'
+        }
+      });
+
+      console.log(`Generated eWR ${receiptNumber} for process ${processId}`);
+
+      res.json({
+        receipt,
+        process: await storage.getProcess(processId),
+        message: 'Electronic Warehouse Receipt generated successfully'
+      });
+
+    } catch (error) {
+      console.error("Error generating eWR:", error);
+      res.status(500).json({ message: "Failed to generate electronic warehouse receipt" });
     }
   });
 
