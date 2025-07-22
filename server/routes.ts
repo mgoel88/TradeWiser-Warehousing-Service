@@ -141,14 +141,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Enhanced warehouse query endpoints - fix route ordering
   apiRouter.get("/warehouses/by-state/:state", async (req: Request, res: Response) => {
     try {
-      const state = req.params.state;
+      const state = decodeURIComponent(req.params.state);
       console.log(`Fetching warehouses for state: ${state}`);
       const warehouses = await storage.getWarehousesByState(state);
       console.log(`Found ${warehouses.length} warehouses in ${state}`);
       res.json(warehouses);
     } catch (error) {
       console.error("Error fetching warehouses by state:", error);
-      res.status(500).json({ message: "Failed to fetch warehouses by state" });
+      res.status(500).json({ message: "Failed to fetch warehouses by state", error: error.message });
     }
   });
 
