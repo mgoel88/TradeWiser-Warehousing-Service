@@ -9,5 +9,137 @@
 
   body {
     @apply font-sans antialiased bg-background text-foreground;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    touch-action: manipulation;
+  }
+
+  /* Mobile scroll improvements */
+  html {
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Better touch targets */
+  button, a, [role="button"] {
+    touch-action: manipulation;
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  /* Prevent zoom on input focus on iOS */
+  input, select, textarea {
+    font-size: 16px;
+  }
+
+  @media (max-width: 767px) {
+    input, select, textarea {
+      font-size: 16px !important;
+    }
+  }
+}
+
+@layer components {
+  /* Mobile-first responsive containers */
+  .mobile-container {
+    @apply px-4 sm:px-6 lg:px-8;
+  }
+
+  .mobile-grid {
+    @apply grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4;
+  }
+
+  .mobile-card {
+    @apply bg-card rounded-lg border p-4 shadow-sm hover:shadow-md transition-shadow;
+  }
+
+  .mobile-button {
+    @apply inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 min-h-[44px] px-4 py-2;
+  }
+
+  .mobile-input {
+    @apply flex h-12 w-full rounded-md border border-input bg-background px-3 py-2 text-base ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50;
+  }
+
+  /* Touch-friendly spacing */
+  .mobile-spacing {
+    @apply space-y-4 sm:space-y-6;
+  }
+
+  /* Mobile navigation */
+  .mobile-nav {
+    @apply fixed bottom-0 left-0 right-0 bg-background border-t z-50 px-4 py-2 sm:hidden;
+  }
+
+  /* Mobile modal/dialog improvements */
+  .mobile-dialog {
+    @apply sm:max-w-lg w-full mx-4 sm:mx-auto;
+  }
+
+  /* Mobile table improvements */
+  .mobile-table-wrapper {
+    @apply overflow-x-auto -mx-4 sm:mx-0;
+  }
+
+  .mobile-table {
+    @apply w-full min-w-[600px] sm:min-w-full;
+  }
+}
+
+@layer utilities {
+  /* Hide on mobile */
+  .hidden-mobile {
+    @apply hidden sm:block;
+  }
+
+  /* Show only on mobile */
+  .mobile-only {
+    @apply block sm:hidden;
+  }
+
+  /* Mobile text sizes */
+  .text-mobile-sm {
+    @apply text-sm sm:text-base;
+  }
+
+  .text-mobile-base {
+    @apply text-base sm:text-lg;
+  }
+
+  .text-mobile-lg {
+    @apply text-lg sm:text-xl;
+  }
+
+  .text-mobile-xl {
+    @apply text-xl sm:text-2xl;
+  }
+
+  /* Mobile padding/margin utilities */
+  .p-mobile {
+    @apply p-4 sm:p-6 lg:p-8;
+  }
+
+  .px-mobile {
+    @apply px-4 sm:px-6 lg:px-8;
+  }
+
+  .py-mobile {
+    @apply py-4 sm:py-6 lg:py-8;
+  }
+
+  /* Safe area for mobile devices with notches */
+  .safe-top {
+    padding-top: env(safe-area-inset-top);
+  }
+
+  .safe-bottom {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  .safe-left {
+    padding-left: env(safe-area-inset-left);
+  }
+
+  .safe-right {
+    padding-right: env(safe-area-inset-right);
   }
 }
