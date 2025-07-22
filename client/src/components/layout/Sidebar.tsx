@@ -2,6 +2,7 @@ import { Link, useLocation } from 'wouter';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
 import { Warehouse, FileText, Package, BadgeDollarSign, CreditCard, FileCheck, ExternalLink, User, Settings, LogOut } from 'lucide-react';
+import tradewiserLogo from '@assets/TradeWiser Logo_1753185456298.png';
 
 export default function Sidebar() {
   const [location] = useLocation();
@@ -13,10 +14,11 @@ export default function Sidebar() {
     <aside className="w-64 bg-white shadow-md hidden md:flex flex-col">
       <div className="p-4 border-b">
         <div className="flex items-center">
-          <div className="w-10 h-10 rounded-md bg-primary-500 flex items-center justify-center text-white">
-            <span className="font-headings font-bold text-xl">TW</span>
-          </div>
-          <h1 className="ml-3 font-headings font-bold text-xl text-primary-500">TradeWiser</h1>
+          <img 
+            src={tradewiserLogo} 
+            alt="TradeWiser" 
+            className="h-8 w-auto object-contain"
+          />
         </div>
       </div>
       

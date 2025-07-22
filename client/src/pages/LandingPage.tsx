@@ -24,6 +24,7 @@ import {
   Lock,
   Users
 } from 'lucide-react';
+import tradewiserLogo from '@assets/TradeWiser Logo_1753185456298.png';
 
 export default function LandingPage() {
   const [, setLocation] = useLocation();
@@ -74,13 +75,12 @@ export default function LandingPage() {
       {/* Header */}
       <header className="bg-slate-950/95 backdrop-blur-sm border-b border-slate-800 sticky top-0 z-50">
         <div className="container mx-auto px-6 py-5 flex justify-between items-center">
-          <div className="flex items-center space-x-3">
-            <div className="w-11 h-11 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-xl flex items-center justify-center shadow-lg">
-              <Warehouse className="h-6 w-6 text-white" />
-            </div>
-            <span className="text-2xl font-bold text-white tracking-tight">
-              TradeWiser
-            </span>
+          <div className="flex items-center">
+            <img 
+              src={tradewiserLogo} 
+              alt="TradeWiser" 
+              className="h-12 w-auto object-contain"
+            />
           </div>
           
           <nav className="hidden md:flex space-x-8">
@@ -454,11 +454,12 @@ export default function LandingPage() {
         <div className="container mx-auto max-w-7xl px-6 py-20">
           <div className="grid md:grid-cols-4 gap-12">
             <div>
-              <div className="flex items-center space-x-3 mb-8">
-                <div className="w-10 h-10 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-xl flex items-center justify-center">
-                  <Warehouse className="h-6 w-6 text-white" />
-                </div>
-                <span className="text-2xl font-bold text-white">TradeWiser</span>
+              <div className="mb-8">
+                <img 
+                  src={tradewiserLogo} 
+                  alt="TradeWiser" 
+                  className="h-10 w-auto object-contain"
+                />
               </div>
               <p className="text-slate-400 leading-relaxed mb-6">
                 Enterprise-grade blockchain infrastructure powering the future of institutional agricultural finance and commodity management.
