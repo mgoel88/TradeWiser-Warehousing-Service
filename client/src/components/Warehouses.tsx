@@ -29,7 +29,7 @@ export default function Warehouses() {
   }, []);
 
   // Fetch warehouses
-  const { data: warehouses, isLoading, error } = useQuery({
+  const { data: warehouses = [], isLoading, error } = useQuery<WarehouseType[]>({
     queryKey: ['/api/warehouses'],
   });
 
@@ -59,8 +59,7 @@ export default function Warehouses() {
 
   // Filter and sort warehouses
   const filteredWarehouses = warehouses
-    ? warehouses
-        .filter((warehouse: WarehouseType) => {
+    .filter((warehouse: WarehouseType) => {
           const matchesSearch = searchTerm === "" ||
             warehouse.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
             warehouse.city.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -74,8 +73,7 @@ export default function Warehouses() {
           const distanceA = calculateDistance(a);
           const distanceB = calculateDistance(b);
           return distanceA - distanceB;
-        })
-    : [];
+        });
 
   return (
     <div>

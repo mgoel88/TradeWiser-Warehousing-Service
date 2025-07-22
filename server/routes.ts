@@ -199,6 +199,55 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Nearby warehouses endpoint
+  apiRouter.get("/warehouses/nearby", async (req: Request, res: Response) => {
+    try {
+      const { lat, lng, radius } = req.query;
+      
+      if (!lat || !lng) {
+        return res.status(400).json({ message: "Latitude and longitude are required" });
+      }
+      
+      const latitude = parseFloat(lat as string);
+      const longitude = parseFloat(lng as string);
+      const searchRadius = parseInt((radius as string) || "50"); // Default 50km radius
+      
+      if (isNaN(latitude) || isNaN(longitude)) {
+        return res.status(400).json({ message: "Invalid latitude or longitude" });
+      }
+      
+      console.log(`Searching nearby warehouses: lat=${latitude}, lng=${longitude}, radius=${searchRadius}km`);
+      const warehouses = await storage.listWarehousesByLocation(latitude, longitude, searchRadius);
+      
+      // Add distance calculation to each warehouse
+      const warehousesWithDistance = warehouses.map(warehouse => {
+        const warehouseLat = parseFloat(warehouse.latitude || '0');
+        const warehouseLng = parseFloat(warehouse.longitude || '0');
+        
+        // Haversine formula for accurate distance calculation
+        const R = 6371; // Earth's radius in kilometers
+        const dLat = (warehouseLat - latitude) * Math.PI / 180;
+        const dLng = (warehouseLng - longitude) * Math.PI / 180;
+        const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                  Math.cos(latitude * Math.PI / 180) * Math.cos(warehouseLat * Math.PI / 180) *
+                  Math.sin(dLng/2) * Math.sin(dLng/2);
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+        const distance = R * c;
+        
+        return {
+          ...warehouse,
+          distance: Math.round(distance * 10) / 10 // Round to 1 decimal place
+        };
+      }).sort((a, b) => a.distance - b.distance); // Sort by distance
+      
+      console.log(`Found ${warehousesWithDistance.length} nearby warehouses`);
+      res.json(warehousesWithDistance);
+    } catch (error) {
+      console.error("Error fetching nearby warehouses:", error);
+      res.status(500).json({ message: "Failed to fetch nearby warehouses" });
+    }
+  });
+
   apiRouter.get("/warehouses/:id", async (req: Request, res: Response) => {
     try {
       const id = parseInt(req.params.id);
