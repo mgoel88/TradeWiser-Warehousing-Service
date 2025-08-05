@@ -27,6 +27,7 @@ import ImportReceiptsPage from "@/pages/ImportReceiptsPage";
 import PrivateStoragePage from "@/pages/PrivateStoragePage";
 import SettingsPage from "@/pages/SettingsPage";
 import NotFound from "@/pages/not-found";
+import ProductDemoPage from "@/pages/ProductDemoPage";
 
 function Router() {
   return (
@@ -53,6 +54,7 @@ function Router() {
       <Route path="/import-receipts" component={ImportReceiptsPage} />
       <Route path="/private-storage" component={PrivateStoragePage} />
       <Route path="/settings" component={SettingsPage} />
+      <Route path="/demo" element={<ProductDemoPage />} />
       <Route component={NotFound} />
     </Switch>
   );

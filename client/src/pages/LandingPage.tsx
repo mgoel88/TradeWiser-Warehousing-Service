@@ -23,7 +23,8 @@ import {
   MapPin,
   BarChart3,
   Lock,
-  Users
+  Users,
+  Play
 } from 'lucide-react';
 import tradewiserLogo from '@assets/TradeWiser Logo_1753185456298.png';
 
@@ -62,6 +63,11 @@ export default function LandingPage() {
 
   const scrollToSection = (sectionId: string) => {
     document.getElementById(sectionId)?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  const handleGetStarted = () => {
+    // Placeholder for get started functionality
+    console.log("Get Started clicked");
   };
 
   return (
@@ -129,6 +135,15 @@ export default function LandingPage() {
                 >
                   Access Platform
                   <ArrowRight className="ml-3 h-5 w-5" />
+                </Button>
+                <Button 
+                  size="lg" 
+                  variant="outline"
+                  onClick={() => window.open('/demo', '_blank')}
+                  className="border-blue-600 text-blue-600 hover:bg-blue-50 px-8 py-4 text-lg font-semibold rounded-xl transition-all duration-300"
+                >
+                  <Play className="mr-3 h-5 w-5" />
+                  Watch Demo
                 </Button>
                 <Button 
                   size="lg" 
