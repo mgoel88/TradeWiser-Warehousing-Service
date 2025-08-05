@@ -54,7 +54,7 @@ function Router() {
       <Route path="/import-receipts" component={ImportReceiptsPage} />
       <Route path="/private-storage" component={PrivateStoragePage} />
       <Route path="/settings" component={SettingsPage} />
-      <Route path="/demo" element={<ProductDemoPage />} />
+      <Route path="/demo" component={ProductDemoPage} />
       <Route component={NotFound} />
     </Switch>
   );
