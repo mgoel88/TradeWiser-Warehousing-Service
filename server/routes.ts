@@ -2341,6 +2341,231 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ===============================
+  // REBUILD: CORE WORKING APIS
+  // ===============================
+
+  // Helper function for commodity pricing
+  function getCommodityBasePrice(commodity: string): number {
+    const prices: Record<string, number> = {
+      'Wheat': 2500,
+      'Rice': 3000,
+      'Maize': 2000,
+      'Soybean': 4500,
+      'Cotton': 6000,
+      'Sugarcane': 300,
+      'Bajra': 2200,
+      'Jowar': 2100,
+      'Groundnut': 5500,
+      'Mustard': 4800,
+      'Barley': 2300,
+      'Gram': 4200,
+      'Tur': 6500,
+      'Moong': 7000,
+      'Urad': 6800
+    };
+    return prices[commodity] || 2500; // Default price per MT
+  }
+
+  // WORKING DEPOSIT API - IMMEDIATELY CREATES RECEIPT
+  apiRouter.post('/deposits', requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { commodityName, commodityType, quantity, unit, qualityParams, location } = req.body;
+      const userId = req.session!.userId as number;
+
+      if (!commodityName || !commodityType || !quantity) {
+        return res.status(400).json({
+          success: false,
+          error: "Missing required fields: commodityName, commodityType, quantity"
+        });
+      }
+
+      // Calculate market value (mock pricing for now)
+      const basePrice = getCommodityBasePrice(commodityName);
+      const marketValue = basePrice * parseFloat(quantity);
+
+      // Create commodity entry
+      const commodity = await storage.createCommodity({
+        name: commodityName,
+        type: commodityType,
+        quantity: quantity.toString(),
+        measurementUnit: unit || 'MT',
+        qualityParameters: qualityParams || {},
+        gradeAssigned: 'Pending Assessment',
+        warehouseId: 1, // Default warehouse
+        ownerId: userId,
+        status: 'active',
+        channelType: 'green',
+        valuation: marketValue.toString(),
+        marketValue: marketValue.toString()
+      });
+
+      console.log("Commodity created:", commodity.id);
+
+      // IMMEDIATELY create warehouse receipt (no complex tracking for now)
+      const receiptNumber = `TW${Date.now()}-${Math.random().toString(36).substr(2, 6)}`;
+      const receipt = await storage.createWarehouseReceipt({
+        receiptNumber,
+        commodityId: commodity.id,
+        ownerId: userId,
+        warehouseId: 1,
+        quantity: parseFloat(quantity).toString(),
+        valuation: marketValue.toString(),
+        status: 'active',
+        availableForCollateral: true,
+        collateralUsed: '0',
+        blockchainHash: `BC-${Date.now()}`,
+        qualityGrade: 'Grade A', // Mock quality for demo
+        commodityName: commodityName,
+        measurementUnit: unit || 'MT',
+        issuedDate: new Date(),
+        expiryDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000) // 1 year
+      });
+
+      res.json({
+        success: true,
+        data: {
+          commodity: commodity,
+          receipt: receipt,
+          message: `Commodity deposited and receipt ${receiptNumber} generated successfully!`
+        }
+      });
+    } catch (error: any) {
+      console.error('Deposit error:', error);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  // PORTFOLIO API - WORKING DATA
+  apiRouter.get('/portfolio', requireAuth, async (req: Request, res: Response) => {
+    try {
+      const userId = req.session!.userId as number;
+      
+      const receipts = await storage.listWarehouseReceiptsByOwner(userId);
+      const commodities = await storage.listCommoditiesByOwner(userId);
+
+      const totalValue = receipts.reduce((sum, receipt) => sum + (parseFloat(receipt.valuation || '0')), 0);
+      const availableCredit = totalValue * 0.8; // 80% LTV
+
+      res.json({
+        success: true,
+        data: {
+          totalValue,
+          receiptsCount: receipts.length,
+          availableCredit,
+          receipts,
+          commodities
+        }
+      });
+    } catch (error: any) {
+      console.error('Portfolio error:', error);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  // ELIGIBLE RECEIPTS FOR LOANS - WORKING
+  apiRouter.get('/receipts/eligible-for-loans', requireAuth, async (req: Request, res: Response) => {
+    try {
+      const userId = req.session!.userId as number;
+      
+      const receipts = await storage.listWarehouseReceiptsByOwner(userId);
+
+      // Filter eligible receipts
+      const eligibleReceipts = receipts
+        .filter(receipt => 
+          receipt.status === 'active' &&
+          receipt.availableForCollateral !== false &&
+          parseFloat(receipt.valuation || '0') > 0
+        )
+        .map(receipt => {
+          const receiptValue = parseFloat(receipt.valuation || '0');
+          const collateralUsed = parseFloat(receipt.collateralUsed || '0');
+          const availableLoanAmount = (receiptValue - collateralUsed) * 0.8;
+          
+          return {
+            ...receipt,
+            availableLoanAmount: Math.max(0, availableLoanAmount)
+          };
+        })
+        .filter(receipt => receipt.availableLoanAmount > 0);
+
+      res.json({ success: true, data: eligibleReceipts });
+    } catch (error: any) {
+      console.error('Eligible receipts error:', error);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  // LOAN APPLICATION - WORKING
+  apiRouter.post('/loans/apply', requireAuth, async (req: Request, res: Response) => {
+    try {
+      const userId = req.session!.userId as number;
+      const { receiptId, amount, durationMonths } = req.body;
+
+      if (!receiptId || !amount || !durationMonths) {
+        return res.status(400).json({
+          success: false,
+          error: 'Receipt ID, amount, and duration are required'
+        });
+      }
+
+      const receipt = await storage.getWarehouseReceipt(receiptId);
+
+      if (!receipt || receipt.ownerId !== userId) {
+        return res.status(400).json({ success: false, error: 'Receipt not found or not owned by user' });
+      }
+
+      const receiptValue = parseFloat(receipt.valuation || '0');
+      const collateralUsed = parseFloat(receipt.collateralUsed || '0');
+      const maxLoanAmount = (receiptValue - collateralUsed) * 0.8;
+
+      if (parseFloat(amount) > maxLoanAmount) {
+        return res.status(400).json({
+          success: false,
+          error: `Maximum available: ₹${maxLoanAmount.toLocaleString()}`
+        });
+      }
+
+      // Calculate EMI
+      const monthlyRate = 0.12 / 12; // 12% annual
+      const emi = (parseFloat(amount) * monthlyRate * Math.pow(1 + monthlyRate, durationMonths)) /
+                  (Math.pow(1 + monthlyRate, durationMonths) - 1);
+
+      const loan = await storage.createLoan({
+        userId: userId,
+        lendingPartnerId: 1, // Default lending partner
+        lendingPartnerName: 'TradeWiser Direct Lending',
+        amount: amount,
+        interestRate: '12.0',
+        endDate: new Date(Date.now() + durationMonths * 30 * 24 * 60 * 60 * 1000),
+        status: 'active',
+        collateralReceiptIds: JSON.stringify([receiptId]),
+        outstandingAmount: amount,
+        purpose: 'Working Capital',
+        creditScore: 750
+      });
+
+      // Update collateral usage
+      const newCollateralUsed = collateralUsed + parseFloat(amount);
+      await storage.updateWarehouseReceipt(receiptId, {
+        collateralUsed: newCollateralUsed.toString(),
+        status: newCollateralUsed >= receiptValue ? 'collateralized' : 'active'
+      });
+
+      res.json({ 
+        success: true, 
+        data: {
+          loan: loan,
+          monthlyEmi: Math.round(emi),
+          message: `Loan of ₹${parseFloat(amount).toLocaleString()} approved successfully!`
+        }
+      });
+    } catch (error: any) {
+      console.error('Loan application error:', error);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
   // Test endpoint
   apiRouter.get("/test", (req: Request, res: Response) => {
     res.json({ message: "API is working", timestamp: new Date().toISOString() });

@@ -176,6 +176,8 @@ export const commodities = pgTable('commodities', {
   status: commodityStatusEnum('status').notNull().default('processing'),
   channelType: channelTypeEnum('channel_type').notNull(),
   valuation: numeric('valuation', { precision: 14, scale: 2 }),
+  // REBUILD: Add market_value field for real-time pricing
+  marketValue: numeric('market_value', { precision: 12, scale: 2 }),
   depositDate: timestamp('deposit_date').defaultNow(),
   lastUpdated: timestamp('last_updated').defaultNow(),
 });
@@ -195,6 +197,9 @@ export const warehouseReceipts = pgTable('warehouse_receipts', {
   expiryDate: timestamp('expiry_date'),
   valuation: numeric('valuation', { precision: 14, scale: 2 }),
   liens: json('liens'),
+  // REBUILD: Add collateral fields for loan functionality
+  availableForCollateral: boolean('available_for_collateral').default(true),
+  collateralUsed: numeric('collateral_used', { precision: 12, scale: 2 }).default('0'),
   // Orange Channel: External Receipt fields
   externalId: text('external_id'),                       // ID in external system
   externalSource: text('external_source'),               // Source provider (e.g., 'agriapp')
