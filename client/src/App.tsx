@@ -11,6 +11,7 @@ import LandingPage from "@/pages/LandingPage";
 import NewDashboardPage from "@/pages/NewDashboardPage";
 import StreamlinedDashboard from "@/pages/StreamlinedDashboard";
 import NewDepositPage from "@/pages/NewDepositPage";
+import StreamlinedLoansPage from "@/pages/StreamlinedLoansPage";
 import WarehousePage from "@/pages/WarehousePage";
 import ReceiptsPage from "@/pages/ReceiptsPage";
 import LoansPage from "@/pages/LoansPage";
@@ -44,7 +45,8 @@ function Router() {
       <Route path="/deposits/new" component={NewDepositPage} />
       <Route path="/warehouses" component={WarehousePage} />
       <Route path="/receipts" component={ReceiptsPage} />
-      <Route path="/loans" component={LoansPage} />
+      <Route path="/loans" component={StreamlinedLoansPage} />
+      <Route path="/loans/legacy" component={LoansPage} />
       <Route path="/loans/:id/repay" component={LoanRepaymentPage} />
       <Route path="/loan-repayment" component={LoanRepaymentPage} />
       <Route path="/payments" component={PaymentsPage} />
