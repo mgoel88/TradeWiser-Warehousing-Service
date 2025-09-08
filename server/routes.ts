@@ -2583,6 +2583,88 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ===============================
+  // CREDIT LINE SYSTEM - EMERGENCY FIX
+  // ===============================
+
+  // Credit Line Details
+  apiRouter.get('/credit-line/details', requireAuth, async (req: Request, res: Response) => {
+    try {
+      const userId = req.session!.userId as number;
+
+      // Mock data for now - replace with actual NBFC API call
+      const mockCreditLine = {
+        totalLimit: 500000,
+        availableBalance: 350000,
+        outstandingAmount: 150000,
+        interestRate: 12.0,
+        dailyInterest: Math.round((150000 * 12 / 100 / 365) * 100) / 100,
+        monthlyInterest: Math.round((150000 * 12 / 100 / 12) * 100) / 100,
+        lastPaymentDate: '2025-09-01'
+      };
+
+      // TODO: Replace with actual NBFC API call
+      // const response = await fetch(`${process.env.NBFC_API_URL}/credit-line/${userId}`, {
+      //   headers: {
+      //     'Authorization': `Bearer ${process.env.NBFC_API_KEY}`,
+      //     'Content-Type': 'application/json'
+      //   }
+      // });
+
+      res.json({
+        success: true,
+        data: mockCreditLine
+      });
+    } catch (error: any) {
+      console.error('Credit line details error:', error);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  // Withdraw Money
+  apiRouter.post('/credit-line/withdraw', requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { amount, purpose } = req.body;
+      const userId = req.session!.userId as number;
+
+      if (!amount || amount <= 0) {
+        return res.status(400).json({ success: false, error: 'Invalid amount' });
+      }
+
+      // Mock response - replace with actual NBFC API call
+      const mockResponse = {
+        transactionId: `TXN${Date.now()}`,
+        amount: parseFloat(amount),
+        purpose: purpose || 'Working Capital',
+        status: 'success',
+        timestamp: new Date().toISOString()
+      };
+
+      // TODO: Replace with actual NBFC API call
+      // const response = await fetch(`${process.env.NBFC_API_URL}/withdraw`, {
+      //   method: 'POST',
+      //   headers: {
+      //     'Authorization': `Bearer ${process.env.NBFC_API_KEY}`,
+      //     'Content-Type': 'application/json'
+      //   },
+      //   body: JSON.stringify({
+      //     userId: userId,
+      //     amount: parseFloat(amount),
+      //     purpose,
+      //     collateralType: 'warehouse_receipts'
+      //   })
+      // });
+
+      res.json({
+        success: true,
+        data: mockResponse
+      });
+    } catch (error: any) {
+      console.error('Credit line withdrawal error:', error);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
   // Test endpoint
   apiRouter.get("/test", (req: Request, res: Response) => {
     res.json({ message: "API is working", timestamp: new Date().toISOString() });
