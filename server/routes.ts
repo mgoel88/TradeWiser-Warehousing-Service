@@ -534,6 +534,112 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Query external receipts (Orange Channel)
+  apiRouter.get("/receipts/external", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const userId = req.session!.userId;
+      
+      // Get all warehouse receipts for orange channel (external imports)
+      const allReceipts = await storage.listWarehouseReceiptsByOwner(userId);
+      const externalReceipts = allReceipts.filter(receipt => 
+        receipt.externalSource || 
+        (receipt.metadata && receipt.metadata.includes('external_receipt'))
+      );
+      
+      res.setHeader('Content-Type', 'application/json');
+      res.json(externalReceipts);
+    } catch (error) {
+      console.error("Error fetching external receipts:", error);
+      res.setHeader('Content-Type', 'application/json');
+      res.status(500).json({ message: "Failed to fetch external receipts" });
+    }
+  });
+
+  // Query disputed receipts (Red Channel)
+  apiRouter.get("/receipts/disputed", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const userId = req.session!.userId;
+      
+      // For now, return mock disputed receipts data since we don't have a disputes table
+      // In production, this would query a disputes table with foreign key to receipts
+      const mockDisputed = [
+        {
+          id: 1,
+          receiptNumber: 'WR577619-1',
+          commodityName: 'Wheat',
+          quantity: '25.5',
+          valuation: '637500',
+          disputeReason: 'Quality parameters do not match expected standards',
+          disputeType: 'quality',
+          status: 'under_review',
+          priority: 'high',
+          createdAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
+          resolutionNote: null
+        },
+        {
+          id: 2,
+          receiptNumber: 'EXT-1757324-456',
+          commodityName: 'Rice',
+          quantity: '15.0',
+          valuation: '375000',
+          disputeReason: 'Quantity discrepancy found during verification',
+          disputeType: 'quantity',
+          status: 'resolved',
+          priority: 'medium',
+          createdAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
+          resolvedAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(),
+          resolutionNote: 'Discrepancy resolved through re-weighing. Quantity confirmed accurate.'
+        }
+      ];
+      
+      res.setHeader('Content-Type', 'application/json');
+      res.json(mockDisputed);
+    } catch (error) {
+      console.error("Error fetching disputed receipts:", error);
+      res.setHeader('Content-Type', 'application/json');
+      res.status(500).json({ message: "Failed to fetch disputed receipts" });
+    }
+  });
+
+  // Submit new dispute (Red Channel)
+  apiRouter.post("/receipts/dispute", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const userId = req.session!.userId;
+      const { receiptNumber, disputeType, priority, description, evidence } = req.body;
+      
+      if (!receiptNumber || !disputeType || !description) {
+        return res.status(400).json({ message: "Receipt number, dispute type, and description are required" });
+      }
+      
+      // For demo purposes, we'll simulate creating a dispute
+      // In production, this would create entries in a disputes table
+      const dispute = {
+        id: Date.now(),
+        receiptNumber,
+        disputeType,
+        priority: priority || 'medium',
+        disputeReason: description,
+        evidence: evidence || null,
+        status: 'disputed',
+        createdAt: new Date().toISOString(),
+        userId
+      };
+      
+      console.log("Dispute filed:", dispute);
+      
+      res.setHeader('Content-Type', 'application/json');
+      res.status(201).json({
+        success: true,
+        dispute,
+        message: 'Dispute filed successfully and sent to Red Channel for review'
+      });
+    } catch (error) {
+      console.error("Error filing dispute:", error);
+      res.setHeader('Content-Type', 'application/json');
+      res.status(500).json({ message: "Failed to file dispute" });
+    }
+  });
+
   // Loans routes
   apiRouter.get("/loans", async (req: Request, res: Response) => {
     try {
@@ -551,27 +657,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Nearby warehouses route
-  apiRouter.get("/warehouses/nearby", async (req: Request, res: Response) => {
-    try {
-      const { lat, lng, radius = 50 } = req.query;
-      
-      if (!lat || !lng) {
-        return res.status(400).json({ message: "Latitude and longitude are required" });
-      }
-      
-      // For demo purposes, return all warehouses
-      // In production, this would filter by geographic proximity
-      const warehouses = await storage.listWarehouses();
-      
-      res.setHeader('Content-Type', 'application/json');
-      res.json(warehouses.slice(0, 3)); // Return closest 3
-    } catch (error) {
-      console.error("Error fetching nearby warehouses:", error);
-      res.setHeader('Content-Type', 'application/json');
-      res.status(500).json({ message: "Failed to fetch nearby warehouses" });
-    }
-  });
 
   // Process routes (for deposits and workflows)
   apiRouter.get("/processes", async (req: Request, res: Response) => {

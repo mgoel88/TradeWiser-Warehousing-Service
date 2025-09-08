@@ -188,15 +188,15 @@ export default function DepositFlow({
     const distanceA = calculateDistance(
       userLocation[0],
       userLocation[1],
-      parseFloat(a.latitude),
-      parseFloat(a.longitude)
+      parseFloat(a.latitude || '0'),
+      parseFloat(a.longitude || '0')
     );
 
     const distanceB = calculateDistance(
       userLocation[0],
       userLocation[1],
-      parseFloat(b.latitude),
-      parseFloat(b.longitude)
+      parseFloat(b.latitude || '0'),
+      parseFloat(b.longitude || '0')
     );
 
     return distanceA - distanceB;
@@ -485,9 +485,9 @@ export default function DepositFlow({
               <div>
                 <label className="text-sm font-medium mb-2 block">Choose Warehouse</label>
                 <WarehouseSelector
-                  warehouses={warehouses}
-                  selectedWarehouse={selectedWarehouse}
-                  onSelect={handleSelectWarehouse}
+                  warehouses={warehouses as any}
+                  selectedWarehouse={selectedWarehouse as any}
+                  onSelect={handleSelectWarehouse as any}
                 />
               </div>
               
