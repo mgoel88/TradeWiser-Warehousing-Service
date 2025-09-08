@@ -420,13 +420,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     dest: 'uploads/', 
     limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit
     fileFilter: (req, file, cb) => {
-      const allowedTypes = /jpeg|jpg|png|pdf|csv|xlsx|xls/;
-      const fileType = allowedTypes.test(path.extname(file.originalname).toLowerCase());
-      const mimeType = allowedTypes.test(file.mimetype);
+      const allowedExtensions = /\.(jpeg|jpg|png|pdf|csv|xlsx|xls)$/i;
+      const allowedMimes = /image\/(jpeg|jpg|png)|application\/(pdf|vnd\.ms-excel|vnd\.openxmlformats-officedocument\.spreadsheetml\.sheet|octet-stream)|text\/csv/;
       
-      if (mimeType && fileType) {
+      const fileType = allowedExtensions.test(file.originalname.toLowerCase());
+      const mimeType = allowedMimes.test(file.mimetype);
+      
+      // For CSV files with generic MIME type, rely more on extension
+      if ((fileType && file.originalname.toLowerCase().endsWith('.csv')) || (mimeType && fileType)) {
         return cb(null, true);
       } else {
+        console.log("File rejected:", {filename: file.originalname, mimetype: file.mimetype});
         cb(new Error('Only image, PDF, CSV, and Excel files are allowed'));
       }
     }
