@@ -1207,18 +1207,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Test endpoint
-  apiRouter.get("/test", (req: Request, res: Response) => {
-    res.json({ message: "API is working", timestamp: new Date().toISOString() });
-  });
-
-  // Mount API router on /api path
-  app.use("/api", apiRouter);
-  
-  // Handle 404 for unknown API routes - this must be last
-  app.use('/api/*', (req, res) => {
-    res.status(404).json({ message: "API endpoint not found" });
-  });
   // Webhook authentication middleware
   const authenticateWebhook = (req: Request, res: Response, next: Function) => {
     const apiKey = req.headers['x-api-key'];
@@ -1686,6 +1674,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.error('Webhook error - quality results:', error);
       res.status(500).json({ message: 'Failed to process quality results' });
     }
+  });
+
+  // Test endpoint
+  apiRouter.get("/test", (req: Request, res: Response) => {
+    res.json({ message: "API is working", timestamp: new Date().toISOString() });
+  });
+
+  // Mount API router on /api path
+  app.use("/api", apiRouter);
+  
+  // Handle 404 for unknown API routes - this must be last
+  app.use('/api/*', (req, res) => {
+    res.status(404).json({ message: "API endpoint not found" });
   });
 
   console.log("API routes registered successfully");
