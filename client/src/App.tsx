@@ -26,6 +26,8 @@ import SackDetailPage from "@/pages/SackDetailPage";
 import ImportReceiptsPage from "@/pages/ImportReceiptsPage";
 import PrivateStoragePage from "@/pages/PrivateStoragePage";
 import SettingsPage from "@/pages/SettingsPage";
+import AdminDashboard from "@/pages/AdminDashboard";
+import SwaggerDocsPage from "@/pages/SwaggerDocsPage";
 import NotFound from "@/pages/not-found";
 import ProductDemoPage from "@/pages/ProductDemoPage";
 
@@ -54,6 +56,8 @@ function Router() {
       <Route path="/import-receipts" component={ImportReceiptsPage} />
       <Route path="/private-storage" component={PrivateStoragePage} />
       <Route path="/settings" component={SettingsPage} />
+      <Route path="/admin/integration-health" component={AdminDashboard} />
+      <Route path="/docs/api" component={SwaggerDocsPage} />
       <Route path="/demo" component={ProductDemoPage} />
       <Route component={NotFound} />
     </Switch>

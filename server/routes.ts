@@ -10,6 +10,7 @@ import { fromZodError } from "zod-validation-error";
 import multer from "multer";
 import IntegrationMonitoringService from "./services/IntegrationMonitoringService";
 import RetryService from "./services/RetryService";
+import { webhookRateLimiter, adminRateLimiter, generalRateLimiter } from "./middleware/rateLimiter";
 import 'express-session';
 
 declare module 'express-session' {
@@ -1299,7 +1300,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // WEBHOOK ENDPOINTS
 
   // Webhook: Warehouse Status Updates
-  apiRouter.post("/webhooks/warehouse/status-update", authenticateWebhook, async (req: Request, res: Response) => {
+  apiRouter.post("/webhooks/warehouse/status-update", webhookRateLimiter, authenticateWebhook, async (req: Request, res: Response) => {
+    const startTime = Date.now();
     try {
       const { processId, status, stage, metadata, timestamp } = req.body;
       
@@ -1345,6 +1347,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       console.log(`Warehouse status update for process ${processId}: ${stage} -> ${status}`);
+      
+      const responseTime = Date.now() - startTime;
+      monitoringService.recordWebhookRequest('/api/webhooks/warehouse/status-update', true, responseTime);
 
       res.json({
         success: true,
@@ -1357,6 +1362,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
     } catch (error) {
       console.error('Webhook error - warehouse status update:', error);
+      const responseTime = Date.now() - startTime;
+      monitoringService.recordWebhookRequest('/api/webhooks/warehouse/status-update', false, responseTime, 
+        error instanceof Error ? error.message : String(error), 'business', 500);
       res.status(500).json({ message: 'Failed to process warehouse status update' });
     }
   });
@@ -1680,6 +1688,258 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.error('Webhook error - quality results:', error);
       res.status(500).json({ message: 'Failed to process quality results' });
     }
+  });
+
+  // ADMIN ENDPOINTS
+
+  // Admin: System Health Dashboard
+  apiRouter.get("/admin/system-health", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const health = monitoringService.getSystemHealth();
+      res.json(health);
+    } catch (error) {
+      console.error('Failed to get system health:', error);
+      res.status(500).json({ message: 'Failed to retrieve system health' });
+    }
+  });
+
+  // Admin: Error Logs
+  apiRouter.get("/admin/error-logs", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const limit = parseInt(req.query.limit as string) || 50;
+      const endpoint = req.query.endpoint as string;
+      
+      const errors = monitoringService.getRecentErrors(limit, endpoint);
+      res.json(errors);
+    } catch (error) {
+      console.error('Failed to get error logs:', error);
+      res.status(500).json({ message: 'Failed to retrieve error logs' });
+    }
+  });
+
+  // Admin: Integration Metrics Export
+  apiRouter.get("/admin/metrics/export", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const metrics = monitoringService.exportMetrics();
+      
+      res.setHeader('Content-Type', 'application/json');
+      res.setHeader('Content-Disposition', `attachment; filename="integration-metrics-${Date.now()}.json"`);
+      res.json(metrics);
+    } catch (error) {
+      console.error('Failed to export metrics:', error);
+      res.status(500).json({ message: 'Failed to export metrics' });
+    }
+  });
+
+  // Admin: Force Health Check
+  apiRouter.post("/admin/health-check/:module", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const module = req.params.module;
+      const isHealthy = await monitoringService.performHealthCheck(module);
+      
+      res.json({
+        module,
+        isHealthy,
+        timestamp: new Date().toISOString(),
+        message: isHealthy ? 'Health check passed' : 'Health check failed'
+      });
+    } catch (error) {
+      console.error(`Health check failed for ${req.params.module}:`, error);
+      res.status(500).json({ message: 'Health check failed' });
+    }
+  });
+
+  // API Documentation Endpoint (OpenAPI Specification)
+  apiRouter.get("/docs/openapi.json", (req: Request, res: Response) => {
+    const openApiSpec = {
+      openapi: "3.0.3",
+      info: {
+        title: "TradeWiser Webhook Integration API",
+        description: "Comprehensive webhook system for external warehouse and quality testing module integration",
+        version: "1.0.0",
+        contact: {
+          name: "TradeWiser Platform",
+          email: "integrations@tradewiser.com"
+        }
+      },
+      servers: [
+        {
+          url: `${req.protocol}://${req.get('host')}/api`,
+          description: "Production server"
+        }
+      ],
+      paths: {
+        "/webhooks/warehouse/status-update": {
+          post: {
+            summary: "Warehouse Status Update",
+            description: "Receive real-time status updates from warehouse management module",
+            tags: ["Webhooks"],
+            security: [{ ApiKeyAuth: [] }],
+            requestBody: {
+              required: true,
+              content: {
+                "application/json": {
+                  schema: {
+                    type: "object",
+                    required: ["processId", "status"],
+                    properties: {
+                      processId: { type: "integer", description: "Process ID being updated" },
+                      status: { type: "string", enum: ["pending", "in_progress", "completed", "failed"] },
+                      stage: { type: "string", description: "Current workflow stage" },
+                      metadata: { type: "object", description: "Additional status metadata" },
+                      timestamp: { type: "string", format: "date-time" }
+                    }
+                  }
+                }
+              }
+            },
+            responses: {
+              200: {
+                description: "Status updated successfully",
+                content: {
+                  "application/json": {
+                    schema: {
+                      type: "object",
+                      properties: {
+                        success: { type: "boolean" },
+                        processId: { type: "integer" },
+                        status: { type: "string" },
+                        stage: { type: "string" },
+                        message: { type: "string" },
+                        timestamp: { type: "string", format: "date-time" }
+                      }
+                    }
+                  }
+                }
+              },
+              401: { description: "Invalid or missing API key" },
+              404: { description: "Process not found" },
+              500: { description: "Internal server error" }
+            }
+          }
+        },
+        "/webhooks/warehouse/weight-update": {
+          post: {
+            summary: "IoT Weight & Quality Data",
+            description: "Receive IoT weighbridge data and quality assessment results",
+            tags: ["Webhooks"],
+            security: [{ ApiKeyAuth: [] }],
+            requestBody: {
+              required: true,
+              content: {
+                "application/json": {
+                  schema: {
+                    type: "object",
+                    properties: {
+                      processId: { type: "integer", description: "Process ID (optional if commodityId provided)" },
+                      commodityId: { type: "integer", description: "Commodity ID (optional if processId provided)" },
+                      actualWeight: { type: "string", description: "Actual weight measurement" },
+                      measurementUnit: { type: "string", enum: ["kg", "MT", "ton"] },
+                      qualityGrade: { type: "string", enum: ["Premium", "A", "Good", "B", "Fair", "C", "Poor"] },
+                      moistureContent: { type: "number", description: "Moisture percentage" },
+                      timestamp: { type: "string", format: "date-time" }
+                    }
+                  }
+                }
+              }
+            },
+            responses: {
+              200: {
+                description: "Weight and quality data updated successfully",
+                content: {
+                  "application/json": {
+                    schema: {
+                      type: "object",
+                      properties: {
+                        success: { type: "boolean" },
+                        commodityId: { type: "integer" },
+                        processId: { type: "integer" },
+                        actualWeight: { type: "string" },
+                        qualityGrade: { type: "string" },
+                        newValuation: { type: "string" },
+                        receiptGenerated: { type: "boolean" },
+                        message: { type: "string" },
+                        timestamp: { type: "string", format: "date-time" }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "/webhooks/quality/results": {
+          post: {
+            summary: "Quality Testing Results",
+            description: "Receive AI-powered quality assessment results",
+            tags: ["Webhooks"],
+            security: [{ ApiKeyAuth: [] }],
+            requestBody: {
+              required: true,
+              content: {
+                "application/json": {
+                  schema: {
+                    type: "object",
+                    properties: {
+                      commodityId: { type: "integer", description: "Commodity ID (optional if processId provided)" },
+                      processId: { type: "integer", description: "Process ID (optional if commodityId provided)" },
+                      qualityScore: { type: "integer", minimum: 0, maximum: 100 },
+                      grade: { type: "string", enum: ["Premium", "A", "B", "C"] },
+                      parameters: { type: "object", description: "Quality assessment parameters" },
+                      defects: { type: "array", items: { type: "string" } },
+                      recommendations: { type: "array", items: { type: "string" } },
+                      certificationUrl: { type: "string", format: "uri" },
+                      timestamp: { type: "string", format: "date-time" }
+                    }
+                  }
+                }
+              }
+            },
+            responses: {
+              200: {
+                description: "Quality assessment results processed successfully",
+                content: {
+                  "application/json": {
+                    schema: {
+                      type: "object",
+                      properties: {
+                        success: { type: "boolean" },
+                        commodityId: { type: "integer" },
+                        processId: { type: "integer" },
+                        qualityScore: { type: "integer" },
+                        grade: { type: "string" },
+                        newValuation: { type: "string" },
+                        receiptNumber: { type: "string" },
+                        message: { type: "string" },
+                        timestamp: { type: "string", format: "date-time" }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      components: {
+        securitySchemes: {
+          ApiKeyAuth: {
+            type: "apiKey",
+            in: "header",
+            name: "X-API-Key",
+            description: "API key for webhook authentication"
+          }
+        }
+      },
+      tags: [
+        {
+          name: "Webhooks",
+          description: "Webhook endpoints for external system integration"
+        }
+      ]
+    };
+
+    res.json(openApiSpec);
   });
 
   // Test endpoint
