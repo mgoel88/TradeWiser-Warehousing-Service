@@ -851,6 +851,65 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const process = await storage.createProcess(processData);
       
       console.log("Created process:", process.id);
+
+      // Send commodity data to warehouse module for processing
+      try {
+        if (typeof globalThis.sendToWarehouseModule === 'function') {
+          const warehouseData = {
+            processId: process.id,
+            commodity: {
+              id: commodity.id,
+              name: commodity.name,
+              type: commodity.type,
+              grade: commodity.grade,
+              quantity: commodity.quantity,
+              measurementUnit: commodity.measurementUnit
+            },
+            warehouse: {
+              id: warehouse.id,
+              name: warehouse.name,
+              location: warehouse.location
+            },
+            owner: {
+              id: req.session.userId
+            },
+            pickupSchedule: {
+              date: pickupDate,
+              time: pickupTime,
+              address: pickupAddress
+            },
+            timestamp: new Date().toISOString()
+          };
+          
+          await globalThis.sendToWarehouseModule(warehouseData);
+          console.log(`Sent commodity ${commodity.id} to warehouse module for processing`);
+        }
+      } catch (error) {
+        console.warn('Failed to send data to warehouse module:', error);
+        // Don't fail the entire request if warehouse integration fails
+      }
+
+      // Request quality testing for the commodity
+      try {
+        if (typeof globalThis.requestQualityTesting === 'function') {
+          const qualityData = {
+            commodityId: commodity.id,
+            processId: process.id,
+            commodityType: commodity.type,
+            expectedGrade: commodity.grade,
+            quantity: commodity.quantity,
+            harvestDate: commodity.harvestDate,
+            storageConditions: commodity.storageConditions,
+            timestamp: new Date().toISOString()
+          };
+          
+          await globalThis.requestQualityTesting(qualityData);
+          console.log(`Requested quality testing for commodity ${commodity.id}`);
+        }
+      } catch (error) {
+        console.warn('Failed to request quality testing:', error);
+        // Don't fail the entire request if quality integration fails
+      }
       
       res.setHeader('Content-Type', 'application/json');
       res.status(201).json(process);
@@ -1160,9 +1219,653 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use('/api/*', (req, res) => {
     res.status(404).json({ message: "API endpoint not found" });
   });
-  
+  // Webhook authentication middleware
+  const authenticateWebhook = (req: Request, res: Response, next: Function) => {
+    const apiKey = req.headers['x-api-key'];
+    const expectedKeys = (process.env.WEBHOOK_API_KEYS || 'warehouse-key-123,quality-key-456').split(',');
+    
+    if (!apiKey || !expectedKeys.includes(apiKey as string)) {
+      return res.status(401).json({ message: 'Invalid or missing API key' });
+    }
+    
+    // Verify request signature if present
+    const signature = req.headers['x-signature'];
+    const timestamp = req.headers['x-timestamp'];
+    
+    if (signature && timestamp) {
+      const payload = JSON.stringify(req.body) + timestamp;
+      const secret = process.env.WEBHOOK_SECRET || 'tradewiser-webhook-secret';
+      const expectedSignature = crypto.createHmac('sha256', secret).update(payload).digest('hex');
+      
+      if (signature !== expectedSignature) {
+        return res.status(401).json({ message: 'Invalid request signature' });
+      }
+    }
+    
+    next();
+  };
+
+  // Outbound API functions
+  const sendToWarehouseModule = async (data: any) => {
+    try {
+      const warehouseApiUrl = process.env.WAREHOUSE_MODULE_URL || 'http://localhost:3001';
+      const apiKey = process.env.WAREHOUSE_MODULE_API_KEY || 'warehouse-api-key';
+      
+      const response = await fetch(`${warehouseApiUrl}/api/process-commodity`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiKey}`,
+          'User-Agent': 'TradeWiser-Platform/1.0'
+        },
+        body: JSON.stringify(data)
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Warehouse module responded with status: ${response.status}`);
+      }
+      
+      const result = await response.json();
+      console.log('Sent to warehouse module:', result);
+      return result;
+    } catch (error) {
+      console.error('Failed to send to warehouse module:', error);
+      throw error;
+    }
+  };
+
+  const requestQualityTesting = async (commodityData: any) => {
+    try {
+      const qualityApiUrl = process.env.QUALITY_MODULE_URL || 'http://localhost:3002';
+      const apiKey = process.env.QUALITY_MODULE_API_KEY || 'quality-api-key';
+      
+      const response = await fetch(`${qualityApiUrl}/api/analyze-quality`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiKey}`,
+          'User-Agent': 'TradeWiser-Platform/1.0'
+        },
+        body: JSON.stringify(commodityData)
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Quality module responded with status: ${response.status}`);
+      }
+      
+      const result = await response.json();
+      console.log('Quality testing requested:', result);
+      return result;
+    } catch (error) {
+      console.error('Failed to request quality testing:', error);
+      throw error;
+    }
+  };
+
+  // WEBHOOK ENDPOINTS
+
+  // Webhook: Warehouse Status Updates
+  apiRouter.post("/webhooks/warehouse/status-update", authenticateWebhook, async (req: Request, res: Response) => {
+    try {
+      const { processId, status, stage, metadata, timestamp } = req.body;
+      
+      if (!processId || !status) {
+        return res.status(400).json({ message: 'processId and status are required' });
+      }
+
+      // Update process status
+      const process = await storage.getProcess(processId);
+      if (!process) {
+        return res.status(404).json({ message: 'Process not found' });
+      }
+
+      // Update process with new status and stage information
+      const updatedProcess = await storage.updateProcess(processId, {
+        currentStage: stage || process.currentStage,
+        stageProgress: {
+          ...process.stageProgress,
+          [stage]: status
+        },
+        metadata: JSON.stringify({
+          ...JSON.parse(process.metadata || '{}'),
+          ...metadata,
+          lastWarehouseUpdate: timestamp || new Date().toISOString()
+        })
+      });
+
+      // Broadcast WebSocket update to subscribed clients
+      if (typeof globalThis.broadcastEntityUpdate === 'function') {
+        globalThis.broadcastEntityUpdate(
+          process.ownerId!,
+          'process', 
+          processId,
+          {
+            type: 'status_update',
+            processId,
+            status,
+            stage,
+            metadata,
+            timestamp: timestamp || new Date().toISOString()
+          }
+        );
+      }
+
+      console.log(`Warehouse status update for process ${processId}: ${stage} -> ${status}`);
+
+      res.json({
+        success: true,
+        processId,
+        status,
+        stage,
+        message: 'Status updated successfully',
+        timestamp: new Date().toISOString()
+      });
+
+    } catch (error) {
+      console.error('Webhook error - warehouse status update:', error);
+      res.status(500).json({ message: 'Failed to process warehouse status update' });
+    }
+  });
+
+  // Webhook: IoT Weight & Quality Data
+  apiRouter.post("/webhooks/warehouse/weight-update", authenticateWebhook, async (req: Request, res: Response) => {
+    try {
+      const { processId, commodityId, actualWeight, measurementUnit, qualityGrade, moistureContent, timestamp } = req.body;
+      
+      if (!processId && !commodityId) {
+        return res.status(400).json({ message: 'processId or commodityId is required' });
+      }
+
+      let commodity, process;
+
+      // Get process and commodity data
+      if (processId) {
+        process = await storage.getProcess(processId);
+        if (process) {
+          commodity = await storage.getCommodity(process.commodityId!);
+        }
+      } else {
+        commodity = await storage.getCommodity(commodityId);
+      }
+
+      if (!commodity) {
+        return res.status(404).json({ message: 'Commodity not found' });
+      }
+
+      // Update commodity with actual weight and quality data
+      const updatedCommodity = await storage.updateCommodity(commodity.id, {
+        quantity: actualWeight || commodity.quantity,
+        measurementUnit: measurementUnit || commodity.measurementUnit,
+        quality: qualityGrade || commodity.quality,
+        metadata: JSON.stringify({
+          ...JSON.parse(commodity.metadata || '{}'),
+          actualWeight,
+          moistureContent,
+          qualityGrade,
+          iotUpdate: timestamp || new Date().toISOString()
+        })
+      });
+
+      // Recalculate valuation based on actual weight
+      const newValuation = actualWeight ? 
+        (parseFloat(actualWeight) * 1000 * 50).toString() : 
+        commodity.valuation;
+
+      if (actualWeight && newValuation !== commodity.valuation) {
+        await storage.updateCommodity(commodity.id, { 
+          valuation: newValuation
+        });
+      }
+
+      // Check if quality assessment is complete and trigger receipt generation
+      if (qualityGrade && actualWeight && process) {
+        // Update process to indicate weight and quality are complete
+        await storage.updateProcess(process.id, {
+          currentStage: "pricing_calculated",
+          stageProgress: {
+            ...process.stageProgress,
+            weighing_complete: 'completed',
+            qa_assessment_complete: 'completed',
+            pricing_calculated: 'completed'
+          }
+        });
+
+        // Auto-generate warehouse receipt if conditions are met
+        if (qualityGrade === 'Premium' || qualityGrade === 'A' || qualityGrade === 'Good') {
+          const warehouse = await storage.getWarehouse(process.warehouseId!);
+          const receiptNumber = `WR${Date.now()}-${commodity.id}`;
+          
+          const receipt = await storage.createWarehouseReceipt({
+            receiptNumber,
+            commodityId: commodity.id,
+            warehouseId: warehouse?.id || 1,
+            ownerId: commodity.ownerId,
+            quantity: actualWeight || commodity.quantity,
+            measurementUnit: measurementUnit || commodity.measurementUnit,
+            status: "active",
+            blockchainHash: `0x${crypto.randomBytes(8).toString('hex')}`,
+            valuation: newValuation || commodity.valuation,
+            warehouseName: warehouse?.name || 'IoT Warehouse',
+            metadata: JSON.stringify({
+              type: 'iot_generated',
+              actualWeight,
+              qualityGrade,
+              moistureContent,
+              autoGenerated: true,
+              timestamp: timestamp || new Date().toISOString()
+            })
+          });
+
+          console.log(`Auto-generated warehouse receipt ${receiptNumber} for commodity ${commodity.id}`);
+        }
+      }
+
+      // Broadcast WebSocket update
+      if (typeof globalThis.broadcastEntityUpdate === 'function') {
+        globalThis.broadcastEntityUpdate(
+          commodity.ownerId,
+          'commodity',
+          commodity.id,
+          {
+            type: 'weight_quality_update',
+            commodityId: commodity.id,
+            actualWeight,
+            qualityGrade,
+            moistureContent,
+            newValuation,
+            timestamp: timestamp || new Date().toISOString()
+          }
+        );
+
+        if (process) {
+          globalThis.broadcastEntityUpdate(
+            process.ownerId!,
+            'process',
+            process.id,
+            {
+              type: 'iot_update',
+              processId: process.id,
+              actualWeight,
+              qualityGrade,
+              timestamp: timestamp || new Date().toISOString()
+            }
+          );
+        }
+      }
+
+      console.log(`IoT weight/quality update for commodity ${commodity.id}: ${actualWeight}${measurementUnit}, grade: ${qualityGrade}`);
+
+      res.json({
+        success: true,
+        commodityId: commodity.id,
+        processId: process?.id,
+        actualWeight,
+        qualityGrade,
+        newValuation,
+        receiptGenerated: qualityGrade && actualWeight && process,
+        message: 'Weight and quality data updated successfully',
+        timestamp: new Date().toISOString()
+      });
+
+    } catch (error) {
+      console.error('Webhook error - weight/quality update:', error);
+      res.status(500).json({ message: 'Failed to process weight/quality update' });
+    }
+  });
+
+  // Webhook: Quality Testing Results
+  apiRouter.post("/webhooks/quality/results", authenticateWebhook, async (req: Request, res: Response) => {
+    try {
+      const { 
+        commodityId, 
+        processId, 
+        qualityScore, 
+        grade, 
+        parameters, 
+        defects, 
+        recommendations,
+        certificationUrl,
+        timestamp 
+      } = req.body;
+      
+      if (!commodityId && !processId) {
+        return res.status(400).json({ message: 'commodityId or processId is required' });
+      }
+
+      let commodity, process;
+
+      // Get commodity and process data
+      if (processId) {
+        process = await storage.getProcess(processId);
+        if (process) {
+          commodity = await storage.getCommodity(process.commodityId!);
+        }
+      } else {
+        commodity = await storage.getCommodity(commodityId);
+      }
+
+      if (!commodity) {
+        return res.status(404).json({ message: 'Commodity not found' });
+      }
+
+      // Update commodity with quality assessment results
+      const updatedCommodity = await storage.updateCommodity(commodity.id, {
+        quality: grade || commodity.quality,
+        metadata: JSON.stringify({
+          ...JSON.parse(commodity.metadata || '{}'),
+          qualityAssessment: {
+            score: qualityScore,
+            grade,
+            parameters,
+            defects,
+            recommendations,
+            certificationUrl,
+            timestamp: timestamp || new Date().toISOString()
+          }
+        })
+      });
+
+      // Recalculate market valuation based on quality grade
+      let qualityMultiplier = 1.0;
+      switch (grade?.toLowerCase()) {
+        case 'premium': qualityMultiplier = 1.3; break;
+        case 'a': case 'good': qualityMultiplier = 1.1; break;
+        case 'b': case 'fair': qualityMultiplier = 0.9; break;
+        case 'c': case 'poor': qualityMultiplier = 0.7; break;
+        default: qualityMultiplier = 1.0;
+      }
+
+      const baseValuation = parseFloat(commodity.quantity) * 1000 * 50;
+      const newValuation = (baseValuation * qualityMultiplier).toString();
+
+      await storage.updateCommodity(commodity.id, { 
+        valuation: newValuation
+      });
+
+      // Update process if exists
+      if (process) {
+        await storage.updateProcess(process.id, {
+          currentStage: "qa_assessment_complete",
+          stageProgress: {
+            ...process.stageProgress,
+            visual_ai_scan: 'completed',
+            qa_assessment_complete: 'completed'
+          },
+          metadata: JSON.stringify({
+            ...JSON.parse(process.metadata || '{}'),
+            qualityResults: {
+              score: qualityScore,
+              grade,
+              parameters,
+              defects,
+              recommendations,
+              timestamp: timestamp || new Date().toISOString()
+            }
+          })
+        });
+      }
+
+      // Auto-generate receipt for high-quality commodities
+      let receipt = null;
+      if (qualityScore >= 80 || ['premium', 'a', 'good'].includes(grade?.toLowerCase())) {
+        const warehouse = process ? await storage.getWarehouse(process.warehouseId!) : null;
+        const receiptNumber = `QC${Date.now()}-${commodity.id}`;
+        
+        receipt = await storage.createWarehouseReceipt({
+          receiptNumber,
+          commodityId: commodity.id,
+          warehouseId: warehouse?.id || 1,
+          ownerId: commodity.ownerId,
+          quantity: commodity.quantity,
+          measurementUnit: commodity.measurementUnit,
+          status: "active",
+          blockchainHash: `0x${crypto.randomBytes(8).toString('hex')}`,
+          valuation: newValuation,
+          warehouseName: warehouse?.name || 'Quality Certified Warehouse',
+          metadata: JSON.stringify({
+            type: 'quality_certified',
+            qualityScore,
+            grade,
+            certificationUrl,
+            autoGenerated: true,
+            timestamp: timestamp || new Date().toISOString()
+          })
+        });
+
+        console.log(`Auto-generated quality-certified receipt ${receiptNumber} for commodity ${commodity.id}`);
+      }
+
+      // Broadcast WebSocket update
+      if (typeof globalThis.broadcastEntityUpdate === 'function') {
+        globalThis.broadcastEntityUpdate(
+          commodity.ownerId,
+          'commodity',
+          commodity.id,
+          {
+            type: 'quality_results',
+            commodityId: commodity.id,
+            qualityScore,
+            grade,
+            newValuation,
+            receiptGenerated: !!receipt,
+            timestamp: timestamp || new Date().toISOString()
+          }
+        );
+
+        if (process) {
+          globalThis.broadcastEntityUpdate(
+            process.ownerId!,
+            'process',
+            process.id,
+            {
+              type: 'quality_complete',
+              processId: process.id,
+              qualityScore,
+              grade,
+              timestamp: timestamp || new Date().toISOString()
+            }
+          );
+        }
+      }
+
+      console.log(`Quality assessment completed for commodity ${commodity.id}: ${grade} (${qualityScore}/100)`);
+
+      res.json({
+        success: true,
+        commodityId: commodity.id,
+        processId: process?.id,
+        qualityScore,
+        grade,
+        newValuation,
+        receiptNumber: receipt?.receiptNumber,
+        message: 'Quality assessment results processed successfully',
+        timestamp: new Date().toISOString()
+      });
+
+    } catch (error) {
+      console.error('Webhook error - quality results:', error);
+      res.status(500).json({ message: 'Failed to process quality results' });
+    }
+  });
+
   console.log("API routes registered successfully");
   
   const httpServer = createServer(app);
+
+  // Initialize WebSocket server on /ws path
+  const wss = new WebSocketServer({ 
+    server: httpServer, 
+    path: '/ws'
+  });
+
+  // Map to store active connections by user ID, entity type, and entity ID
+  const connections = new Map<string, WebSocket[]>();
+
+  wss.on('connection', (ws: WebSocket) => {
+    console.log('WebSocket client connected');
+    const subscriptions: {userId: string, entityType: string, entityId: string}[] = [];
+
+    ws.on('message', (message: string) => {
+      try {
+        const data = JSON.parse(message);
+
+        if (data.type === 'subscribe' && data.userId) {
+          const userId = data.userId.toString();
+          
+          if (data.processId) {
+            const processId = data.processId.toString();
+            const entityType = 'process';
+            addSubscription(ws, userId, entityType, processId, subscriptions);
+          }
+          else if (data.entityType && data.entityId) {
+            const entityType = data.entityType.toString();
+            const entityId = data.entityId.toString();
+            addSubscription(ws, userId, entityType, entityId, subscriptions);
+          }
+        }
+        else if (data.type === 'unsubscribe' && data.userId) {
+          const userId = data.userId.toString();
+
+          if (data.entityType && data.entityId) {
+            const entityType = data.entityType.toString(); 
+            const entityId = data.entityId.toString();
+            removeSubscription(ws, userId, entityType, entityId, subscriptions);
+          }
+          else if (data.processId) {
+            const processId = data.processId.toString();
+            const entityType = 'process';
+            removeSubscription(ws, userId, entityType, processId, subscriptions);
+          }
+        }
+      } catch (err) {
+        console.error('Error processing WebSocket message:', err);
+      }
+    });
+
+    ws.on('close', () => {
+      subscriptions.forEach(sub => {
+        const key = sub.userId + ":" + sub.entityType + ":" + sub.entityId;
+        const clients = connections.get(key) || [];
+        const index = clients.indexOf(ws);
+
+        if (index !== -1) {
+          clients.splice(index, 1);
+          if (clients.length === 0) {
+            connections.delete(key);
+          } else {
+            connections.set(key, clients);
+          }
+        }
+      });
+      console.log('WebSocket client disconnected');
+    });
+
+    function addSubscription(
+      ws: WebSocket,
+      userId: string,
+      entityType: string,
+      entityId: string,
+      subscriptions: {userId: string, entityType: string, entityId: string}[]
+    ) {
+      const key = userId + ":" + entityType + ":" + entityId;
+
+      if (!connections.has(key)) {
+        connections.set(key, []);
+      }
+
+      if (!connections.get(key)?.includes(ws)) {
+        connections.get(key)?.push(ws);
+      }
+
+      const existingSubscription = subscriptions.find(
+        s => s.userId === userId && s.entityType === entityType && s.entityId === entityId
+      );
+
+      if (!existingSubscription) {
+        subscriptions.push({ userId, entityType, entityId });
+      }
+
+      ws.send(JSON.stringify({
+        type: 'subscribed',
+        entityType,
+        entityId,
+        userId,
+        timestamp: new Date().toISOString()
+      }));
+
+      console.log("User " + userId + " subscribed to " + entityType + " " + entityId);
+    }
+
+    function removeSubscription(
+      ws: WebSocket,
+      userId: string,
+      entityType: string,
+      entityId: string,
+      subscriptions: {userId: string, entityType: string, entityId: string}[]
+    ) {
+      const key = userId + ":" + entityType + ":" + entityId;
+      const clients = connections.get(key) || [];
+      const index = clients.indexOf(ws);
+
+      if (index !== -1) {
+        clients.splice(index, 1);
+        if (clients.length === 0) {
+          connections.delete(key);
+        } else {
+          connections.set(key, clients);
+        }
+      }
+
+      const subIndex = subscriptions.findIndex(
+        s => s.userId === userId && s.entityType === entityType && s.entityId === entityId
+      );
+
+      if (subIndex !== -1) {
+        subscriptions.splice(subIndex, 1);
+      }
+
+      ws.send(JSON.stringify({
+        type: 'unsubscribed',
+        entityType,
+        entityId,
+        userId,
+        timestamp: new Date().toISOString()
+      }));
+
+      console.log("User " + userId + " unsubscribed from " + entityType + " " + entityId);
+    }
+  });
+
+  // Global broadcast function for webhook updates
+  globalThis.broadcastEntityUpdate = function(userId: number, entityType: string, entityId: number, updateData: any) {
+    const key = userId + ":" + entityType + ":" + entityId;
+    const clients = connections.get(key) || [];
+
+    if (clients.length === 0) {
+      return;
+    }
+
+    const message = JSON.stringify({
+      type: 'entity_update',
+      entityType,
+      entityId,
+      userId,
+      data: updateData,
+      timestamp: new Date().toISOString()
+    });
+
+    clients.forEach(client => {
+      if (client.readyState === WebSocket.OPEN) {
+        client.send(message);
+      }
+    });
+
+    console.log("Sent " + entityType + " update to " + clients.length + " clients for " + entityType + " " + entityId);
+  }
+
+  // Make outbound API functions globally available
+  globalThis.sendToWarehouseModule = sendToWarehouseModule;
+  globalThis.requestQualityTesting = requestQualityTesting;
+
   return httpServer;
 }
