@@ -2436,16 +2436,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // PORTFOLIO API - WORKING DATA
+  // PORTFOLIO API - FIXED VERSION WITH PROPER ERROR HANDLING
   apiRouter.get('/portfolio', requireAuth, async (req: Request, res: Response) => {
     try {
       const userId = req.session!.userId as number;
-      
+
+      // Get receipts with commodity data
       const receipts = await storage.listWarehouseReceiptsByOwner(userId);
       const commodities = await storage.listCommoditiesByOwner(userId);
 
-      const totalValue = receipts.reduce((sum, receipt) => sum + (parseFloat(receipt.valuation || '0')), 0);
-      const availableCredit = totalValue * 0.8; // 80% LTV
+      // Calculate portfolio metrics
+      const totalValue = receipts.reduce((sum, receipt) =>
+        sum + (parseFloat(receipt.valuation || '0')), 0);
+
+      const totalCollateralUsed = receipts.reduce((sum, receipt) =>
+        sum + (parseFloat(receipt.collateralUsed || '0')), 0);
+
+      const availableCredit = Math.max(0, (totalValue * 0.8) - totalCollateralUsed);
 
       res.json({
         success: true,
@@ -2454,12 +2461,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
           receiptsCount: receipts.length,
           availableCredit,
           receipts,
-          commodities
+          commodities: receipts
         }
       });
     } catch (error: any) {
-      console.error('Portfolio error:', error);
-      res.status(500).json({ success: false, error: error.message });
+      console.error('Portfolio API error:', error);
+      res.status(500).json({
+        success: false,
+        error: error.message,
+        data: {
+          totalValue: 0,
+          receiptsCount: 0,
+          availableCredit: 0,
+          receipts: [],
+          commodities: []
+        }
+      });
     }
   });
 
