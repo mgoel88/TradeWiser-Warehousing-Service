@@ -1,7 +1,0 @@
-Test warehouse receipt content
-Receipt Number: WH-EXT-2025001
-Commodity: Rice
-Quantity: 10 MT
-Date: 2025-09-08
-Warehouse: External Warehouse ABC
-Value: Rs 250,000
