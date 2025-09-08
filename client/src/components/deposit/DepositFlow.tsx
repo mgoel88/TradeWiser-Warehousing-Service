@@ -408,12 +408,24 @@ export default function DepositFlow({
       if (processResult && processResult.id) {
         setProcessId(processResult.id);
 
+        // AUTO-START TRACKING: Immediately call start-tracking endpoint
+        try {
+          await fetch(`/api/deposits/${processResult.id}/start-tracking`, {
+            method: 'POST',
+            credentials: 'include'
+          });
+          console.log("Auto-started tracking for process:", processResult.id);
+        } catch (error) {
+          console.warn("Failed to auto-start tracking:", error);
+          // Don't fail the whole process if this fails
+        }
+
         // Move to confirmation step
         setCurrentStep(DepositStep.Confirmation);
 
         toast({
           title: "Deposit initiated successfully",
-          description: "Your commodity deposit process has been started",
+          description: "Your commodity deposit process has been started and tracking enabled",
         });
       } else {
         throw new Error("Process ID not returned from server");
@@ -994,11 +1006,17 @@ export default function DepositFlow({
             </CardContent>
 
             <CardFooter className="flex flex-col space-y-2">
+              <div className="bg-blue-50 p-3 rounded-lg mb-4">
+                <div className="flex items-center justify-center gap-2 text-blue-800">
+                  <div className="animate-spin w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full"></div>
+                  <span className="text-sm font-medium">Automatic tracking enabled</span>
+                </div>
+              </div>
               <Button 
                 className="w-full" 
-                onClick={() => processId ? setCurrentStep(DepositStep.TrackDeposit) : null}
+                onClick={() => processId ? window.location.href = `/track/${processId}` : null}
               >
-                Track This Deposit
+                View Live Progress
               </Button>
               <Button 
                 variant="outline" 

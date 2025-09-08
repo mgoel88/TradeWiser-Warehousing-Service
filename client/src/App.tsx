@@ -30,6 +30,7 @@ import AdminDashboard from "@/pages/AdminDashboard";
 import SwaggerDocsPage from "@/pages/SwaggerDocsPage";
 import NotFound from "@/pages/not-found";
 import ProductDemoPage from "@/pages/ProductDemoPage";
+import TrackDepositPage from "@/pages/TrackDepositPage";
 
 function Router() {
   return (
@@ -45,6 +46,7 @@ function Router() {
       <Route path="/payments" component={PaymentsPage} />
       <Route path="/profile" component={ProfilePage} />
       <Route path="/deposit" component={DepositPage} />
+      <Route path="/track/:id" component={TrackDepositPage} />
       <Route path="/commodities/:id" component={CommodityDetailPage} />
       <Route path="/verify-receipt/:verificationCode" component={ReceiptVerificationPage} />
       <Route path="/receipts/verify/:code" component={ReceiptVerificationPage} />
