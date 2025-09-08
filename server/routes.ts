@@ -8,6 +8,8 @@ import { insertUserSchema } from "@shared/schema";
 import { z } from "zod";
 import { fromZodError } from "zod-validation-error";
 import multer from "multer";
+import IntegrationMonitoringService from "./services/IntegrationMonitoringService";
+import RetryService from "./services/RetryService";
 import 'express-session';
 
 declare module 'express-session' {
@@ -18,6 +20,10 @@ declare module 'express-session' {
 
 export async function registerRoutes(app: Express): Promise<Server> {
   const apiRouter = express.Router();
+  
+  // Initialize monitoring and retry services
+  const monitoringService = new IntegrationMonitoringService();
+  const retryService = new RetryService();
   
   console.log("Registering API routes...");
 
