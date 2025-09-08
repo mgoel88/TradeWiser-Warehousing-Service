@@ -1,0 +1,85 @@
+# TradeWiser: Create Module Integration & Webhook System
+
+CONTEXT: TradeWiser core application is working perfectly. Now implement webhook system for seamless integration with external warehousing and quality testing modules.
+
+OBJECTIVE: Create comprehensive API integration system for real-time communication between TradeWiser and external modules.
+
+## WEBHOOK ENDPOINTS TO CREATE:
+
+### 1. Warehouse Status Updates
+Endpoint: POST /api/webhooks/warehouse/status-update
+Purpose: Receive real-time updates from warehouse management module
+
+IMPLEMENTATION:
+- Accept webhook calls from warehouse module
+- Update process status in database (processes table)
+- Emit WebSocket updates to frontend for real-time UI updates
+- Handle all 9 deposit workflow stages
+- Update commodity status and location data
+
+### 2. IoT Weight & Quality Data  
+Endpoint: POST /api/webhooks/warehouse/weight-update
+Purpose: Receive IoT weighbridge data and quality assessment results
+
+IMPLEMENTATION:
+- Process weight measurements from IoT devices
+- Update commodity quantities based on actual measurements
+- Trigger automatic receipt generation when quality assessment complete
+- Update valuation based on final weight and grade
+
+### 3. Quality Testing Results
+Endpoint: POST /api/webhooks/quality/results  
+Purpose: Receive AI-powered quality assessment results
+
+IMPLEMENTATION:
+- Save quality assessment data to database
+- Update commodity grade and market valuation
+- Trigger automatic receipt generation if quality meets standards
+- Send notifications to user about quality results
+
+## OUTBOUND API SYSTEM:
+
+### 1. Send to Warehouse Module
+Function: sendToWarehouseModule()
+Purpose: Send new deposits to warehouse for processing
+
+FEATURES:
+- Send commodity details when deposit created
+- Include farmer information and pickup preferences  
+- Handle API authentication with warehouse module
+- Retry mechanism for failed requests
+- Error logging and monitoring
+
+### 2. Request Quality Testing
+Function: requestQualityTesting()  
+Purpose: Trigger AI quality assessment
+
+FEATURES:
+- Send commodity samples for AI analysis
+- Include commodity type and expected parameters
+- Handle quality module authentication
+- Track testing status and results
+
+## REAL-TIME UPDATES:
+
+### WebSocket Integration
+- Use existing WebSocket infrastructure (ws package)
+- Emit status updates to connected clients
+- Update dashboard values in real-time
+- Show live process tracking for deposits
+
+### Database Triggers
+- Auto-generate receipts when quality+weight confirmed
+- Update portfolio values when new data received
+- Create audit trails for all external data updates
+
+## API AUTHENTICATION:
+
+### Security Implementation
+- API key authentication for webhook endpoints
+- Request signature verification for data integrity
+- Rate limiting to prevent abuse
+- IP whitelist for trusted warehouse/quality modules
+
+## ENVIRONMENT VARIABLES:
+Add these to .env configuration:
