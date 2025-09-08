@@ -537,13 +537,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Query external receipts (Orange Channel)
   apiRouter.get("/receipts/external", requireAuth, async (req: Request, res: Response) => {
     try {
-      const userId = req.session!.userId;
+      const userId = req.session!.userId as number;
       
       // Get all warehouse receipts for orange channel (external imports)
       const allReceipts = await storage.listWarehouseReceiptsByOwner(userId);
       const externalReceipts = allReceipts.filter(receipt => 
         receipt.externalSource || 
-        (receipt.metadata && receipt.metadata.includes('external_receipt'))
+        (receipt.metadata && typeof receipt.metadata === 'string' && receipt.metadata.includes('external_receipt'))
       );
       
       res.setHeader('Content-Type', 'application/json');
