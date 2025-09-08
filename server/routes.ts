@@ -1942,6 +1942,231 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json(openApiSpec);
   });
 
+  // NEW LOAN-RECEIPT CONNECTION ENDPOINTS
+
+  // Get eligible receipts for loan collateral
+  apiRouter.get("/loans/eligible-collateral", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const userId = req.session!.userId as number;
+      
+      // Get all active receipts for the user that aren't already collateralized
+      const userReceipts = await storage.listWarehouseReceiptsByOwner(userId);
+      const eligibleReceipts = userReceipts.filter(receipt => 
+        receipt.status === 'active' && 
+        !receipt.liens && // No existing liens
+        receipt.valuation && 
+        parseFloat(receipt.valuation) > 0
+      );
+      
+      // Calculate loan eligibility for each receipt
+      const eligibleCollateral = await Promise.all(eligibleReceipts.map(async (receipt) => {
+        const receiptValue = parseFloat(receipt.valuation || '0');
+        const maxLoanAmount = Math.floor(receiptValue * 0.8); // 80% collateral ratio
+        const warehouse = await storage.getWarehouse(receipt.warehouseId!);
+        const commodity = receipt.commodityId ? await storage.getCommodity(receipt.commodityId) : null;
+        
+        return {
+          id: receipt.id,
+          receiptNumber: receipt.receiptNumber,
+          commodityName: commodity?.name || receipt.commodityName || 'Unknown Commodity',
+          commodityType: commodity?.type || 'Unknown Type',
+          quantity: receipt.quantity,
+          measurementUnit: receipt.measurementUnit || commodity?.measurementUnit || 'MT',
+          warehouseName: warehouse?.name || receipt.warehouseName || 'Unknown Warehouse',
+          receiptValue: receiptValue,
+          maxLoanAmount: maxLoanAmount,
+          collateralRatio: 80,
+          issuedDate: receipt.issuedDate,
+          expiryDate: receipt.expiryDate,
+          status: receipt.status,
+          qualityGrade: receipt.qualityGrade || commodity?.gradeAssigned || 'Standard',
+          blockchainVerified: !!receipt.blockchainHash
+        };
+      }));
+      
+      // Sort by receipt value descending (most valuable first)
+      eligibleCollateral.sort((a, b) => b.receiptValue - a.receiptValue);
+      
+      res.json({
+        eligibleCollateral,
+        totalEligibleValue: eligibleCollateral.reduce((sum, item) => sum + item.receiptValue, 0),
+        totalMaxLoanAmount: eligibleCollateral.reduce((sum, item) => sum + item.maxLoanAmount, 0),
+        count: eligibleCollateral.length
+      });
+    } catch (error) {
+      console.error('Failed to fetch eligible collateral:', error);
+      res.status(500).json({ message: 'Failed to fetch eligible collateral' });
+    }
+  });
+
+  // Calculate loan offer for specific receipts
+  apiRouter.post("/loans/calculate-offer", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const userId = req.session!.userId as number;
+      const { receiptIds, requestedAmount } = req.body;
+      
+      if (!receiptIds || !Array.isArray(receiptIds) || receiptIds.length === 0) {
+        return res.status(400).json({ message: 'Receipt IDs are required' });
+      }
+      
+      // Fetch and validate receipts
+      const receipts = await Promise.all(
+        receiptIds.map(id => storage.getWarehouseReceipt(id))
+      );
+      
+      // Check all receipts exist and belong to user
+      const validReceipts = receipts.filter((receipt): receipt is NonNullable<typeof receipt> => 
+        receipt !== undefined &&
+        receipt !== null && 
+        receipt.ownerId === userId && 
+        receipt.status === 'active' && 
+        !receipt.liens
+      );
+      
+      if (validReceipts.length !== receiptIds.length) {
+        return res.status(400).json({ message: 'Some receipts are invalid or not eligible' });
+      }
+      
+      // Calculate total collateral value
+      const totalCollateralValue = validReceipts.reduce((sum, receipt) => {
+        return sum + parseFloat(receipt.valuation || '0');
+      }, 0);
+      
+      const maxLoanAmount = Math.floor(totalCollateralValue * 0.8); // 80% ratio
+      const finalLoanAmount = requestedAmount ? 
+        Math.min(requestedAmount, maxLoanAmount) : 
+        maxLoanAmount;
+      
+      // Calculate loan terms
+      const interestRate = 12; // 12% annual rate (can be dynamic based on risk)
+      const defaultTenureMonths = 12;
+      const monthlyPayment = Math.ceil((finalLoanAmount * (1 + (interestRate / 100))) / defaultTenureMonths);
+      const totalPayment = monthlyPayment * defaultTenureMonths;
+      const totalInterest = totalPayment - finalLoanAmount;
+      
+      res.json({
+        eligible: finalLoanAmount > 0,
+        collateralReceiptIds: receiptIds,
+        totalCollateralValue,
+        maxLoanAmount,
+        requestedAmount: requestedAmount || maxLoanAmount,
+        approvedAmount: finalLoanAmount,
+        collateralRatio: 80,
+        interestRate,
+        tenureMonths: defaultTenureMonths,
+        monthlyPayment,
+        totalPayment,
+        totalInterest,
+        receipts: validReceipts.map(receipt => ({
+          id: receipt.id,
+          receiptNumber: receipt.receiptNumber,
+          value: parseFloat(receipt.valuation || '0'),
+          commodityName: receipt.commodityName,
+          quantity: receipt.quantity
+        }))
+      });
+    } catch (error) {
+      console.error('Failed to calculate loan offer:', error);
+      res.status(500).json({ message: 'Failed to calculate loan offer' });
+    }
+  });
+
+  // Apply for loan using specific receipts
+  apiRouter.post("/loans/apply-with-collateral", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const userId = req.session!.userId as number;
+      const { 
+        receiptIds, 
+        requestedAmount, 
+        tenureMonths = 12, 
+        purpose = 'Working Capital',
+        lendingPartnerName = 'TradeWiser Direct Lending'
+      } = req.body;
+      
+      if (!receiptIds || !Array.isArray(receiptIds) || receiptIds.length === 0) {
+        return res.status(400).json({ message: 'Receipt IDs are required' });
+      }
+      
+      if (!requestedAmount || requestedAmount <= 0) {
+        return res.status(400).json({ message: 'Valid requested amount is required' });
+      }
+      
+      // Get loan calculation first
+      const offerResponse = await fetch(`http://localhost:5000/api/loans/calculate-offer`, {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Cookie': req.headers.cookie || ''
+        },
+        body: JSON.stringify({ receiptIds, requestedAmount })
+      });
+      
+      if (!offerResponse.ok) {
+        return res.status(400).json({ message: 'Unable to calculate loan offer' });
+      }
+      
+      const offer = await offerResponse.json();
+      
+      if (!offer.eligible || offer.approvedAmount <= 0) {
+        return res.status(400).json({ message: 'Loan not eligible based on collateral' });
+      }
+      
+      // Create the loan
+      const endDate = new Date();
+      endDate.setMonth(endDate.getMonth() + tenureMonths);
+      
+      const newLoan = await storage.createLoan({
+        userId,
+        lendingPartnerId: 1, // Default lending partner
+        lendingPartnerName,
+        amount: offer.approvedAmount.toString(),
+        interestRate: offer.interestRate.toString(),
+        endDate,
+        status: 'pending_approval',
+        collateralReceiptIds: JSON.stringify(receiptIds),
+        outstandingAmount: offer.approvedAmount.toString(),
+        purpose,
+        creditScore: 750 // Default credit score
+      });
+      
+      // Update receipts to mark them as collateralized
+      await Promise.all(receiptIds.map(async (receiptId: number) => {
+        await storage.updateWarehouseReceipt(receiptId, {
+          status: 'collateralized',
+          liens: JSON.stringify([{
+            type: 'loan_collateral',
+            loanId: newLoan.id,
+            amount: offer.approvedAmount,
+            date: new Date().toISOString()
+          }])
+        });
+      }));
+      
+      // Auto-approve for demo purposes (in production, this would go through underwriting)
+      const approvedLoan = await storage.updateLoan(newLoan.id, {
+        status: 'approved',
+        outstandingAmount: offer.approvedAmount.toString()
+      });
+      
+      res.json({
+        success: true,
+        loan: approvedLoan,
+        message: 'Loan application submitted successfully',
+        loanId: newLoan.id,
+        approvedAmount: offer.approvedAmount,
+        monthlyPayment: offer.monthlyPayment,
+        totalPayment: offer.totalPayment,
+        interestRate: offer.interestRate,
+        tenure: tenureMonths,
+        collateralReceipts: receiptIds.length
+      });
+      
+    } catch (error) {
+      console.error('Failed to apply for loan:', error);
+      res.status(500).json({ message: 'Failed to process loan application' });
+    }
+  });
+
   // Test endpoint
   apiRouter.get("/test", (req: Request, res: Response) => {
     res.json({ message: "API is working", timestamp: new Date().toISOString() });
