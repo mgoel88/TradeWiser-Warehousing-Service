@@ -101,18 +101,54 @@ export const creditRatingEnum = pgEnum('credit_rating', [
   'AAA', 'AA', 'A', 'BBB', 'BB', 'B', 'C', 'D'
 ]);
 
-// User table
+// Authentication method enum
+export const authMethodEnum = pgEnum('auth_method', ['phone_otp', 'username_password', 'google', 'facebook']);
+
+// User table - Enhanced for multiple authentication methods
 export const users = pgTable('users', {
   id: serial('id').primaryKey(),
-  username: text('username').notNull().unique(),
-  password: text('password').notNull(),
+  
+  // Traditional credentials (optional for social/OTP users)
+  username: text('username').unique(),
+  password: text('password'),
+  
+  // Core profile information  
   fullName: text('full_name').notNull(),
-  email: text('email').notNull().unique(),
-  phone: text('phone'),
+  email: text('email').unique(),
+  phone: text('phone').unique(),
+  
+  // Authentication method tracking
+  authMethod: authMethodEnum('auth_method').notNull().default('username_password'),
+  phoneVerified: boolean('phone_verified').default(false),
+  emailVerified: boolean('email_verified').default(false),
+  
+  // Social login providers
+  googleId: text('google_id').unique(),
+  facebookId: text('facebook_id').unique(),
+  profileImageUrl: text('profile_image_url'),
+  
+  // Account status and verification
   role: userRoleEnum('role').notNull().default('farmer'),
   kycVerified: boolean('kyc_verified').default(false),
   kycDocuments: json('kyc_documents'),
   businessDetails: json('business_details'),
+  
+  // Security and tracking
+  lastLogin: timestamp('last_login'),
+  isActive: boolean('is_active').default(true),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
+});
+
+// OTP verification table for phone authentication
+export const otpVerifications = pgTable('otp_verifications', {
+  id: serial('id').primaryKey(),
+  phone: text('phone').notNull(),
+  otp: text('otp').notNull(),
+  purpose: text('purpose').notNull(), // 'login', 'registration', 'password_reset'
+  attempts: integer('attempts').default(0),
+  isUsed: boolean('is_used').default(false),
+  expiresAt: timestamp('expires_at').notNull(),
   createdAt: timestamp('created_at').defaultNow(),
 });
 

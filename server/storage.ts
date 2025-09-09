@@ -44,16 +44,24 @@ export interface InsertReceiptTransfer {
 }
 
 export interface IStorage {
-  // User operations
+  // User operations - Enhanced for multiple auth methods
   getUser(id: number): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
   getUserByEmail(email: string): Promise<User | undefined>;
+  getUserByPhone(phone: string): Promise<User | undefined>;
+  getUserByGoogleId(googleId: string): Promise<User | undefined>;
+  getUserByFacebookId(facebookId: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
   listUsers(): Promise<User[]>;
   updateUser(id: number, user: Partial<InsertUser>): Promise<User | undefined>;
   getUserSettings(userId: number): Promise<any>;
   updateUserSettings(userId: number, settings: any): Promise<any>;
   updateUserPassword(userId: number, newPassword: string): Promise<void>;
+  
+  // OTP operations
+  storeOTP(phone: string, otp: string, purpose: string, expiryMinutes: number): Promise<void>;
+  verifyOTP(phone: string, otp: string, purpose: string): Promise<boolean>;
+  cleanupExpiredOTPs(): Promise<void>;
   
   // Warehouse operations
   getWarehouse(id: number): Promise<Warehouse | undefined>;
@@ -524,6 +532,24 @@ export class MemStorage implements IStorage {
     );
   }
 
+  async getUserByPhone(phone: string): Promise<User | undefined> {
+    return Array.from(this.users.values()).find(
+      (user) => user.phone === phone
+    );
+  }
+
+  async getUserByGoogleId(googleId: string): Promise<User | undefined> {
+    return Array.from(this.users.values()).find(
+      (user) => user.googleId === googleId
+    );
+  }
+
+  async getUserByFacebookId(facebookId: string): Promise<User | undefined> {
+    return Array.from(this.users.values()).find(
+      (user) => user.facebookId === facebookId
+    );
+  }
+
   async createUser(insertUser: InsertUser): Promise<User> {
     const id = this.currentUserId++;
     const now = new Date();
@@ -595,6 +621,43 @@ export class MemStorage implements IStorage {
     if (user) {
       const updatedUser: User = { ...user, password: newPassword };
       this.users.set(userId, updatedUser);
+    }
+  }
+
+  // OTP operations - In-memory implementation
+  private otpStore = new Map<string, { otp: string; purpose: string; expiresAt: Date; attempts: number }>();
+
+  async storeOTP(phone: string, otp: string, purpose: string, expiryMinutes: number): Promise<void> {
+    const expiresAt = new Date(Date.now() + expiryMinutes * 60 * 1000);
+    const key = `${phone}_${purpose}`;
+    this.otpStore.set(key, { otp, purpose, expiresAt, attempts: 0 });
+  }
+
+  async verifyOTP(phone: string, otp: string, purpose: string): Promise<boolean> {
+    const key = `${phone}_${purpose}`;
+    const stored = this.otpStore.get(key);
+    
+    if (!stored) return false;
+    if (stored.expiresAt < new Date()) {
+      this.otpStore.delete(key);
+      return false;
+    }
+    if (stored.attempts >= 3) return false;
+    if (stored.otp !== otp) {
+      stored.attempts++;
+      return false;
+    }
+
+    this.otpStore.delete(key); // Remove after successful verification
+    return true;
+  }
+
+  async cleanupExpiredOTPs(): Promise<void> {
+    const now = new Date();
+    for (const [key, value] of this.otpStore.entries()) {
+      if (value.expiresAt < now) {
+        this.otpStore.delete(key);
+      }
     }
   }
   

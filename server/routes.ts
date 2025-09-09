@@ -11,6 +11,7 @@ import multer from "multer";
 import IntegrationMonitoringService from "./services/IntegrationMonitoringService";
 import RetryService from "./services/RetryService";
 import { webhookRateLimiter, adminRateLimiter, generalRateLimiter } from "./middleware/rateLimiter";
+import authRouter from "./routes/auth";
 import 'express-session';
 
 declare module 'express-session' {
@@ -36,8 +37,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     next();
   };
 
-  // Auth routes
-  apiRouter.post("/auth/register", async (req: Request, res: Response) => {
+  // OLD Auth routes - REPLACED with comprehensive auth system at /api/auth
+  // apiRouter.post("/auth/register", async (req: Request, res: Response) => {
     try {
       const userData = insertUserSchema.parse(req.body);
       const user = await storage.createUser(userData);
@@ -55,7 +56,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  apiRouter.post("/auth/login", async (req: Request, res: Response) => {
+  // apiRouter.post("/auth/login", async (req: Request, res: Response) => {
     try {
       const { username, password } = req.body;
       
@@ -86,7 +87,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  apiRouter.get("/auth/session", async (req: Request, res: Response) => {
+  // apiRouter.get("/auth/session", async (req: Request, res: Response) => {
     try {
       if (!req.session || !req.session.userId) {
         return res.status(401).json({ message: "Not authenticated" });
@@ -106,7 +107,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  apiRouter.post("/auth/logout", (req: Request, res: Response) => {
+  // apiRouter.post("/auth/logout", (req: Request, res: Response) => {
     req.session.destroy((err) => {
       if (err) {
         console.error("Logout error:", err);
@@ -2669,6 +2670,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   apiRouter.get("/test", (req: Request, res: Response) => {
     res.json({ message: "API is working", timestamp: new Date().toISOString() });
   });
+
+  // Enhanced Authentication System - Phone/OTP, Username/Password, Social Login
+  app.use("/api/auth", authRouter);
 
   // Mount API router on /api path
   app.use("/api", apiRouter);
