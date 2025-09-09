@@ -32,7 +32,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     // Check if user is already logged in
     const checkAuthStatus = async () => {
       try {
-        const response = await apiRequest('GET', '/auth/session');
+        const response = await apiRequest('GET', '/api/auth/session');
         const result = await response.json();
 
         if (result.success && result.data?.user) {
@@ -52,7 +52,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const login = async (username: string, password: string): Promise<boolean> => {
     try {
       setIsLoading(true);
-      const response = await apiRequest('POST', '/auth/login', { username, password });
+      const response = await apiRequest('POST', '/api/auth/login', { username, password });
       const result = await response.json();
 
       if (result.success && result.data?.user) {
@@ -80,7 +80,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const register = async (userData: any): Promise<boolean> => {
     try {
       setIsLoading(true);
-      const response = await apiRequest('POST', '/auth/register', userData);
+      const response = await apiRequest('POST', '/api/auth/register', userData);
       const result = await response.json();
 
       if (result.success && result.data?.user) {
@@ -115,7 +115,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setIsLoading(true);
       
       // Call logout API
-      await apiRequest('POST', '/auth/logout');
+      await apiRequest('POST', '/api/auth/logout');
       
       // Always clear user state regardless of API response
       setUser(null);

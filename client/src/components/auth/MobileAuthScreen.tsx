@@ -56,7 +56,7 @@ export default function MobileAuthScreen({ onAuthSuccess }: { onAuthSuccess: (us
   // Send OTP mutation
   const sendOTPMutation = useMutation({
     mutationFn: async (data: { phone: string; purpose: string }): Promise<AuthResponse> => {
-      const response = await apiRequest('POST', '/auth/send-otp', data);
+      const response = await apiRequest('POST', '/api/auth/send-otp', data);
       return response.json();
     },
     onSuccess: () => {
@@ -88,7 +88,7 @@ export default function MobileAuthScreen({ onAuthSuccess }: { onAuthSuccess: (us
   // Verify OTP mutation
   const verifyOTPMutation = useMutation({
     mutationFn: async (data: any): Promise<AuthResponse> => {
-      const response = await apiRequest('POST', '/auth/verify-otp', data);
+      const response = await apiRequest('POST', '/api/auth/verify-otp', data);
       return response.json();
     },
     onSuccess: (response: AuthResponse) => {
@@ -112,7 +112,7 @@ export default function MobileAuthScreen({ onAuthSuccess }: { onAuthSuccess: (us
   // Username/Password auth mutation
   const credentialsAuthMutation = useMutation({
     mutationFn: async (data: any): Promise<AuthResponse> => {
-      const endpoint = credentialsData.isRegistering ? '/auth/register' : '/auth/login';
+      const endpoint = credentialsData.isRegistering ? '/api/auth/register' : '/api/auth/login';
       const response = await apiRequest('POST', endpoint, data);
       return response.json();
     },
@@ -137,7 +137,7 @@ export default function MobileAuthScreen({ onAuthSuccess }: { onAuthSuccess: (us
   // Social login mutation
   const socialLoginMutation = useMutation({
     mutationFn: async (data: { provider: 'google' | 'facebook'; token: string }): Promise<AuthResponse> => {
-      const response = await apiRequest('POST', '/auth/social-login', data);
+      const response = await apiRequest('POST', '/api/auth/social-login', data);
       return response.json();
     },
     onSuccess: (response: AuthResponse) => {
