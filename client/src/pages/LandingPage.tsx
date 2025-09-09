@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useLocation } from 'wouter';
 import { useContext } from 'react';
 import { AuthContext } from '@/context/AuthContext';
+import MobileAuthScreen from '@/components/auth/MobileAuthScreen';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -30,10 +31,10 @@ import tradewiserLogo from '@assets/TradeWiser Logo_1753185456298.png';
 
 export default function LandingPage() {
   const [, setLocation] = useLocation();
-  const { user, login } = useContext(AuthContext);
+  const { user, setAuthenticatedUser, isLoading } = useContext(AuthContext);
+  const [showAuth, setShowAuth] = useState(false);
   const [loginData, setLoginData] = useState({ username: '', password: '' });
   const [loginError, setLoginError] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
 
   // If user is already logged in, redirect to dashboard
   useEffect(() => {
@@ -42,23 +43,29 @@ export default function LandingPage() {
     }
   }, [user, setLocation]);
 
+  // Handle successful authentication from any method
+  const handleAuthSuccess = (userData: any) => {
+    setAuthenticatedUser(userData);
+    setLocation('/dashboard');
+  };
+
+  // Show authentication screen if user clicks login
+  if (showAuth) {
+    return <MobileAuthScreen onAuthSuccess={handleAuthSuccess} />;
+  }
+
+  // Show loading state while checking authentication
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600"></div>
+      </div>
+    );
+  }
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsLoading(true);
-    setLoginError('');
-
-    try {
-      const success = await login(loginData.username, loginData.password);
-      if (success) {
-        setLocation('/dashboard');
-      } else {
-        setLoginError('Invalid credentials. Please try again.');
-      }
-    } catch (error) {
-      setLoginError('Network error. Please try again.');
-    } finally {
-      setIsLoading(false);
-    }
+    setShowAuth(true);
   };
 
   const scrollToSection = (sectionId: string) => {
@@ -93,7 +100,7 @@ export default function LandingPage() {
             <button onClick={() => scrollToSection('technology')} className="text-slate-300 hover:text-emerald-400 transition-all duration-300 font-medium">
               Technology
             </button>
-            <button onClick={() => scrollToSection('login')} className="bg-emerald-600 hover:bg-emerald-500 text-white px-6 py-2 rounded-lg transition-all duration-300 font-medium shadow-lg">
+            <button onClick={() => setShowAuth(true)} className="bg-emerald-600 hover:bg-emerald-500 text-white px-6 py-2 rounded-lg transition-all duration-300 font-medium shadow-lg">
               Access Platform
             </button>
           </nav>
@@ -130,7 +137,7 @@ export default function LandingPage() {
               <div className="flex flex-col sm:flex-row gap-6">
                 <Button 
                   size="lg" 
-                  onClick={() => scrollToSection('login')}
+                  onClick={() => setShowAuth(true)}
                   className="bg-emerald-600 hover:bg-emerald-500 text-white px-8 py-4 text-lg font-semibold rounded-xl shadow-2xl hover:shadow-emerald-500/25 transition-all duration-300"
                 >
                   Access Platform
@@ -398,50 +405,21 @@ export default function LandingPage() {
             <div className="absolute inset-0 bg-gradient-to-r from-emerald-500/10 to-teal-500/10 blur-2xl"></div>
             <Card className="relative bg-slate-800/80 backdrop-blur border border-slate-700 shadow-2xl">
               <CardContent className="p-8">
-                <form onSubmit={handleLogin} className="space-y-6">
-                  {loginError && (
-                    <Alert className="bg-red-900/30 border-red-700/50">
-                      <AlertDescription className="text-red-300">
-                        {loginError}
-                      </AlertDescription>
-                    </Alert>
-                  )}
+                <div className="space-y-6">
 
-                  <div>
-                    <Input
-                      type="text"
-                      placeholder="Institution Username"
-                      value={loginData.username}
-                      onChange={(e) => setLoginData({...loginData, username: e.target.value})}
-                      required
-                      className="w-full bg-slate-900/50 border-slate-600 text-white placeholder-slate-400 focus:border-emerald-500 focus:ring-emerald-500 h-12"
-                    />
-                  </div>
-
-                  <div>
-                    <Input
-                      type="password"
-                      placeholder="Secure Password"
-                      value={loginData.password}
-                      onChange={(e) => setLoginData({...loginData, password: e.target.value})}
-                      required
-                      className="w-full bg-slate-900/50 border-slate-600 text-white placeholder-slate-400 focus:border-emerald-500 focus:ring-emerald-500 h-12"
-                    />
+                  <div className="text-center">
+                    <p className="text-slate-300 mb-6">
+                      Click the button below to access the modern multi-method authentication system
+                    </p>
                   </div>
 
                   <Button 
-                    type="submit" 
-                    disabled={isLoading}
+                    onClick={() => setShowAuth(true)}
                     className="w-full bg-emerald-600 hover:bg-emerald-500 text-white h-12 text-lg font-semibold rounded-xl shadow-lg hover:shadow-emerald-500/25 transition-all duration-300"
                   >
-                    {isLoading ? (
-                      <div className="flex items-center space-x-2">
-                        <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                        <span>Authenticating...</span>
-                      </div>
-                    ) : 'Access Platform'}
+                    Access Platform
                   </Button>
-                </form>
+                </div>
 
                 <div className="mt-6 p-4 bg-slate-900/30 border border-slate-700/50 rounded-xl">
                   <div className="flex items-center space-x-2 mb-2">
