@@ -1,7 +1,7 @@
 import { Link, useLocation } from 'wouter';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
-import { Warehouse, FileText, Package, BadgeDollarSign, CreditCard, FileCheck, ExternalLink, User, Settings, LogOut } from 'lucide-react';
+import { Warehouse, FileText, Package, BadgeDollarSign, CreditCard, FileCheck, ExternalLink, User, Settings, LogOut, Wallet } from 'lucide-react';
 import tradewiserLogo from '@assets/TradeWiser Logo_1753185456298.png';
 
 export default function Sidebar() {
