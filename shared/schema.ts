@@ -297,6 +297,19 @@ export const processes = pgTable('processes', {
   startTime: timestamp('start_time').defaultNow(),
   estimatedCompletionTime: timestamp('estimated_completion_time'),
   completedTime: timestamp('completed_time'),
+  
+  // Transport and logistics details for deposit tracking
+  vehicleNumber: text('vehicle_number'),
+  driverName: text('driver_name'),
+  driverPhone: text('driver_phone'),
+  transportCompany: text('transport_company'),
+  pickupDate: timestamp('pickup_date'),
+  arrivalDate: timestamp('arrival_date'),
+  
+  // Additional tracking metadata
+  trackingData: json('tracking_data'), // Comprehensive tracking information
+  statusMessage: text('status_message'), // Current status description
+  estimatedArrival: timestamp('estimated_arrival'),
 });
 
 

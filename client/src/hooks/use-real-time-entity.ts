@@ -49,7 +49,7 @@ export function useRealTimeEntity(
       case 'receipt':
         return ['/api/receipts', entityId];
       case 'process':
-        return ['/api/processes', entityId];
+        return ['deposit-progress', entityId];
       case 'loan':
         return ['/api/loans', entityId];
       case 'commodity':
@@ -80,12 +80,12 @@ export function useRealTimeEntity(
   
   // Setup listener for entity updates
   useEffect(() => {
-    // This would normally be handled by the WebSocketContext provider
-    // But we add an additional effect to handle specific entity-related updates
-    
-    const handleEntityUpdate = (event: MessageEvent) => {
+    const handleWebSocketMessage = (event: CustomEvent) => {
       try {
-        const data = JSON.parse(event.data);
+        const data = event.detail;
+        
+        // Debug log for WebSocket messages
+        console.log('🔄 WebSocket message received:', data);
         
         // Only process messages for this specific entity
         if (
@@ -93,12 +93,15 @@ export function useRealTimeEntity(
           data.entityId === entityId && 
           data.entityType === entityType
         ) {
+          console.log(`✅ Processing ${entityType} update for entity ${entityId}`);
+          
           // Update the last update timestamp
           setLastUpdate(new Date(data.timestamp));
           
           // If autoRefresh is enabled, refresh data from the API
           if (autoRefresh) {
             const queryKey = getQueryKey();
+            console.log('🔄 Invalidating query cache:', queryKey);
             queryClient.invalidateQueries({ queryKey });
           }
           
@@ -112,11 +115,11 @@ export function useRealTimeEntity(
       }
     };
     
-    // The actual event listener would be in the WebSocketContext
-    // This is just a placeholder for the entity-specific logic
+    // Listen to WebSocket messages dispatched by WebSocketContext
+    window.addEventListener('tradewiser:ws:message', handleWebSocketMessage as EventListener);
     
     return () => {
-      // Cleanup would be handled by the WebSocketContext
+      window.removeEventListener('tradewiser:ws:message', handleWebSocketMessage as EventListener);
     };
   }, [entityType, entityId, autoRefresh, onUpdate, queryClient, getQueryKey]);
   

@@ -2210,17 +2210,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Process not found or access denied" });
       }
 
-      // Update process to start tracking with estimated completion
+      // Generate realistic transport details
+      const vehicleNumber = `MH12-AB-${Math.floor(Math.random() * 9000) + 1000}`;
+      const driverName = 'Rajesh Kumar';
+      const driverPhone = '+91-98765-43210';
+      const transportCompany = 'Swift Logistics Pvt Ltd';
+      
+      // Update process to start tracking with estimated completion and transport details
       const updatedProcess = await storage.updateProcess(parseInt(id), {
         currentStage: "pickup_scheduled",
-        stageProgress: {
+        vehicleNumber,
+        driverName,
+        driverPhone,
+        transportCompany,
+        statusMessage: 'Pickup has been scheduled and vehicle assigned',
+        stageProgress: JSON.stringify({
           startedAt: new Date(),
-          estimatedCompletion: new Date(Date.now() + 4 * 60 * 60 * 1000) // 4 hours
-        }
+          estimatedCompletion: new Date(Date.now() + 5.25 * 60 * 60 * 1000) // Total 5.25 hours for all stages
+        })
       });
 
-      // Trigger automatic progression
-      setTimeout(() => progressToNextStage(parseInt(id)), 15 * 60 * 1000); // 15 minutes
+      // Trigger automatic progression with realistic timing
+      setTimeout(() => progressToNextStage(parseInt(id)), 10 * 1000); // Start after 10 seconds for demo
 
       res.json({ success: true, data: updatedProcess });
     } catch (error) {
@@ -2238,8 +2249,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const stageProgression: Record<string, string> = {
         'pickup_scheduled': 'in_transit',
         'in_transit': 'arrived_warehouse',
-        'arrived_warehouse': 'quality_check',
-        'quality_check': 'receipt_generated'
+        'arrived_warehouse': 'quality_assessment',
+        'quality_assessment': 'pricing_complete',
+        'pricing_complete': 'receipt_generated'
+      };
+
+      const stageMessages: Record<string, string> = {
+        'pickup_scheduled': 'Pickup has been scheduled and vehicle assigned',
+        'in_transit': 'Vehicle is en route to warehouse facility',
+        'arrived_warehouse': 'Commodity has arrived at warehouse for processing',
+        'quality_assessment': 'Quality inspection and grading in progress',
+        'pricing_complete': 'Valuation and pricing has been finalized',
+        'receipt_generated': 'Electronic warehouse receipt has been generated'
       };
 
       const nextStage = stageProgression[process.currentStage || 'pickup_scheduled'];
@@ -2248,11 +2269,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const currentProgress = JSON.parse(process.stageProgress as string || '{}');
         await storage.updateProcess(processId, {
           currentStage: nextStage,
+          statusMessage: stageMessages[nextStage] || 'Processing your deposit',
           stageProgress: JSON.stringify({
             ...currentProgress,
             [`${nextStage}_at`]: new Date()
           })
         });
+
+        // Broadcast WebSocket update to connected clients
+        try {
+          if (process.userId && global.broadcastEntityUpdate) {
+            global.broadcastEntityUpdate(process.userId.toString(), 'process', processId.toString(), {
+              type: 'process_update',
+              processId,
+              entityId: processId,
+              entityType: 'process',
+              currentStage: nextStage,
+              statusMessage: stageMessages[nextStage],
+              timestamp: new Date().toISOString()
+            });
+          }
+        } catch (error) {
+          console.error('Error broadcasting WebSocket update:', error);
+        }
 
         console.log(`Process ${processId} progressed to ${nextStage}`);
 
@@ -2271,13 +2310,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
   }
 
   function getStageDelay(stage: string): number {
+    // Realistic timing delays for client demo (shortened for demonstration)
     const delays: Record<string, number> = {
-      'in_transit': 30 * 60 * 1000,        // 30 minutes
-      'arrived_warehouse': 45 * 60 * 1000, // 45 minutes
-      'quality_check': 90 * 60 * 1000,     // 90 minutes
-      'receipt_generated': 15 * 60 * 1000  // 15 minutes
+      'pickup_scheduled': 10 * 1000,       // 10 seconds for demo
+      'in_transit': 15 * 1000,             // 15 seconds for demo
+      'arrived_warehouse': 20 * 1000,      // 20 seconds for demo
+      'quality_assessment': 30 * 1000,     // 30 seconds for demo
+      'pricing_complete': 15 * 1000,       // 15 seconds for demo
+      'receipt_generated': 0                // Complete
     };
-    return delays[stage] || 30 * 60 * 1000;
+    return delays[stage] || 15 * 1000;
   }
 
   async function generateWarehouseReceipt(commodityId: number) {
@@ -2329,40 +2371,103 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const stageMessages: Record<string, string> = {
         'pickup_scheduled': 'Pickup has been scheduled and vehicle assigned',
-        'in_transit': 'Vehicle is on route to warehouse facility',
+        'in_transit': 'Vehicle is en route to warehouse facility',
         'arrived_warehouse': 'Commodity has arrived at warehouse for processing',
-        'quality_check': 'Quality assessment and grading in progress',
+        'quality_assessment': 'Quality inspection and grading in progress',
+        'pricing_complete': 'Valuation and pricing has been finalized',
         'receipt_generated': 'Electronic warehouse receipt has been generated'
       };
 
       const estimatedCompletionTimes: Record<string, number> = {
-        'pickup_scheduled': 45 * 60 * 1000, // 45 minutes
-        'in_transit': 75 * 60 * 1000,       // 75 minutes
-        'arrived_warehouse': 120 * 60 * 1000, // 2 hours
-        'quality_check': 210 * 60 * 1000,   // 3.5 hours
-        'receipt_generated': 0               // Complete
+        'pickup_scheduled': 30 * 60 * 1000,  // 30 minutes
+        'in_transit': 90 * 60 * 1000,        // 90 minutes  
+        'arrived_warehouse': 45 * 60 * 1000, // 45 minutes
+        'quality_assessment': 120 * 60 * 1000, // 2 hours
+        'pricing_complete': 30 * 60 * 1000,  // 30 minutes
+        'receipt_generated': 0                // Complete
       };
 
       const currentStage = process.currentStage || 'pickup_scheduled';
-      const estimatedCompletion = process.stageProgress ? 
-        JSON.parse(process.stageProgress as string).startedAt : new Date();
+      const stageProgress = process.stageProgress ? JSON.parse(process.stageProgress as string) : {};
+      
+      // Calculate estimated completion time
+      let estimatedCompletion = new Date();
+      if (stageProgress.startedAt) {
+        const startTime = new Date(stageProgress.startedAt);
+        const remainingTime = estimatedCompletionTimes[currentStage] || 0;
+        estimatedCompletion = new Date(startTime.getTime() + remainingTime);
+      }
 
-      res.json({
+      // Fetch related data for comprehensive tracking
+      let commodity = null;
+      let warehouse = null;
+      
+      try {
+        if (process.commodityId) {
+          commodity = await storage.getCommodity(process.commodityId);
+        }
+        if (process.warehouseId) {
+          warehouse = await storage.getWarehouse(process.warehouseId);
+        }
+      } catch (error) {
+        console.error('Error fetching related data:', error);
+      }
+
+      // Generate realistic transport details
+      const transportDetails = {
+        vehicleNumber: process.vehicleNumber || `MH12-AB-${Math.floor(Math.random() * 9000) + 1000}`,
+        driverName: process.driverName || 'Rajesh Kumar',
+        driverPhone: process.driverPhone || '+91-98765-43210',
+        transportCompany: process.transportCompany || 'Swift Logistics Pvt Ltd'
+      };
+
+      // Build comprehensive progress object with 6 stages
+      const progressData = {
+        pickup_scheduled: currentStage === 'pickup_scheduled' ? 'current' : 
+                         ['in_transit', 'arrived_warehouse', 'quality_assessment', 'pricing_complete', 'receipt_generated'].includes(currentStage) ? 'completed' : 'pending',
+        in_transit: currentStage === 'in_transit' ? 'current' : 
+                   ['arrived_warehouse', 'quality_assessment', 'pricing_complete', 'receipt_generated'].includes(currentStage) ? 'completed' : 'pending',
+        arrived_warehouse: currentStage === 'arrived_warehouse' ? 'current' : 
+                          ['quality_assessment', 'pricing_complete', 'receipt_generated'].includes(currentStage) ? 'completed' : 'pending',
+        quality_assessment: currentStage === 'quality_assessment' ? 'current' : 
+                           ['pricing_complete', 'receipt_generated'].includes(currentStage) ? 'completed' : 'pending',
+        pricing_complete: currentStage === 'pricing_complete' ? 'current' : 
+                         currentStage === 'receipt_generated' ? 'completed' : 'pending',
+        receipt_generated: currentStage === 'receipt_generated' ? 'completed' : 'pending'
+      };
+
+      // Build response with comprehensive tracking data
+      const responseData = {
         id: process.id,
         currentStage,
-        statusMessage: stageMessages[currentStage] || 'Processing your deposit',
-        estimatedCompletion: new Date(new Date(estimatedCompletion).getTime() + estimatedCompletionTimes[currentStage]),
-        progress: {
-          pickup_scheduled: currentStage !== 'pickup_scheduled' ? 'completed' : 'current',
-          in_transit: ['in_transit', 'arrived_warehouse', 'quality_check', 'receipt_generated'].includes(currentStage) ? 
-            (currentStage === 'in_transit' ? 'current' : 'completed') : 'pending',
-          arrived_warehouse: ['arrived_warehouse', 'quality_check', 'receipt_generated'].includes(currentStage) ? 
-            (currentStage === 'arrived_warehouse' ? 'current' : 'completed') : 'pending',
-          quality_check: ['quality_check', 'receipt_generated'].includes(currentStage) ? 
-            (currentStage === 'quality_check' ? 'current' : 'completed') : 'pending',
-          receipt_generated: currentStage === 'receipt_generated' ? 'completed' : 'pending'
-        }
-      });
+        statusMessage: process.statusMessage || stageMessages[currentStage] || 'Processing your deposit',
+        estimatedCompletion: estimatedCompletion.toISOString(),
+        progress: progressData
+      };
+
+      // Add commodity details if available
+      if (commodity) {
+        responseData.commodity = {
+          name: commodity.name,
+          quantity: parseFloat(commodity.quantity),
+          measurementUnit: commodity.measurementUnit || 'MT',
+          estimatedValue: commodity.valuation ? parseFloat(commodity.valuation) : getCommodityBasePrice(commodity.name) * parseFloat(commodity.quantity)
+        };
+      }
+
+      // Add warehouse details if available
+      if (warehouse) {
+        responseData.warehouse = {
+          name: warehouse.name,
+          address: `${warehouse.address}, ${warehouse.city}, ${warehouse.state}`,
+          contact: warehouse.phoneNumber || '+91-12345-67890'
+        };
+      }
+
+      // Add transport details
+      responseData.transport = transportDetails;
+
+      res.json(responseData);
     } catch (error) {
       console.error('Error fetching deposit progress:', error);
       res.status(500).json({ message: "Failed to fetch progress" });
