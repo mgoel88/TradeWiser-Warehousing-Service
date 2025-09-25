@@ -896,21 +896,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
               id: commodity.id,
               name: commodity.name,
               type: commodity.type,
-              grade: commodity.grade,
+              grade: commodity.gradeAssigned,
               quantity: commodity.quantity,
               measurementUnit: commodity.measurementUnit
             },
             warehouse: {
-              id: warehouse.id,
-              name: warehouse.name,
-              location: warehouse.location
+              id: parseInt(warehouseId),
+              name: `Warehouse ${warehouseId}`,
+              location: 'Unknown'
             },
             owner: {
               id: req.session.userId
             },
             pickupSchedule: {
-              date: pickupDate,
-              time: pickupTime,
+              date: scheduledDate,
+              time: scheduledTime,
               address: pickupAddress
             },
             timestamp: new Date().toISOString()
@@ -931,10 +931,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
             commodityId: commodity.id,
             processId: process.id,
             commodityType: commodity.type,
-            expectedGrade: commodity.grade,
+            expectedGrade: commodity.gradeAssigned,
             quantity: commodity.quantity,
-            harvestDate: commodity.harvestDate,
-            storageConditions: commodity.storageConditions,
+            harvestDate: new Date(),
+            storageConditions: 'Standard',
             timestamp: new Date().toISOString()
           };
           
