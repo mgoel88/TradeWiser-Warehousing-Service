@@ -33,14 +33,17 @@ export default function Warehouses() {
     queryKey: ['/api/warehouses'],
   });
 
-  // Calculate distance between user and warehouse
+  // Calculate distance between user and warehouse with null safety
   const calculateDistance = (warehouse: WarehouseType) => {
-    if (!userLocation) return Infinity;
+    if (!userLocation || !warehouse.latitude || !warehouse.longitude) return Infinity;
     
     const lat1 = userLocation[0];
     const lon1 = userLocation[1];
     const lat2 = Number(warehouse.latitude);
     const lon2 = Number(warehouse.longitude);
+    
+    // Check if coordinates are valid numbers
+    if (isNaN(lat2) || isNaN(lon2)) return Infinity;
     
     const R = 6371; // Radius of the earth in km
     const dLat = deg2rad(lat2 - lat1);
@@ -57,15 +60,21 @@ export default function Warehouses() {
     return deg * (Math.PI / 180);
   }
 
-  // Filter and sort warehouses
+  // Filter and sort warehouses with null safety
   const filteredWarehouses = warehouses
     .filter((warehouse: WarehouseType) => {
-          const matchesSearch = searchTerm === "" ||
-            warehouse.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            warehouse.city.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            warehouse.state.toLowerCase().includes(searchTerm.toLowerCase());
+          // Safe null checks for all properties
+          const name = warehouse.name || '';
+          const city = warehouse.city || '';
+          const state = warehouse.state || '';
+          const channelType = warehouse.channelType || '';
           
-          const matchesChannel = filterChannel === null || filterChannel === 'all' || warehouse.channelType === filterChannel;
+          const matchesSearch = searchTerm === "" ||
+            name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            city.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            state.toLowerCase().includes(searchTerm.toLowerCase());
+          
+          const matchesChannel = filterChannel === null || filterChannel === 'all' || channelType === filterChannel;
           
           return matchesSearch && matchesChannel;
         })
@@ -133,20 +142,20 @@ export default function Warehouses() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {filteredWarehouses.length > 0 ? (
             filteredWarehouses.map((warehouse: WarehouseType) => (
-              <Card key={warehouse.id} className={`overflow-hidden ${getChannelClass(warehouse.channelType)}`}>
+              <Card key={warehouse.id} className={`overflow-hidden ${getChannelClass(warehouse.channelType || 'green')}`}>
                 <CardHeader className="pb-2">
                   <div className="flex justify-between items-start">
                     <div>
-                      <CardTitle>{warehouse.name}</CardTitle>
+                      <CardTitle>{warehouse.name || 'Unknown Warehouse'}</CardTitle>
                       <CardDescription className="flex items-center mt-1">
                         <MapPin size={14} className="mr-1" />
-                        {warehouse.city}, {warehouse.state}
+                        {warehouse.city || 'Unknown'}, {warehouse.state || 'Unknown'}
                       </CardDescription>
                     </div>
                     <div className={`w-10 h-10 rounded-full flex items-center justify-center 
-                      ${warehouse.channelType === 'green' 
+                      ${(warehouse.channelType || 'green') === 'green' 
                         ? 'bg-primary-100 text-primary-600' 
-                        : warehouse.channelType === 'orange'
+                        : (warehouse.channelType || 'green') === 'orange'
                           ? 'bg-secondary-100 text-secondary-600'
                           : 'bg-red-100 text-red-600'
                       }`}>
@@ -159,22 +168,22 @@ export default function Warehouses() {
                     <div className="flex justify-between text-sm">
                       <span className="text-gray-500">Channel Type:</span>
                       <span className={`font-medium 
-                        ${warehouse.channelType === 'green' 
+                        ${(warehouse.channelType || 'green') === 'green' 
                           ? 'text-primary-600' 
-                          : warehouse.channelType === 'orange'
+                          : (warehouse.channelType || 'green') === 'orange'
                             ? 'text-secondary-600'
                             : 'text-red-600'
                         }`}>
-                        {warehouse.channelType.charAt(0).toUpperCase() + warehouse.channelType.slice(1)}
+                        {(warehouse.channelType || 'green').charAt(0).toUpperCase() + (warehouse.channelType || 'green').slice(1)}
                       </span>
                     </div>
                     <div className="flex justify-between text-sm">
                       <span className="text-gray-500">Total Capacity:</span>
-                      <span className="font-medium">{warehouse.capacity} MT</span>
+                      <span className="font-medium">{warehouse.capacity || 0} MT</span>
                     </div>
                     <div className="flex justify-between text-sm">
                       <span className="text-gray-500">Available Space:</span>
-                      <span className="font-medium">{warehouse.availableSpace} MT</span>
+                      <span className="font-medium">{warehouse.availableSpace || 0} MT</span>
                     </div>
                     {userLocation && (
                       <div className="flex justify-between text-sm">
@@ -186,9 +195,9 @@ export default function Warehouses() {
                 </CardContent>
                 <CardFooter>
                   <Button className={`w-full 
-                    ${warehouse.channelType === 'green' 
+                    ${(warehouse.channelType || 'green') === 'green' 
                       ? 'bg-primary-500 hover:bg-primary-600' 
-                      : warehouse.channelType === 'orange'
+                      : (warehouse.channelType || 'green') === 'orange'
                         ? 'bg-secondary-500 hover:bg-secondary-600'
                         : 'bg-red-500 hover:bg-red-600'
                     }`}>

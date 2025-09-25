@@ -90,6 +90,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       req.session.userId = user.id;
       
+      // Save the session to ensure userId is persisted - WITH ERROR HANDLING
+      try {
+        await new Promise<void>((resolve, reject) => {
+          req.session.save((err) => {
+            if (err) {
+              console.error('Session save error:', err);
+              reject(err);
+            } else {
+              console.log(`Session saved successfully for user ${user.id}, userId: ${req.session.userId}`);
+              resolve();
+            }
+          });
+        });
+        console.log('Session save completed successfully');
+      } catch (sessionError) {
+        console.error('Session save failed, continuing anyway:', sessionError);
+        // Don't fail the login if session save fails - just log it
+      }
+      
       // Seed demo bank accounts for demo purposes
       try {
         await storage.seedDemoBankAccounts(user.id);
@@ -219,6 +238,98 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error changing password:", error);
       res.status(500).json({ message: "Failed to change password" });
+    }
+  });
+
+  // Deposit Creation Route - POST /api/deposits  
+  apiRouter.post("/deposits", requireAuth, async (req: Request, res: Response) => {
+    try {
+      console.log("=== DEPOSIT CREATION DEBUG ===");
+      console.log('User ID from session:', req.session.userId);
+      console.log('Request body:', JSON.stringify(req.body, null, 2));
+
+      const userId = req.session.userId as number;
+      const { 
+        commodityName, 
+        commodityType, 
+        quantity, 
+        measurementUnit, 
+        warehouseId, 
+        deliveryDate,
+        deliveryTime,
+        pickupAddress 
+      } = req.body;
+
+      // Validate required fields
+      if (!commodityName || !quantity || !warehouseId) {
+        return res.status(400).json({ 
+          message: "Missing required fields: commodityName, quantity, warehouseId" 
+        });
+      }
+
+      // Get warehouse details for validation
+      const warehouse = await storage.getWarehouse(warehouseId);
+      if (!warehouse) {
+        return res.status(404).json({ message: "Warehouse not found" });
+      }
+
+      // Create commodity first
+      const commodityData = {
+        name: commodityName,
+        type: commodityType || 'Grains',
+        quantity: parseFloat(quantity.toString()),
+        measurementUnit: measurementUnit || 'MT',
+        qualityParameters: {},
+        gradeAssigned: 'A',
+        ownerId: userId,
+        warehouseId: warehouseId,
+        notes: `Deposit created on ${new Date().toISOString()}`,
+        valuation: parseFloat(quantity.toString()) * 1000 * 50 // Default Rs 50/kg, 1000kg per MT
+      };
+
+      console.log('Creating commodity:', commodityData);
+      const commodity = await storage.createCommodity(commodityData);
+      console.log('Commodity created:', commodity.id);
+
+      // Create warehouse receipt
+      const receiptData = {
+        receiptNumber: `TW-${Date.now()}-${commodity.id}`,
+        commodityId: commodity.id,
+        commodityName: commodityName,
+        quantity: parseFloat(quantity.toString()),
+        measurementUnit: measurementUnit || 'MT',
+        warehouseId: warehouseId,
+        issuedDate: new Date(),
+        status: 'active' as const,
+        valuation: commodityData.valuation,
+        smartContractId: `SC-${commodity.id}-${Date.now().toString(16)}`,
+        blockchainHash: `0x${Math.random().toString(16).substr(2, 40)}`,
+        metadata: {
+          deliveryDate: deliveryDate,
+          deliveryTime: deliveryTime,
+          pickupAddress: pickupAddress,
+          channelType: 'green',
+          createdAt: new Date().toISOString()
+        }
+      };
+
+      console.log('Creating warehouse receipt:', receiptData);
+      const receipt = await storage.createWarehouseReceipt(receiptData);
+      console.log('Warehouse receipt created:', receipt.id);
+
+      res.status(201).json({
+        success: true,
+        commodity: commodity,
+        receipt: receipt,
+        message: "Deposit created successfully"
+      });
+
+    } catch (error) {
+      console.error("Deposit creation error:", error);
+      res.status(500).json({ 
+        message: "Failed to create deposit",
+        error: error instanceof Error ? error.message : String(error)
+      });
     }
   });
 
@@ -482,8 +593,54 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       const receipts = await storage.listWarehouseReceiptsByOwner(req.session.userId);
+
+      // Enhance receipts with commodity and warehouse data
+      const enhancedReceipts = await Promise.all(receipts.map(async (receipt) => {
+        // Get the liens field as a properly typed object
+        const liens: Record<string, any> = typeof receipt.liens === 'object' && receipt.liens !== null 
+          ? (receipt.liens as any) 
+          : {};
+
+        // Get related entities
+        let commodity = null;
+        let warehouse = null;
+
+        if (receipt.commodityId) {
+          try {
+            commodity = await storage.getCommodity(receipt.commodityId);
+          } catch (error) {
+            console.log("Could not find commodity with ID:", receipt.commodityId);
+          }
+        }
+
+        if (receipt.warehouseId) {
+          try {
+            warehouse = await storage.getWarehouse(receipt.warehouseId);
+          } catch (error) {
+            console.log("Could not find warehouse with ID:", receipt.warehouseId);
+          }
+        }
+
+        // Return an enhanced receipt with client-expected fields
+        return {
+          ...receipt,
+          // Add fields that the client might expect, sourced from liens and related entities
+          commodityName: commodity ? commodity.name : receipt.commodityName || liens.commodityName || 'Unknown Commodity',
+          qualityGrade: liens.qualityGrade || 'Standard',
+          warehouseName: warehouse ? warehouse.name : receipt.warehouseName || liens.warehouseName || 'Unknown Warehouse',
+          warehouseAddress: warehouse ? warehouse.address : liens.warehouseAddress || 'Unknown Address',
+          // Add a metadata field for compatibility with client code
+          metadata: {
+            verificationCode: liens.verificationCode || '',
+            processId: liens.processId || 0,
+            depositDate: liens.depositDate || receipt.issuedDate,
+            expiryDate: liens.expiryDate || receipt.expiryDate
+          }
+        };
+      }));
+
       res.setHeader('Content-Type', 'application/json');
-      res.json(receipts);
+      res.json(enhancedReceipts);
     } catch (error) {
       console.error("Error fetching receipts:", error);
       res.setHeader('Content-Type', 'application/json');
@@ -947,7 +1104,61 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Don't fail the entire request if quality integration fails
       }
       
-      // AUTO-START TRACKING: Immediately start progression after process creation
+      // IMMEDIATE WAREHOUSE RECEIPT CREATION: Create receipt right after deposit confirmation
+      try {
+        console.log("Creating warehouse receipt for completed deposit...");
+        
+        const receiptData = {
+          receiptNumber: `WR${Date.now()}-${req.session.userId}`,
+          commodityId: commodity.id,
+          warehouseId: parseInt(warehouseId),
+          ownerId: req.session.userId,
+          quantity: quantity.toString(),
+          measurementUnit: "MT",
+          status: "active" as const,
+          blockchainHash: `0x${Math.random().toString(16).substring(2, 18)}`,
+          valuation: estimatedValue?.toString() || (parseFloat(quantity) * 1000 * 50).toString(),
+          issuedDate: new Date(),
+          expiryDate: new Date(Date.now() + 6 * 30 * 24 * 60 * 60 * 1000), // 6 months from now
+          commodityName: commodityName,
+          qualityGrade: "Grade A", // Default grade
+          warehouseName: `Warehouse ${warehouseId}`, // We'll enhance this later
+          warehouseAddress: "Warehouse Address", // We'll enhance this later
+          measurementUnit: "MT",
+          liens: JSON.stringify({
+            verificationCode: `WR-${req.session.userId}-${Math.random().toString(16).substring(2, 11).toUpperCase()}`,
+            processId: process.id,
+            depositDate: new Date().toISOString(),
+            qualityParameters: {
+              moisture: "12.5%",
+              foreignMatter: "1.2%",
+              brokenGrains: "2.8%"
+            }
+          }),
+          metadata: JSON.stringify({
+            processId: process.id,
+            depositMethod: deliveryMethod,
+            scheduledDate,
+            scheduledTime,
+            pickupAddress
+          })
+        };
+
+        const receipt = await storage.createWarehouseReceipt(receiptData);
+        console.log("Warehouse receipt created immediately:", receipt.id);
+        
+        // Update process to show eWR generation completed
+        await storage.updateProcess(process.id, {
+          currentStage: "ewr_generation_complete",
+          progress: 90
+        });
+        
+      } catch (error) {
+        console.warn("Failed to create immediate warehouse receipt:", error);
+        // Don't fail the entire request if receipt creation fails
+      }
+
+      // AUTO-START TRACKING: Immediately start progression after process creation  
       setTimeout(() => progressToNextStage(process.id), 15 * 60 * 1000); // 15 minutes
       
       res.setHeader('Content-Type', 'application/json');

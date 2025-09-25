@@ -75,7 +75,7 @@ export default function DepositFlow({
   initialCommodity, 
   initialQuantity 
 }: DepositFlowProps) {
-  const { user } = useAuth();
+  const { user, isAuthenticated } = useAuth();
   const { toast } = useToast();
   const [_, setLocation] = useLocation();
   const [currentStep, setCurrentStep] = useState<DepositStep>(DepositStep.CommodityDetails);
@@ -220,10 +220,25 @@ export default function DepositFlow({
 
   // Validate pickup date is not in the past
   const isValidPickupDate = (date: string) => {
+    if (!date) return false;
+    
     const selectedDate = new Date(date);
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    return selectedDate >= today;
+    
+    // Debug logging
+    console.log('=== DATE VALIDATION DEBUG ===');
+    console.log('Input date string:', date);
+    console.log('Parsed selected date:', selectedDate);
+    console.log('Today date:', today);
+    console.log('Is valid date?', !isNaN(selectedDate.getTime()));
+    console.log('Is in future?', selectedDate >= today);
+    
+    // Check if date is valid and in the future
+    const isValid = !isNaN(selectedDate.getTime()) && selectedDate >= today;
+    console.log('Final validation result:', isValid);
+    
+    return isValid;
   };
 
   // Mock function to check slot availability (replace with actual API call)
@@ -257,10 +272,21 @@ export default function DepositFlow({
         }
       } else {
         // For managed pickup, we need date, time and address
+        console.log('=== PICKUP VALIDATION DEBUG ===');
+        console.log('pickupDate:', pickupDate);
+        console.log('pickupTime:', pickupTime);
+        console.log('pickupAddress:', pickupAddress);
+        console.log('isValidPickupDate result:', isValidPickupDate(pickupDate));
+        
         if (!pickupDate || !isValidPickupDate(pickupDate) || !pickupTime || !pickupAddress) {
+          console.log('Validation failed - showing toast');
           toast({
             title: "Missing information",
-            description: "Please fill in all the required pickup details",
+            description: `Please fill in all the required pickup details. Missing: ${
+              !pickupDate ? 'date ' : ''
+            }${!isValidPickupDate(pickupDate) ? 'valid-date ' : ''
+            }${!pickupTime ? 'time ' : ''
+            }${!pickupAddress ? 'address ' : ''}`,
             variant: "destructive",
           });
           return;
@@ -305,25 +331,11 @@ export default function DepositFlow({
         return;
       }
 
-      // Check if user is authenticated by making a direct session check
-      const sessionResponse = await fetch('/api/auth/session', {
-        credentials: 'include'
-      });
+      // Use existing authentication context instead of direct session check
+      console.log("Submitting deposit with authenticated user");
       
-      if (!sessionResponse.ok) {
-        console.error("Session validation failed:", await sessionResponse.text());
-        toast({
-          title: "Authentication required",
-          description: "Your session has expired. Please log in again to continue.",
-          variant: "destructive",
-        });
-        return;
-      }
-      
-      const userData = await sessionResponse.json();
-      console.log("Session validated, user data:", userData);
-      
-      if (!userData || !userData.id) {
+      // Check authentication using the context
+      if (!isAuthenticated || !user) {
         toast({
           title: "Authentication required",
           description: "Please log in to continue",
@@ -331,6 +343,8 @@ export default function DepositFlow({
         });
         return;
       }
+      
+      const userData = { id: user.id };
 
       // Parse quantity as a number for validation but keep as string for API
       let quantityValue: number;

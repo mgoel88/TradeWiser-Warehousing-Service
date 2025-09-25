@@ -431,9 +431,20 @@ export default function WarehouseReceiptCard({ receipt, onView, onPledge, classN
                         // Generate grades - most will be the same as receipt but some might vary
                         const grades = ["A+", "A", "B+", "B", "C+", "C"];
                         const mainGrade = commodity?.gradeAssigned || grades[1];
-                        const grade = Math.random() > 0.9 ? 
-                          grades[grades.indexOf(mainGrade) + (Math.random() > 0.5 ? 1 : -1) || 1] : 
-                          mainGrade;
+                        
+                        // Safe grade calculation with bounds checking
+                        let grade = mainGrade;
+                        if (Math.random() > 0.9 && mainGrade) {
+                          const currentIndex = grades.indexOf(mainGrade);
+                          if (currentIndex >= 0) {
+                            const offset = Math.random() > 0.5 ? 1 : -1;
+                            const newIndex = Math.max(0, Math.min(grades.length - 1, currentIndex + offset));
+                            grade = grades[newIndex];
+                          }
+                        }
+                        
+                        // Ensure grade is never undefined
+                        grade = grade || "A";
                           
                         // Status may vary
                         const statuses = ["active", "processing", "inspected"];
@@ -445,8 +456,8 @@ export default function WarehouseReceiptCard({ receipt, onView, onPledge, classN
                             <td className="p-2">{weight} kg</td>
                             <td className="p-2">
                               <Badge variant="outline" className={
-                                grade.includes("A") ? "bg-green-100 text-green-800 hover:bg-green-100" :
-                                grade.includes("B") ? "bg-blue-100 text-blue-800 hover:bg-blue-100" :
+                                (grade && grade.includes("A")) ? "bg-green-100 text-green-800 hover:bg-green-100" :
+                                (grade && grade.includes("B")) ? "bg-blue-100 text-blue-800 hover:bg-blue-100" :
                                 "bg-amber-100 text-amber-800 hover:bg-amber-100"
                               }>
                                 {grade}
