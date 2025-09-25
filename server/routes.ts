@@ -12,6 +12,7 @@ import IntegrationMonitoringService from "./services/IntegrationMonitoringServic
 import RetryService from "./services/RetryService";
 import { webhookRateLimiter, adminRateLimiter, generalRateLimiter } from "./middleware/rateLimiter";
 import authRouter from "./routes/auth";
+import { verifyPassword } from './auth';
 import 'express-session';
 
 declare module 'express-session' {
@@ -79,8 +80,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ message: "Invalid credentials" });
       }
 
-      console.log('Password comparison:', { provided: password, stored: user.password, matches: user.password === password });
-      const isValidPassword = user.password === password;
+      console.log('Password verification using secure hash comparison');
+      const isValidPassword = verifyPassword(password, user.password);
       
       if (!isValidPassword) {
         console.log("Login attempt failed: Invalid password");
