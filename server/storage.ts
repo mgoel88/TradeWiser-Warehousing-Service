@@ -11,6 +11,9 @@ import {
   collateralPledges, CollateralPledge, InsertCollateralPledge,
   loanRepayments, LoanRepayment, InsertLoanRepayment,
   userCreditProfiles, UserCreditProfile, InsertUserCreditProfile,
+  // Credit withdrawal related imports
+  userBankAccounts, UserBankAccount, InsertUserBankAccount,
+  creditWithdrawals, CreditWithdrawal, InsertCreditWithdrawal,
   // Enums for lending and loan status
   LendingPartnerType, CollateralStatus, LoanStatus, CreditRating,
   // Sack-level tracking imports
@@ -166,6 +169,31 @@ export interface IStorage {
   // Sack Quality Assessment operations
   createSackQualityAssessment(assessment: InsertSackQualityAssessment): Promise<SackQualityAssessment>;
   getSackQualityAssessmentHistory(sackId: number): Promise<SackQualityAssessment[]>;
+  
+  // Bank Account operations
+  getUserBankAccount(id: number): Promise<UserBankAccount | undefined>;
+  createUserBankAccount(bankAccount: InsertUserBankAccount): Promise<UserBankAccount>;
+  listUserBankAccounts(userId: number): Promise<UserBankAccount[]>;
+  updateUserBankAccount(id: number, bankAccount: Partial<InsertUserBankAccount>): Promise<UserBankAccount | undefined>;
+  deleteUserBankAccount(id: number): Promise<boolean>;
+  setDefaultBankAccount(userId: number, bankAccountId: number): Promise<boolean>;
+  seedDemoBankAccounts(userId: number): Promise<UserBankAccount[]>;
+  
+  // Credit Withdrawal operations
+  getCreditWithdrawal(id: number): Promise<CreditWithdrawal | undefined>;
+  createCreditWithdrawal(withdrawal: InsertCreditWithdrawal): Promise<CreditWithdrawal>;
+  listCreditWithdrawals(): Promise<CreditWithdrawal[]>;
+  listCreditWithdrawalsByUser(userId: number): Promise<CreditWithdrawal[]>;
+  updateCreditWithdrawal(id: number, withdrawal: Partial<InsertCreditWithdrawal>): Promise<CreditWithdrawal | undefined>;
+  
+  // Credit Line operations
+  getAvailableCredit(userId: number): Promise<{
+    totalCollateralValue: number;
+    maxEligibleCredit: number;
+    outstandingBalance: number;
+    availableCredit: number;
+    utilizationPercentage: number;
+  }>;
 }
 
 // In-memory storage implementation
@@ -189,6 +217,10 @@ export class MemStorage implements IStorage {
   private sackMovements: Map<number, SackMovement>;
   private sackQualityAssessments: Map<number, SackQualityAssessment>;
   
+  // Credit withdrawal related maps
+  private userBankAccounts: Map<number, UserBankAccount>;
+  private creditWithdrawals: Map<number, CreditWithdrawal>;
+  
   // ID counters
   private currentUserId: number;
   private currentWarehouseId: number;
@@ -208,6 +240,10 @@ export class MemStorage implements IStorage {
   private currentSackId: number;
   private currentSackMovementId: number;
   private currentSackQualityAssessmentId: number;
+  
+  // ID counters for credit withdrawal related entities
+  private currentBankAccountId: number;
+  private currentCreditWithdrawalId: number;
   
   constructor() {
     this.users = new Map();
@@ -229,23 +265,33 @@ export class MemStorage implements IStorage {
     this.sackMovements = new Map();
     this.sackQualityAssessments = new Map();
     
+    // Initialize maps for credit withdrawal related entities
+    this.userBankAccounts = new Map();
+    this.creditWithdrawals = new Map();
+    
     // Set starting ID counters
     this.currentUserId = 1;
     this.currentWarehouseId = 1;
     this.currentCommodityId = 1;
     
     // Create test user for development
-    this.createUser({
-      username: 'testuser',
-      password: 'password123',
-      email: 'testuser@example.com',
-      fullName: 'Test User',
-      phone: '+919876543210',
-      role: 'user',
-      address: 'Test Address, New Delhi',
-      kycVerified: true
+    // Import bcrypt dynamically to avoid dependency issues
+    import('bcrypt').then(bcrypt => {
+      return bcrypt.hash('password123', 12);
+    }).then(hashedPassword => {
+      return this.createUser({
+        username: 'testuser',
+        password: hashedPassword,
+        email: 'testuser@example.com',
+        fullName: 'Test User',
+        phone: '+919876543210',
+        role: 'farmer', // Changed to match auth schema
+        address: 'Test Address, New Delhi',
+        kycVerified: true,
+        authMethod: 'username_password'
+      });
     }).then(user => {
-      console.log('Test user created at startup: testuser/password123');
+      console.log('Test user created at startup: testuser/password123 (hashed)');
       
       // Create sample warehouses
       Promise.all([
@@ -333,6 +379,8 @@ export class MemStorage implements IStorage {
     this.currentSackId = 1;
     this.currentSackMovementId = 1;
     this.currentSackQualityAssessmentId = 1;
+    this.currentBankAccountId = 1;
+    this.currentCreditWithdrawalId = 1;
   }
   
   // Lending Partner operations
@@ -1122,6 +1170,189 @@ export class MemStorage implements IStorage {
     return Array.from(this.sackQualityAssessments.values())
       .filter(assessment => assessment.sackId === sackId)
       .sort((a, b) => b.inspectionDate.getTime() - a.inspectionDate.getTime()); // Sort by date descending
+  }
+
+  // Bank Account operations
+  async getUserBankAccount(id: number): Promise<UserBankAccount | undefined> {
+    return this.userBankAccounts.get(id);
+  }
+
+  async createUserBankAccount(bankAccount: InsertUserBankAccount): Promise<UserBankAccount> {
+    const id = this.currentBankAccountId++;
+    const now = new Date();
+    const userBankAccount: UserBankAccount = {
+      ...bankAccount,
+      id,
+      createdAt: now,
+      updatedAt: now
+    };
+    this.userBankAccounts.set(id, userBankAccount);
+    return userBankAccount;
+  }
+
+  async listUserBankAccounts(userId: number): Promise<UserBankAccount[]> {
+    return Array.from(this.userBankAccounts.values())
+      .filter(account => account.userId === userId);
+  }
+
+  async updateUserBankAccount(id: number, bankAccountData: Partial<InsertUserBankAccount>): Promise<UserBankAccount | undefined> {
+    const account = await this.getUserBankAccount(id);
+    if (!account) return undefined;
+    
+    const now = new Date();
+    const updatedAccount: UserBankAccount = {
+      ...account,
+      ...bankAccountData,
+      updatedAt: now
+    };
+    this.userBankAccounts.set(id, updatedAccount);
+    return updatedAccount;
+  }
+
+  async deleteUserBankAccount(id: number): Promise<boolean> {
+    return this.userBankAccounts.delete(id);
+  }
+
+  async setDefaultBankAccount(userId: number, bankAccountId: number): Promise<boolean> {
+    // First, unset all default accounts for this user
+    const userAccounts = await this.listUserBankAccounts(userId);
+    for (const account of userAccounts) {
+      if (account.isDefault) {
+        await this.updateUserBankAccount(account.id, { isDefault: false });
+      }
+    }
+    
+    // Set the specified account as default
+    const result = await this.updateUserBankAccount(bankAccountId, { isDefault: true });
+    return !!result;
+  }
+
+  async seedDemoBankAccounts(userId: number): Promise<UserBankAccount[]> {
+    // Check if user already has bank accounts
+    const existingAccounts = await this.listUserBankAccounts(userId);
+    if (existingAccounts.length > 0) {
+      return existingAccounts;
+    }
+
+    // Create demo bank accounts for the user
+    const demoAccounts = [
+      {
+        userId,
+        accountNumber: '1234567890123456',
+        ifscCode: 'SBIN0001234',
+        accountHolderName: 'Demo User Account',
+        bankName: 'State Bank of India',
+        branchName: 'Main Branch',
+        accountType: 'savings' as const,
+        isDefault: true,
+        isVerified: true
+      },
+      {
+        userId,
+        accountNumber: '9876543210987654',
+        ifscCode: 'HDFC0001234',
+        accountHolderName: 'Demo User Business Account',
+        bankName: 'HDFC Bank',
+        branchName: 'Commercial Branch',
+        accountType: 'current' as const,
+        isDefault: false,
+        isVerified: true
+      }
+    ];
+
+    const createdAccounts: UserBankAccount[] = [];
+    for (const accountData of demoAccounts) {
+      const account = await this.createUserBankAccount(accountData);
+      createdAccounts.push(account);
+    }
+
+    console.log(`Seeded ${createdAccounts.length} demo bank accounts for user ${userId}`);
+    return createdAccounts;
+  }
+
+  // Credit Withdrawal operations
+  async getCreditWithdrawal(id: number): Promise<CreditWithdrawal | undefined> {
+    return this.creditWithdrawals.get(id);
+  }
+
+  async createCreditWithdrawal(withdrawal: InsertCreditWithdrawal): Promise<CreditWithdrawal> {
+    const id = this.currentCreditWithdrawalId++;
+    const now = new Date();
+    const creditWithdrawal: CreditWithdrawal = {
+      ...withdrawal,
+      id,
+      requestDate: now
+    };
+    this.creditWithdrawals.set(id, creditWithdrawal);
+    return creditWithdrawal;
+  }
+
+  async listCreditWithdrawals(): Promise<CreditWithdrawal[]> {
+    return Array.from(this.creditWithdrawals.values());
+  }
+
+  async listCreditWithdrawalsByUser(userId: number): Promise<CreditWithdrawal[]> {
+    return Array.from(this.creditWithdrawals.values())
+      .filter(withdrawal => withdrawal.userId === userId)
+      .sort((a, b) => b.requestDate.getTime() - a.requestDate.getTime());
+  }
+
+  async updateCreditWithdrawal(id: number, withdrawalData: Partial<InsertCreditWithdrawal>): Promise<CreditWithdrawal | undefined> {
+    const withdrawal = await this.getCreditWithdrawal(id);
+    if (!withdrawal) return undefined;
+    
+    const now = new Date();
+    const updatedWithdrawal: CreditWithdrawal = {
+      ...withdrawal,
+      ...withdrawalData,
+      processedDate: withdrawalData.status && ['approved', 'completed', 'rejected'].includes(withdrawalData.status) ? now : withdrawal.processedDate,
+      completedDate: withdrawalData.status === 'completed' ? now : withdrawal.completedDate
+    };
+    this.creditWithdrawals.set(id, updatedWithdrawal);
+    return updatedWithdrawal;
+  }
+
+  // Credit Line operations
+  async getAvailableCredit(userId: number): Promise<{
+    totalCollateralValue: number;
+    maxEligibleCredit: number;
+    outstandingBalance: number;
+    availableCredit: number;
+    utilizationPercentage: number;
+  }> {
+    // Get all active warehouse receipts for the user
+    const receipts = await this.listWarehouseReceiptsByOwner(userId);
+    const activeReceipts = receipts.filter(receipt => receipt.status === 'active');
+    
+    // Calculate total collateral value
+    const totalCollateralValue = activeReceipts.reduce((sum, receipt) => {
+      return sum + parseFloat(receipt.valuation || '0');
+    }, 0);
+    
+    // Calculate maximum eligible credit (80% LTV ratio)
+    const LTV_RATIO = 0.8;
+    const maxEligibleCredit = totalCollateralValue * LTV_RATIO;
+    
+    // Calculate outstanding balance from all active loans
+    const userLoans = await this.listLoansByUser(userId);
+    const activeLoans = userLoans.filter(loan => loan.status === 'active');
+    const outstandingBalance = activeLoans.reduce((sum, loan) => {
+      return sum + parseFloat(loan.outstandingAmount || '0');
+    }, 0);
+    
+    // Calculate available credit
+    const availableCredit = Math.max(0, maxEligibleCredit - outstandingBalance);
+    
+    // Calculate utilization percentage
+    const utilizationPercentage = maxEligibleCredit > 0 ? (outstandingBalance / maxEligibleCredit) * 100 : 0;
+    
+    return {
+      totalCollateralValue,
+      maxEligibleCredit,
+      outstandingBalance,
+      availableCredit,
+      utilizationPercentage: Math.round(utilizationPercentage * 100) / 100 // Round to 2 decimal places
+    };
   }
 }
 

@@ -165,10 +165,10 @@ const PortfolioDashboard = () => {
           <CardContent className="p-6">
             <h3 className="text-lg font-semibold mb-2">Credit Line</h3>
             <p className="text-gray-600 mb-4">Withdraw funds against your holdings</p>
-            <Link href="/credit-line">
-              <Button className="w-full" variant="outline">
+            <Link href="/credit/withdraw">
+              <Button className="w-full" variant="outline" data-testid="button-withdraw-credit">
                 <Wallet className="w-4 h-4 mr-2" />
-                Manage Credit
+                Withdraw Funds
               </Button>
             </Link>
           </CardContent>

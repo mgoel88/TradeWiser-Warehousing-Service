@@ -134,6 +134,17 @@ export default function Sidebar() {
               Payments
             </Link>
           </li>
+          <li className="mb-2">
+            <Link href="/credit/withdraw" className={cn(
+              "flex items-center p-2 rounded-md",
+              location === "/credit/withdraw" 
+                ? "bg-primary-50 text-primary-600 font-medium" 
+                : "text-gray-700 hover:bg-gray-100"
+            )}>
+              <Wallet className="h-5 w-5 mr-3" />
+              Credit Withdrawal
+            </Link>
+          </li>
         </ul>
         
         <p className="mt-6 text-xs font-medium uppercase text-gray-500 mb-2">Account</p>

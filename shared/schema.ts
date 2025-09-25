@@ -449,6 +449,50 @@ export const sackQualityAssessments = pgTable('sack_quality_assessments', {
   blockchainHash: text('blockchain_hash'), // Verification hash
 });
 
+// User Bank Accounts - to store bank account details for withdrawals
+export const userBankAccounts = pgTable('user_bank_accounts', {
+  id: serial('id').primaryKey(),
+  userId: integer('user_id').references(() => users.id).notNull(),
+  accountNumber: text('account_number').notNull(),
+  ifscCode: text('ifsc_code').notNull(),
+  accountHolderName: text('account_holder_name').notNull(),
+  bankName: text('bank_name').notNull(),
+  branchName: text('branch_name'),
+  accountType: text('account_type').default('savings'), // 'savings', 'current'
+  isDefault: boolean('is_default').default(false),
+  isVerified: boolean('is_verified').default(false),
+  verificationMethod: text('verification_method'), // 'penny_drop', 'account_statement', etc.
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
+});
+
+// Credit Withdrawal Status Enum
+export const withdrawalStatusEnum = pgEnum('withdrawal_status', [
+  'pending', 'processing', 'approved', 'completed', 'rejected', 'failed'
+]);
+
+// Credit Withdrawals - to track credit line withdrawal requests
+export const creditWithdrawals = pgTable('credit_withdrawals', {
+  id: serial('id').primaryKey(),
+  userId: integer('user_id').references(() => users.id).notNull(),
+  bankAccountId: integer('bank_account_id').references(() => userBankAccounts.id).notNull(),
+  amount: numeric('amount', { precision: 14, scale: 2 }).notNull(),
+  availableCreditAtTime: numeric('available_credit_at_time', { precision: 14, scale: 2 }).notNull(),
+  status: withdrawalStatusEnum('status').notNull().default('pending'),
+  withdrawalMethod: text('withdrawal_method').notNull().default('bank_transfer'), // 'bank_transfer', 'upi', etc.
+  requestDate: timestamp('request_date').defaultNow(),
+  processedDate: timestamp('processed_date'),
+  completedDate: timestamp('completed_date'),
+  externalTransactionId: text('external_transaction_id'),
+  transactionReference: text('transaction_reference'),
+  processingFee: numeric('processing_fee', { precision: 8, scale: 2 }).default('0'),
+  actualAmount: numeric('actual_amount', { precision: 14, scale: 2 }), // Amount after deducting fees
+  rejectionReason: text('rejection_reason'),
+  metadata: json('metadata'), // Additional data like IP, user agent, etc.
+  approvedBy: integer('approved_by').references(() => users.id),
+  notes: text('notes'),
+});
+
 // Zod schemas for insertion
 export const insertUserSchema = createInsertSchema(users).omit({ id: true, createdAt: true });
 export const insertWarehouseSchema = createInsertSchema(warehouses).omit({ id: true, createdAt: true });
@@ -466,6 +510,12 @@ export const insertSackMovementSchema = createInsertSchema(sackMovements)
   .omit({ id: true, movementDate: true });
 export const insertSackQualityAssessmentSchema = createInsertSchema(sackQualityAssessments)
   .omit({ id: true, inspectionDate: true });
+
+// Schemas for credit withdrawal related tables
+export const insertUserBankAccountSchema = createInsertSchema(userBankAccounts)
+  .omit({ id: true, createdAt: true, updatedAt: true });
+export const insertCreditWithdrawalSchema = createInsertSchema(creditWithdrawals)
+  .omit({ id: true, requestDate: true, processedDate: true, completedDate: true });
 
 // Types
 export type InsertUser = z.infer<typeof insertUserSchema>;
@@ -524,6 +574,13 @@ export type SackMovement = typeof sackMovements.$inferSelect;
 
 export type InsertSackQualityAssessment = z.infer<typeof insertSackQualityAssessmentSchema>;
 export type SackQualityAssessment = typeof sackQualityAssessments.$inferSelect;
+
+// Types for credit withdrawal related tables
+export type InsertUserBankAccount = z.infer<typeof insertUserBankAccountSchema>;
+export type UserBankAccount = typeof userBankAccounts.$inferSelect;
+
+export type InsertCreditWithdrawal = z.infer<typeof insertCreditWithdrawalSchema>;
+export type CreditWithdrawal = typeof creditWithdrawals.$inferSelect;
 
 // Bank payment type for receipt generation
 export interface BankPayment {

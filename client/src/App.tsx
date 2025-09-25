@@ -34,6 +34,7 @@ import SwaggerDocsPage from "@/pages/SwaggerDocsPage";
 import NotFound from "@/pages/not-found";
 import ProductDemoPage from "@/pages/ProductDemoPage";
 import TrackDepositPage from "@/pages/TrackDepositPage";
+import CreditWithdrawalPage from "@/pages/CreditWithdrawalPage";
 
 function Router() {
   return (
@@ -67,6 +68,7 @@ function Router() {
       <Route path="/admin/integration-health" component={AdminDashboard} />
       <Route path="/docs/api" component={SwaggerDocsPage} />
       <Route path="/demo" component={ProductDemoPage} />
+      <Route path="/credit/withdraw" component={CreditWithdrawalPage} />
       <Route component={NotFound} />
     </Switch>
   );

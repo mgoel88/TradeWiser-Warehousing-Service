@@ -60,19 +60,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   apiRouter.post("/auth/login", async (req: Request, res: Response) => {
     try {
+      console.log('=== LOGIN DEBUG ===');
+      console.log('Request body:', JSON.stringify(req.body, null, 2));
+      
       const { username, password } = req.body;
+      console.log('Extracted credentials:', { username, password: password ? '***' : 'MISSING' });
       
       if (!username || !password) {
+        console.log('VALIDATION FAILED: Missing username or password');
         return res.status(400).json({ message: "Username and password are required" });
       }
 
       const user = await storage.getUserByUsername(username);
+      console.log('User found:', user ? `ID: ${user.id}, Username: ${user.username}` : 'NOT FOUND');
       
       if (!user) {
         console.log("Login attempt failed: Username not found");
         return res.status(401).json({ message: "Invalid credentials" });
       }
 
+      console.log('Password comparison:', { provided: password, stored: user.password, matches: user.password === password });
       const isValidPassword = user.password === password;
       
       if (!isValidPassword) {
@@ -81,6 +88,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       req.session.userId = user.id;
+      
+      // Seed demo bank accounts for demo purposes
+      try {
+        await storage.seedDemoBankAccounts(user.id);
+        console.log(`Demo bank accounts seeded for user ${user.id}`);
+      } catch (error) {
+        console.error(`Failed to seed demo bank accounts for user ${user.id}:`, error);
+        // Don't fail the login if bank account seeding fails
+      }
+      
       const { password: _, ...userWithoutPassword } = user;
       res.status(200).json(userWithoutPassword);
     } catch (error) {
@@ -99,6 +116,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       if (!user) {
         return res.status(401).json({ message: "User not found" });
+      }
+
+      // Ensure demo bank accounts are seeded for existing sessions
+      try {
+        await storage.seedDemoBankAccounts(user.id);
+      } catch (error) {
+        console.error(`Failed to seed demo bank accounts for user ${user.id}:`, error);
+        // Don't fail the session check if bank account seeding fails
       }
 
       const { password, ...userWithoutPassword } = user;
@@ -2755,36 +2780,59 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // ===============================
-  // CREDIT LINE SYSTEM - EMERGENCY FIX
+  // CREDIT LINE SYSTEM - FULL IMPLEMENTATION
   // ===============================
 
-  // Credit Line Details
+  // Get Available Credit
+  apiRouter.get('/credit/available', requireAuth, async (req: Request, res: Response) => {
+    try {
+      const userId = req.session!.userId as number;
+      console.log('=== CREDIT AVAILABLE DEBUG ===');
+      console.log('User ID:', userId);
+      
+      const creditInfo = await storage.getAvailableCredit(userId);
+      console.log('Credit info calculated:', JSON.stringify(creditInfo, null, 2));
+
+      const responseData = {
+        success: true,
+        data: {
+          totalCollateralValue: creditInfo.totalCollateralValue,
+          maxEligibleCredit: creditInfo.maxEligibleCredit,
+          outstandingBalance: creditInfo.outstandingBalance,
+          availableCredit: creditInfo.availableCredit,
+          utilizationPercentage: creditInfo.utilizationPercentage,
+          interestRate: 12.0, // Fixed rate for demo
+          processingTime: '2-4 business hours',
+          minimumWithdrawal: 1000,
+          maximumWithdrawal: creditInfo.availableCredit
+        }
+      };
+      console.log('Sending response:', JSON.stringify(responseData, null, 2));
+
+      res.json(responseData);
+    } catch (error: any) {
+      console.error('Error fetching available credit:', error);
+      res.status(500).json({ success: false, error: 'Failed to fetch available credit' });
+    }
+  });
+
+  // Credit Line Details (Legacy endpoint)
   apiRouter.get('/credit-line/details', requireAuth, async (req: Request, res: Response) => {
     try {
       const userId = req.session!.userId as number;
-
-      // Mock data for now - replace with actual NBFC API call
-      const mockCreditLine = {
-        totalLimit: 500000,
-        availableBalance: 350000,
-        outstandingAmount: 150000,
-        interestRate: 12.0,
-        dailyInterest: Math.round((150000 * 12 / 100 / 365) * 100) / 100,
-        monthlyInterest: Math.round((150000 * 12 / 100 / 12) * 100) / 100,
-        lastPaymentDate: '2025-09-01'
-      };
-
-      // TODO: Replace with actual NBFC API call
-      // const response = await fetch(`${process.env.NBFC_API_URL}/credit-line/${userId}`, {
-      //   headers: {
-      //     'Authorization': `Bearer ${process.env.NBFC_API_KEY}`,
-      //     'Content-Type': 'application/json'
-      //   }
-      // });
+      const creditInfo = await storage.getAvailableCredit(userId);
 
       res.json({
         success: true,
-        data: mockCreditLine
+        data: {
+          totalLimit: creditInfo.maxEligibleCredit,
+          availableBalance: creditInfo.availableCredit,
+          outstandingAmount: creditInfo.outstandingBalance,
+          interestRate: 12.0,
+          dailyInterest: Math.round((creditInfo.outstandingBalance * 12 / 100 / 365) * 100) / 100,
+          monthlyInterest: Math.round((creditInfo.outstandingBalance * 12 / 100 / 12) * 100) / 100,
+          lastPaymentDate: '2025-09-01'
+        }
       });
     } catch (error: any) {
       console.error('Credit line details error:', error);
@@ -2792,48 +2840,244 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Withdraw Money
-  apiRouter.post('/credit-line/withdraw', requireAuth, async (req: Request, res: Response) => {
+  // Bank Account Management
+  apiRouter.get('/credit/bank-accounts', requireAuth, async (req: Request, res: Response) => {
     try {
-      const { amount, purpose } = req.body;
       const userId = req.session!.userId as number;
+      console.log('=== BANK ACCOUNTS DEBUG ===');
+      console.log('User ID:', userId);
+      
+      // Ensure demo bank accounts are seeded if none exist
+      const bankAccounts = await storage.seedDemoBankAccounts(userId);
+      
+      // Return bank accounts with proper verification status
+      const accountsWithStatus = bankAccounts.map(account => ({
+        id: account.id,
+        accountNumber: account.accountNumber,
+        ifscCode: account.ifscCode,
+        accountHolderName: account.accountHolderName,
+        bankName: account.bankName,
+        branchName: account.branchName,
+        accountType: account.accountType,
+        isDefault: account.isDefault,
+        isVerified: account.isVerified,
+        createdAt: account.createdAt,
+        updatedAt: account.updatedAt
+      }));
+      
+      res.json({
+        success: true,
+        data: accountsWithStatus,
+        meta: {
+          total: accountsWithStatus.length,
+          verified: accountsWithStatus.filter(acc => acc.isVerified).length,
+          default: accountsWithStatus.find(acc => acc.isDefault)?.id || null
+        }
+      });
+    } catch (error: any) {
+      console.error('Error fetching bank accounts:', error);
+      res.status(500).json({ success: false, error: 'Failed to fetch bank accounts' });
+    }
+  });
 
-      if (!amount || amount <= 0) {
-        return res.status(400).json({ success: false, error: 'Invalid amount' });
+  apiRouter.post('/credit/bank-accounts', requireAuth, async (req: Request, res: Response) => {
+    try {
+      const userId = req.session!.userId as number;
+      const { accountNumber, ifscCode, accountHolderName, bankName, branchName, accountType } = req.body;
+
+      // Validate required fields
+      if (!accountNumber || !ifscCode || !accountHolderName || !bankName) {
+        return res.status(400).json({ 
+          success: false, 
+          error: 'Missing required fields: accountNumber, ifscCode, accountHolderName, bankName' 
+        });
       }
 
-      // Mock response - replace with actual NBFC API call
-      const mockResponse = {
-        transactionId: `TXN${Date.now()}`,
-        amount: parseFloat(amount),
-        purpose: purpose || 'Working Capital',
-        status: 'success',
-        timestamp: new Date().toISOString()
-      };
+      // Validate IFSC format
+      const ifscRegex = /^[A-Z]{4}0[A-Z0-9]{6}$/;
+      if (!ifscRegex.test(ifscCode)) {
+        return res.status(400).json({
+          success: false,
+          error: 'Invalid IFSC code format'
+        });
+      }
 
-      // TODO: Replace with actual NBFC API call
-      // const response = await fetch(`${process.env.NBFC_API_URL}/withdraw`, {
-      //   method: 'POST',
-      //   headers: {
-      //     'Authorization': `Bearer ${process.env.NBFC_API_KEY}`,
-      //     'Content-Type': 'application/json'
-      //   },
-      //   body: JSON.stringify({
-      //     userId: userId,
-      //     amount: parseFloat(amount),
-      //     purpose,
-      //     collateralType: 'warehouse_receipts'
-      //   })
-      // });
+      // Validate account number (basic validation)
+      if (accountNumber.length < 8 || accountNumber.length > 18) {
+        return res.status(400).json({
+          success: false,
+          error: 'Account number must be between 8 and 18 characters'
+        });
+      }
+
+      const bankAccount = await storage.createUserBankAccount({
+        userId,
+        accountNumber,
+        ifscCode: ifscCode.toUpperCase(),
+        accountHolderName,
+        bankName,
+        branchName: branchName || '',
+        accountType: accountType || 'savings',
+        isDefault: false,
+        isVerified: true // Auto-verify for demo
+      });
+
+      // Return bank account with proper verification status
+      const accountWithStatus = {
+        id: bankAccount.id,
+        accountNumber: bankAccount.accountNumber,
+        ifscCode: bankAccount.ifscCode,
+        accountHolderName: bankAccount.accountHolderName,
+        bankName: bankAccount.bankName,
+        branchName: bankAccount.branchName,
+        accountType: bankAccount.accountType,
+        isDefault: bankAccount.isDefault,
+        isVerified: bankAccount.isVerified,
+        createdAt: bankAccount.createdAt,
+        updatedAt: bankAccount.updatedAt
+      };
 
       res.json({
         success: true,
-        data: mockResponse
+        data: accountWithStatus,
+        message: 'Bank account added and verified successfully for demo purposes'
       });
     } catch (error: any) {
-      console.error('Credit line withdrawal error:', error);
-      res.status(500).json({ success: false, error: error.message });
+      console.error('Error creating bank account:', error);
+      res.status(500).json({ success: false, error: 'Failed to create bank account' });
     }
+  });
+
+  // Credit Withdrawal
+  apiRouter.post('/credit/withdraw', requireAuth, async (req: Request, res: Response) => {
+    try {
+      const userId = req.session!.userId as number;
+      console.log('=== CREDIT WITHDRAWAL DEBUG ===');
+      console.log('Request body:', JSON.stringify(req.body, null, 2));
+      console.log('User ID:', userId);
+      
+      const { amount, bankAccountId, purpose } = req.body;
+      console.log('Extracted values:', { amount, bankAccountId, purpose, types: { amount: typeof amount, bankAccountId: typeof bankAccountId } });
+
+      // Enhanced amount validation
+      if (amount === null || amount === undefined || amount === '') {
+        console.log('VALIDATION FAILED: Amount is required');
+        return res.status(400).json({ success: false, error: 'Withdrawal amount is required' });
+      }
+
+      const parsedAmount = parseFloat(amount);
+      if (isNaN(parsedAmount) || !isFinite(parsedAmount)) {
+        return res.status(400).json({ success: false, error: 'Invalid withdrawal amount - must be a valid number' });
+      }
+
+      if (parsedAmount <= 0) {
+        return res.status(400).json({ success: false, error: 'Withdrawal amount must be greater than zero' });
+      }
+
+      const MINIMUM_WITHDRAWAL = 1000;
+      if (parsedAmount < MINIMUM_WITHDRAWAL) {
+        return res.status(400).json({ 
+          success: false, 
+          error: `Minimum withdrawal amount is ₹${MINIMUM_WITHDRAWAL.toLocaleString()}` 
+        });
+      }
+
+      // Check available credit with explicit maximum validation
+      const creditInfo = await storage.getAvailableCredit(userId);
+      const maxWithdrawal = Math.floor(creditInfo.availableCredit);
+      
+      if (parsedAmount > maxWithdrawal) {
+        return res.status(400).json({ 
+          success: false, 
+          error: `Withdrawal amount exceeds available credit. Maximum allowed: ₹${maxWithdrawal.toLocaleString()}, Available: ₹${creditInfo.availableCredit.toLocaleString()}` 
+        });
+      }
+
+      // Enhanced bank account validation
+      if (bankAccountId === null || bankAccountId === undefined || bankAccountId === '') {
+        return res.status(400).json({ success: false, error: 'Bank account selection is required' });
+      }
+
+      const parsedBankAccountId = parseInt(bankAccountId);
+      if (isNaN(parsedBankAccountId) || !isFinite(parsedBankAccountId)) {
+        return res.status(400).json({ success: false, error: 'Invalid bank account selection' });
+      }
+
+      const bankAccount = await storage.getUserBankAccount(parsedBankAccountId);
+      if (!bankAccount) {
+        return res.status(400).json({ success: false, error: 'Selected bank account does not exist' });
+      }
+
+      if (bankAccount.userId !== userId) {
+        return res.status(400).json({ success: false, error: 'Bank account does not belong to current user' });
+      }
+
+      if (!bankAccount.isVerified) {
+        return res.status(400).json({ 
+          success: false, 
+          error: 'Selected bank account is not verified. Please verify your bank account before withdrawing funds.' 
+        });
+      }
+
+      // Create withdrawal request with validated data
+      const withdrawal = await storage.createCreditWithdrawal({
+        userId,
+        bankAccountId: parsedBankAccountId,
+        amount: parsedAmount.toString(),
+        availableCreditAtTime: creditInfo.availableCredit.toString(),
+        status: 'approved', // Auto-approve for demo
+        withdrawalMethod: 'bank_transfer',
+        processingFee: '0',
+        actualAmount: parsedAmount.toString(),
+        metadata: {
+          purpose: purpose || 'Working Capital',
+          ipAddress: req.ip,
+          userAgent: req.get('User-Agent'),
+          validationChecks: {
+            amountValidated: true,
+            bankAccountValidated: true,
+            creditLimitValidated: true,
+            timestamp: new Date().toISOString()
+          }
+        }
+      });
+
+      // For demo purposes, immediately complete the withdrawal
+      await storage.updateCreditWithdrawal(withdrawal.id, {
+        status: 'completed',
+        externalTransactionId: `TXN${Date.now()}`,
+        transactionReference: `REF${withdrawal.id}${Date.now()}`
+      });
+
+      res.json({
+        success: true,
+        data: {
+          withdrawalId: withdrawal.id,
+          transactionId: `TXN${Date.now()}`,
+          amount: parsedAmount,
+          bankAccount: {
+            accountNumber: `****${bankAccount.accountNumber.slice(-4)}`,
+            bankName: bankAccount.bankName,
+            accountHolderName: bankAccount.accountHolderName,
+            isVerified: bankAccount.isVerified
+          },
+          status: 'completed',
+          processingTime: '2-4 business hours',
+          estimatedCreditTime: 'Within 1 business day',
+          remainingCredit: creditInfo.availableCredit - parsedAmount,
+          message: `Withdrawal of ₹${parsedAmount.toLocaleString()} has been processed successfully to ${bankAccount.bankName} account ending in ${bankAccount.accountNumber.slice(-4)}!`
+        }
+      });
+    } catch (error: any) {
+      console.error('Credit withdrawal error:', error);
+      res.status(500).json({ success: false, error: 'Failed to process withdrawal' });
+    }
+  });
+
+  // Legacy withdraw endpoint
+  apiRouter.post('/credit-line/withdraw', requireAuth, async (req: Request, res: Response) => {
+    // Redirect to new endpoint
+    return res.redirect(307, '/api/credit/withdraw');
   });
 
   // Test endpoint
