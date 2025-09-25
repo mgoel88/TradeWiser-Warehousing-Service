@@ -1,23 +1,37 @@
-import { useState } from "react";
+import { useState, useMemo, useEffect } from "react";
 import MainLayout from "@/components/layout/MainLayout";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { ReceiptCollateralLoanForm } from "@/components/loans/ReceiptCollateralLoanForm";
-import LoanRepaymentButton from "@/components/loans/LoanRepaymentButton";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Checkbox } from "@/components/ui/checkbox";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { PlusCircle, CreditCard, CircleDollarSign, Clock, Check, AlertCircle, IndianRupee, Receipt, Shield, CheckCircle } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
-import { format } from "date-fns";
+import { Progress } from "@/components/ui/progress";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
-import { Loan } from "@shared/schema";
 import { apiRequest } from "@/lib/queryClient";
+import {
+  ArrowLeft,
+  ArrowRight,
+  Calculator,
+  CreditCard,
+  CheckCircle,
+  Receipt,
+  IndianRupee,
+  Shield,
+  AlertCircle,
+  PlusCircle,
+  FileText,
+  Calendar,
+  User,
+  Building2,
+  Percent
+} from "lucide-react";
+import { format } from "date-fns";
 
-interface EligibleCollateral {
+interface EligibleReceipt {
   id: number;
   receiptNumber: string;
   commodityName: string;
@@ -34,507 +48,747 @@ interface EligibleCollateral {
   blockchainVerified: boolean;
 }
 
+interface LoanTerms {
+  loanAmount: number;
+  interestRate: number;
+  tenureMonths: number;
+  monthlyEMI: number;
+  totalAmount: number;
+  totalInterest: number;
+  processingFee: number;
+}
+
+interface BankDetails {
+  accountNumber: string;
+  confirmAccountNumber: string;
+  ifscCode: string;
+  accountHolderName: string;
+  bankName: string;
+}
+
+interface LoanApplication {
+  selectedReceiptIds: number[];
+  requestedAmount: number;
+  bankDetails: BankDetails;
+  loanTerms: LoanTerms;
+}
+
+const STEPS = [
+  { id: 1, title: "Select Receipt", description: "Choose warehouse receipts as collateral" },
+  { id: 2, title: "Enter Amount", description: "Calculate loan amount and terms" },
+  { id: 3, title: "Bank Details", description: "Provide disbursement details" },
+  { id: 4, title: "Confirmation", description: "Review and submit application" }
+];
+
+const INTEREST_RATE = 12; // 12% annual interest rate
+const LTV_RATIO = 0.8; // 80% Loan-to-Value ratio
+const MIN_LOAN_AMOUNT = 10000; // Minimum ₹10,000
+
+// EMI calculation utility
+const calculateEMI = (principal: number, rate: number, tenure: number): number => {
+  const monthlyRate = rate / 12 / 100;
+  const emi = (principal * monthlyRate * Math.pow(1 + monthlyRate, tenure)) / 
+              (Math.pow(1 + monthlyRate, tenure) - 1);
+  return Math.round(emi);
+};
+
 export default function LoansPage() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const [selectedTab, setSelectedTab] = useState("collateral");
-  const [showNewLoanForm, setShowNewLoanForm] = useState(false);
-  const [selectedReceipts, setSelectedReceipts] = useState<number[]>([]);
+  
+  // Form state
+  const [currentStep, setCurrentStep] = useState(1);
+  const [selectedReceiptIds, setSelectedReceiptIds] = useState<number[]>([]);
   const [requestedAmount, setRequestedAmount] = useState<string>("");
-  const [showLoanDialog, setShowLoanDialog] = useState(false);
-  const [isApplyingLoan, setIsApplyingLoan] = useState(false);
-  
-  // Query to fetch loans
-  const { data: loans, isLoading } = useQuery({
-    queryKey: ['/api/loans'],
-    retry: 1,
-    staleTime: 30000
+  const [loanTerms, setLoanTerms] = useState<LoanTerms | null>(null);
+  const [bankDetails, setBankDetails] = useState<BankDetails>({
+    accountNumber: "",
+    confirmAccountNumber: "",
+    ifscCode: "",
+    accountHolderName: "",
+    bankName: ""
   });
-  
-  // Query to fetch eligible collateral
-  const { data: eligibleCollateralData, isLoading: isLoadingCollateral, refetch: refetchCollateral } = useQuery({
+
+  // Fetch eligible receipts
+  const { data: eligibleReceiptsData, isLoading: isLoadingReceipts } = useQuery({
     queryKey: ['/api/loans/eligible-collateral'],
     retry: 1,
     staleTime: 30000
   });
-  
-  // Close loan form handler
-  const handleCloseLoanForm = () => {
-    setShowNewLoanForm(false);
-    // Refresh the loans data
-    queryClient.invalidateQueries({ queryKey: ['/api/loans'] });
+
+  // Calculate loan terms when amount changes
+  useEffect(() => {
+    if (requestedAmount && parseFloat(requestedAmount) >= MIN_LOAN_AMOUNT) {
+      const amount = parseFloat(requestedAmount);
+      const monthlyEMI = calculateEMI(amount, INTEREST_RATE, 12);
+      const totalAmount = monthlyEMI * 12;
+      const totalInterest = totalAmount - amount;
+      const processingFee = amount * 0.005; // 0.5% processing fee
+
+      setLoanTerms({
+        loanAmount: amount,
+        interestRate: INTEREST_RATE,
+        tenureMonths: 12,
+        monthlyEMI,
+        totalAmount,
+        totalInterest,
+        processingFee
+      });
+    } else {
+      setLoanTerms(null);
+    }
+  }, [requestedAmount]);
+
+  // Calculate maximum available loan amount
+  const maxAvailableLoan = useMemo(() => {
+    if (!eligibleReceiptsData?.eligibleCollateral) return 0;
+    
+    return selectedReceiptIds.reduce((total, receiptId) => {
+      const receipt = eligibleReceiptsData.eligibleCollateral.find((r: EligibleReceipt) => r.id === receiptId);
+      return total + (receipt?.maxLoanAmount || 0);
+    }, 0);
+  }, [selectedReceiptIds, eligibleReceiptsData]);
+
+  // Submit loan application
+  const submitLoanMutation = useMutation({
+    mutationFn: async (application: LoanApplication) => {
+      const response = await apiRequest("/api/loans/apply", "POST", {
+        receiptIds: application.selectedReceiptIds,
+        requestedAmount: application.requestedAmount,
+        tenureMonths: 12,
+        purpose: "Working Capital",
+        bankDetails: application.bankDetails,
+        loanTerms: application.loanTerms
+      });
+      
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || "Loan application failed");
+      }
+      
+      return response.json();
+    },
+    onSuccess: (data) => {
+      toast({
+        title: "Loan Approved! 🎉",
+        description: `Your loan of ₹${requestedAmount} has been approved and will be disbursed within 24 hours.`,
+      });
+      
+      // Reset form
+      setCurrentStep(1);
+      setSelectedReceiptIds([]);
+      setRequestedAmount("");
+      setBankDetails({
+        accountNumber: "",
+        confirmAccountNumber: "",
+        ifscCode: "",
+        accountHolderName: "",
+        bankName: ""
+      });
+      
+      queryClient.invalidateQueries({ queryKey: ['/api/loans'] });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Application Failed",
+        description: error.message,
+        variant: "destructive"
+      });
+    }
+  });
+
+  // Step navigation
+  const nextStep = () => {
+    if (currentStep < 4) {
+      setCurrentStep(currentStep + 1);
+    }
   };
-  
-  // Handle apply for loan button click
-  const handleApplyForLoan = () => {
-    setShowNewLoanForm(true);
-    // Scroll to top for better visibility of the form
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+
+  const prevStep = () => {
+    if (currentStep > 1) {
+      setCurrentStep(currentStep - 1);
+    }
   };
 
   // Handle receipt selection
-  const handleReceiptSelection = (receiptId: number, checked: boolean) => {
+  const handleReceiptToggle = (receiptId: number, checked: boolean) => {
     if (checked) {
-      setSelectedReceipts(prev => [...prev, receiptId]);
+      setSelectedReceiptIds(prev => [...prev, receiptId]);
     } else {
-      setSelectedReceipts(prev => prev.filter(id => id !== receiptId));
+      setSelectedReceiptIds(prev => prev.filter(id => id !== receiptId));
     }
   };
 
-  // Calculate total loan amount for selected receipts
-  const calculateTotalLoanAmount = () => {
-    if (!eligibleCollateralData?.eligibleCollateral) return 0;
-    return selectedReceipts.reduce((total, receiptId) => {
-      const receipt = eligibleCollateralData.eligibleCollateral.find((r: EligibleCollateral) => r.id === receiptId);
-      return total + (receipt?.maxLoanAmount || 0);
-    }, 0);
+  // Validation functions
+  const isStep1Valid = () => selectedReceiptIds.length > 0;
+  const isStep2Valid = () => {
+    const amount = parseFloat(requestedAmount);
+    return amount >= MIN_LOAN_AMOUNT && amount <= maxAvailableLoan && loanTerms !== null;
+  };
+  const isStep3Valid = () => {
+    return bankDetails.accountNumber &&
+           bankDetails.confirmAccountNumber &&
+           bankDetails.accountNumber === bankDetails.confirmAccountNumber &&
+           bankDetails.ifscCode &&
+           bankDetails.ifscCode.length === 11 &&
+           bankDetails.accountHolderName &&
+           bankDetails.bankName;
   };
 
-  // Apply for loan with selected receipts
-  const handleApplyForLoanWithReceipts = async () => {
-    if (selectedReceipts.length === 0) {
-      toast({
-        title: "No receipts selected",
-        description: "Please select at least one receipt as collateral",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    const amount = parseFloat(requestedAmount) || calculateTotalLoanAmount();
-    if (amount <= 0) {
-      toast({
-        title: "Invalid amount",
-        description: "Please enter a valid loan amount",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    setIsApplyingLoan(true);
-    try {
-      await apiRequest("/loans/apply-with-collateral", "POST", {
-        receiptIds: selectedReceipts,
-        requestedAmount: amount,
-        tenureMonths: 12,
-        purpose: "Working Capital"
-      });
-
-      toast({
-        title: "Loan application successful!",
-        description: "Your loan has been approved and will be disbursed shortly",
-      });
-
-      // Reset form and refresh data
-      setSelectedReceipts([]);
-      setRequestedAmount("");
-      setShowLoanDialog(false);
-      queryClient.invalidateQueries({ queryKey: ['/api/loans'] });
-      refetchCollateral();
-      
-    } catch (error: any) {
-      toast({
-        title: "Application failed",
-        description: error.message || "Failed to process loan application",
-        variant: "destructive"
-      });
-    } finally {
-      setIsApplyingLoan(false);
-    }
+  // Handle bank details change
+  const handleBankDetailsChange = (field: keyof BankDetails, value: string) => {
+    setBankDetails(prev => ({ ...prev, [field]: value }));
   };
-  
-  // Filter loans by status
-  const getFilteredLoans = () => {
-    if (!loans) return [];
+
+  // Submit application
+  const handleSubmit = () => {
+    if (!isStep3Valid() || !loanTerms) return;
     
-    return loans.filter((loan: Loan) => {
-      if (selectedTab === "active") return loan.status === "active";
-      if (selectedTab === "pending") return loan.status === "pending";
-      if (selectedTab === "repaid") return loan.status === "repaid";
-      return true; // all
-    });
+    const application: LoanApplication = {
+      selectedReceiptIds,
+      requestedAmount: parseFloat(requestedAmount),
+      bankDetails,
+      loanTerms
+    };
+    
+    submitLoanMutation.mutate(application);
   };
-  
-  // Get loan status badge color
-  const getLoanStatusColor = (status: string) => {
-    switch (status) {
-      case "active": return "bg-green-100 text-green-800";
-      case "pending": return "bg-blue-100 text-blue-800";
-      case "repaid": return "bg-gray-100 text-gray-800";
-      case "defaulted": return "bg-red-100 text-red-800";
-      default: return "bg-gray-100 text-gray-800";
-    }
-  };
-  
-  // Get loan status icon
-  const getLoanStatusIcon = (status: string) => {
-    switch (status) {
-      case "active": return <CreditCard className="h-4 w-4" />;
-      case "pending": return <Clock className="h-4 w-4" />;
-      case "repaid": return <Check className="h-4 w-4" />;
-      case "defaulted": return <AlertCircle className="h-4 w-4" />;
-      default: return <CreditCard className="h-4 w-4" />;
-    }
-  };
-  
+
   return (
     <MainLayout>
       <div className="container mx-auto py-6">
-        <div className="flex justify-between items-center mb-6">
-          <h1 className="text-3xl font-bold">Loans & Financing</h1>
-          <Button 
-            onClick={() => {
-              if (showNewLoanForm) {
-                handleCloseLoanForm();
-              } else {
-                handleApplyForLoan();
-              }
-            }}
-            className="gap-2"
-            variant={showNewLoanForm ? "outline" : "default"}
-          >
-            {showNewLoanForm ? (
-              "Cancel Application"
-            ) : (
-              <>
-                <PlusCircle className="h-4 w-4" />
-                Apply for Loan
-              </>
-            )}
-          </Button>
+        {/* Header */}
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold text-gray-900">Commodity-Backed Loans</h1>
+          <p className="text-gray-600 mt-2">
+            Get instant loans using your warehouse receipts as collateral with competitive rates
+          </p>
         </div>
-        
-        {showNewLoanForm ? (
-          <div className="mb-8">
-            <ReceiptCollateralLoanForm onSuccess={handleCloseLoanForm} />
+
+        {/* Progress Bar */}
+        <div className="mb-8">
+          <div className="flex items-center justify-between mb-4">
+            {STEPS.map((step, index) => (
+              <div key={step.id} className="flex items-center">
+                <div className={`flex items-center justify-center w-10 h-10 rounded-full border-2 ${
+                  currentStep >= step.id 
+                    ? 'bg-primary border-primary text-white' 
+                    : 'border-gray-300 text-gray-400'
+                }`}>
+                  {currentStep > step.id ? <CheckCircle className="h-5 w-5" /> : step.id}
+                </div>
+                {index < STEPS.length - 1 && (
+                  <div className={`w-20 h-1 mx-2 ${
+                    currentStep > step.id ? 'bg-primary' : 'bg-gray-200'
+                  }`} />
+                )}
+              </div>
+            ))}
           </div>
-        ) : (
-          <>
-            <Card className="mb-8">
+          <div className="text-center">
+            <h3 className="font-medium">{STEPS[currentStep - 1].title}</h3>
+            <p className="text-sm text-gray-600">{STEPS[currentStep - 1].description}</p>
+          </div>
+          <Progress value={(currentStep / 4) * 100} className="mt-2" />
+        </div>
+
+        {/* Step Content */}
+        <div className="max-w-4xl mx-auto">
+          {/* Step 1: Select Receipts */}
+          {currentStep === 1 && (
+            <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <IndianRupee className="h-5 w-5 text-primary" />
-                  Receipt Collateral Loans
+                  <Receipt className="h-5 w-5" />
+                  Select Warehouse Receipts
                 </CardTitle>
                 <CardDescription>
-                  Use your warehouse receipts as collateral to get quick, low-interest loans
+                  Choose eligible warehouse receipts to use as collateral. Up to 80% of receipt value available as loan.
                 </CardDescription>
               </CardHeader>
-              <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="p-4 border rounded-lg">
-                  <h3 className="font-medium text-lg mb-1">Fast Processing</h3>
-                  <p className="text-sm text-muted-foreground">
-                    Get loans approved in as little as 24 hours with quick blockchain verification
-                  </p>
+              <CardContent>
+                {isLoadingReceipts ? (
+                  <div className="text-center py-8">Loading eligible receipts...</div>
+                ) : !eligibleReceiptsData?.eligibleCollateral?.length ? (
+                  <div className="text-center py-12 border-2 border-dashed border-gray-200 rounded-lg">
+                    <Receipt className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                    <h3 className="text-lg font-medium text-gray-900 mb-2">No Eligible Receipts</h3>
+                    <p className="text-gray-600 mb-4">
+                      You need active warehouse receipts to apply for loans. Create a deposit first.
+                    </p>
+                    <Button onClick={() => window.location.href = '/deposits/new'}>
+                      <PlusCircle className="h-4 w-4 mr-2" />
+                      Create New Deposit
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {selectedReceiptIds.length > 0 && (
+                      <div className="p-4 bg-blue-50 rounded-lg border">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <h4 className="font-medium text-blue-900">Selected Receipts Summary</h4>
+                            <p className="text-sm text-blue-700">
+                              {selectedReceiptIds.length} receipts selected • 
+                              Max loan available: ₹{maxAvailableLoan.toLocaleString()}
+                            </p>
+                          </div>
+                          <Badge variant="secondary" className="bg-blue-100 text-blue-800">
+                            {LTV_RATIO * 100}% LTV
+                          </Badge>
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="grid gap-4">
+                      {eligibleReceiptsData.eligibleCollateral.map((receipt: EligibleReceipt) => (
+                        <div key={receipt.id} className="border rounded-lg p-4 hover:bg-gray-50">
+                          <div className="flex items-start gap-4">
+                            <Checkbox
+                              checked={selectedReceiptIds.includes(receipt.id)}
+                              onCheckedChange={(checked) => handleReceiptToggle(receipt.id, !!checked)}
+                              data-testid={`checkbox-receipt-${receipt.id}`}
+                            />
+                            <div className="flex-1">
+                              <div className="flex items-center justify-between mb-2">
+                                <div className="flex items-center gap-2">
+                                  <h4 className="font-medium" data-testid={`receipt-number-${receipt.id}`}>
+                                    {receipt.receiptNumber}
+                                  </h4>
+                                  {receipt.blockchainVerified && (
+                                    <Badge variant="secondary" className="text-xs">
+                                      <Shield className="h-3 w-3 mr-1" />
+                                      Verified
+                                    </Badge>
+                                  )}
+                                </div>
+                                <div className="text-right">
+                                  <p className="text-lg font-bold text-green-600" data-testid={`max-loan-${receipt.id}`}>
+                                    ₹{receipt.maxLoanAmount.toLocaleString()}
+                                  </p>
+                                  <p className="text-xs text-gray-500">Max loan amount</p>
+                                </div>
+                              </div>
+
+                              <div className="grid grid-cols-2 gap-4 text-sm">
+                                <div>
+                                  <p className="text-gray-500">Commodity</p>
+                                  <p className="font-medium">{receipt.commodityName}</p>
+                                </div>
+                                <div>
+                                  <p className="text-gray-500">Quantity</p>
+                                  <p className="font-medium">{receipt.quantity} {receipt.measurementUnit}</p>
+                                </div>
+                                <div>
+                                  <p className="text-gray-500">Quality Grade</p>
+                                  <p className="font-medium">{receipt.qualityGrade}</p>
+                                </div>
+                                <div>
+                                  <p className="text-gray-500">Receipt Value</p>
+                                  <p className="font-medium">₹{receipt.receiptValue.toLocaleString()}</p>
+                                </div>
+                              </div>
+
+                              <div className="mt-3 flex items-center justify-between">
+                                <div className="text-sm text-gray-500">
+                                  Warehouse: {receipt.warehouseName}
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <Badge variant="outline" className="text-xs">
+                                    {receipt.collateralRatio}% LTV
+                                  </Badge>
+                                  <Badge variant="default" className="text-xs">
+                                    {receipt.status}
+                                  </Badge>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Step 2: Enter Amount */}
+          {currentStep === 2 && (
+            <div className="space-y-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Calculator className="h-5 w-5" />
+                    Loan Amount & Terms
+                  </CardTitle>
+                  <CardDescription>
+                    Enter your desired loan amount and review the calculated terms
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-4">
+                      <div>
+                        <Label htmlFor="loan-amount">Requested Loan Amount (₹)</Label>
+                        <Input
+                          id="loan-amount"
+                          type="number"
+                          value={requestedAmount}
+                          onChange={(e) => setRequestedAmount(e.target.value)}
+                          placeholder="Enter amount"
+                          min={MIN_LOAN_AMOUNT}
+                          max={maxAvailableLoan}
+                          data-testid="input-loan-amount"
+                        />
+                        <div className="flex justify-between text-sm text-gray-500 mt-1">
+                          <span>Min: ₹{MIN_LOAN_AMOUNT.toLocaleString()}</span>
+                          <span>Max: ₹{maxAvailableLoan.toLocaleString()}</span>
+                        </div>
+                      </div>
+
+                      {parseFloat(requestedAmount) > 0 && parseFloat(requestedAmount) < MIN_LOAN_AMOUNT && (
+                        <div className="flex items-center gap-2 text-red-600 text-sm">
+                          <AlertCircle className="h-4 w-4" />
+                          Minimum loan amount is ₹{MIN_LOAN_AMOUNT.toLocaleString()}
+                        </div>
+                      )}
+
+                      {parseFloat(requestedAmount) > maxAvailableLoan && (
+                        <div className="flex items-center gap-2 text-red-600 text-sm">
+                          <AlertCircle className="h-4 w-4" />
+                          Amount exceeds maximum available loan
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="space-y-4">
+                      <h4 className="font-medium">Loan Parameters</h4>
+                      <div className="grid grid-cols-2 gap-4 text-sm">
+                        <div>
+                          <p className="text-gray-500">Interest Rate</p>
+                          <p className="font-medium flex items-center gap-1">
+                            <Percent className="h-3 w-3" />
+                            {INTEREST_RATE}% per annum
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-gray-500">Loan Tenure</p>
+                          <p className="font-medium flex items-center gap-1">
+                            <Calendar className="h-3 w-3" />
+                            12 months
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-gray-500">LTV Ratio</p>
+                          <p className="font-medium">{LTV_RATIO * 100}%</p>
+                        </div>
+                        <div>
+                          <p className="text-gray-500">Processing Fee</p>
+                          <p className="font-medium">0.5%</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Loan Terms Summary */}
+              {loanTerms && (
+                <Card className="border-green-200 bg-green-50">
+                  <CardHeader>
+                    <CardTitle className="text-green-800">Loan Terms Summary</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                      <div className="text-center">
+                        <p className="text-2xl font-bold text-green-700" data-testid="monthly-emi">
+                          ₹{loanTerms.monthlyEMI.toLocaleString()}
+                        </p>
+                        <p className="text-sm text-green-600">Monthly EMI</p>
+                      </div>
+                      <div className="text-center">
+                        <p className="text-lg font-medium">₹{loanTerms.totalAmount.toLocaleString()}</p>
+                        <p className="text-sm text-gray-600">Total Amount</p>
+                      </div>
+                      <div className="text-center">
+                        <p className="text-lg font-medium">₹{loanTerms.totalInterest.toLocaleString()}</p>
+                        <p className="text-sm text-gray-600">Total Interest</p>
+                      </div>
+                      <div className="text-center">
+                        <p className="text-lg font-medium">₹{Math.round(loanTerms.processingFee).toLocaleString()}</p>
+                        <p className="text-sm text-gray-600">Processing Fee</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+          )}
+
+          {/* Step 3: Bank Details */}
+          {currentStep === 3 && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Building2 className="h-5 w-5" />
+                  Bank Details for Disbursement
+                </CardTitle>
+                <CardDescription>
+                  Provide your bank account details for loan disbursement
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-4">
+                    <div>
+                      <Label htmlFor="account-holder-name">Account Holder Name *</Label>
+                      <Input
+                        id="account-holder-name"
+                        value={bankDetails.accountHolderName}
+                        onChange={(e) => handleBankDetailsChange('accountHolderName', e.target.value)}
+                        placeholder="Enter full name as per bank records"
+                        data-testid="input-account-holder-name"
+                      />
+                    </div>
+
+                    <div>
+                      <Label htmlFor="bank-name">Bank Name *</Label>
+                      <Select value={bankDetails.bankName} onValueChange={(value) => handleBankDetailsChange('bankName', value)}>
+                        <SelectTrigger data-testid="select-bank-name">
+                          <SelectValue placeholder="Select your bank" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="SBI">State Bank of India</SelectItem>
+                          <SelectItem value="HDFC">HDFC Bank</SelectItem>
+                          <SelectItem value="ICICI">ICICI Bank</SelectItem>
+                          <SelectItem value="AXIS">Axis Bank</SelectItem>
+                          <SelectItem value="BOI">Bank of India</SelectItem>
+                          <SelectItem value="PNB">Punjab National Bank</SelectItem>
+                          <SelectItem value="BOB">Bank of Baroda</SelectItem>
+                          <SelectItem value="CANARA">Canara Bank</SelectItem>
+                          <SelectItem value="UNION">Union Bank of India</SelectItem>
+                          <SelectItem value="OTHER">Other</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div>
+                      <Label htmlFor="ifsc-code">IFSC Code *</Label>
+                      <Input
+                        id="ifsc-code"
+                        value={bankDetails.ifscCode}
+                        onChange={(e) => handleBankDetailsChange('ifscCode', e.target.value.toUpperCase())}
+                        placeholder="e.g., SBIN0001234"
+                        maxLength={11}
+                        data-testid="input-ifsc-code"
+                      />
+                      {bankDetails.ifscCode && bankDetails.ifscCode.length !== 11 && (
+                        <p className="text-red-600 text-sm mt-1">IFSC code must be 11 characters</p>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="space-y-4">
+                    <div>
+                      <Label htmlFor="account-number">Account Number *</Label>
+                      <Input
+                        id="account-number"
+                        type="number"
+                        value={bankDetails.accountNumber}
+                        onChange={(e) => handleBankDetailsChange('accountNumber', e.target.value)}
+                        placeholder="Enter account number"
+                        data-testid="input-account-number"
+                      />
+                    </div>
+
+                    <div>
+                      <Label htmlFor="confirm-account-number">Confirm Account Number *</Label>
+                      <Input
+                        id="confirm-account-number"
+                        type="number"
+                        value={bankDetails.confirmAccountNumber}
+                        onChange={(e) => handleBankDetailsChange('confirmAccountNumber', e.target.value)}
+                        placeholder="Re-enter account number"
+                        data-testid="input-confirm-account-number"
+                      />
+                      {bankDetails.confirmAccountNumber && bankDetails.accountNumber !== bankDetails.confirmAccountNumber && (
+                        <p className="text-red-600 text-sm mt-1">Account numbers do not match</p>
+                      )}
+                    </div>
+                  </div>
                 </div>
-                <div className="p-4 border rounded-lg">
-                  <h3 className="font-medium text-lg mb-1">Competitive Rates</h3>
-                  <p className="text-sm text-muted-foreground">
-                    Collateral-backed loans with interest rates as low as 8% per annum
-                  </p>
-                </div>
-                <div className="p-4 border rounded-lg">
-                  <h3 className="font-medium text-lg mb-1">Flexible Terms</h3>
-                  <p className="text-sm text-muted-foreground">
-                    Choose loan durations from 1 to 24 months with simple repayment options
-                  </p>
+
+                <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
+                  <div className="flex items-start gap-3">
+                    <AlertCircle className="h-5 w-5 text-blue-600 mt-0.5" />
+                    <div>
+                      <h4 className="font-medium text-blue-900">Important Notes:</h4>
+                      <ul className="text-sm text-blue-800 mt-1 space-y-1">
+                        <li>• Ensure account holder name matches your KYC documents</li>
+                        <li>• Account should be active and operational</li>
+                        <li>• Loan will be disbursed within 24 hours of approval</li>
+                      </ul>
+                    </div>
+                  </div>
                 </div>
               </CardContent>
             </Card>
-            
-            <Tabs value={selectedTab} onValueChange={setSelectedTab} className="w-full">
-              <TabsList className="grid w-full grid-cols-5">
-                <TabsTrigger value="collateral">Eligible Collateral</TabsTrigger>
-                <TabsTrigger value="active">Active Loans</TabsTrigger>
-                <TabsTrigger value="pending">Pending</TabsTrigger>
-                <TabsTrigger value="repaid">Repaid</TabsTrigger>
-                <TabsTrigger value="all">All Loans</TabsTrigger>
-              </TabsList>
-              
-              <TabsContent value="collateral" className="mt-4">
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <Receipt className="h-5 w-5" />
-                      Eligible Warehouse Receipts
-                    </CardTitle>
-                    <CardDescription>
-                      Use your warehouse receipts as collateral to secure loans. 
-                      Up to 80% of receipt value available as loan amount.
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    {isLoadingCollateral ? (
-                      <div className="text-center py-8">Loading eligible receipts...</div>
-                    ) : !eligibleCollateralData?.eligibleCollateral?.length ? (
-                      <div className="text-center py-8 border rounded-lg bg-muted/10">
-                        <Receipt className="h-10 w-10 text-muted-foreground mx-auto mb-3" />
-                        <h3 className="text-lg font-medium text-muted-foreground">No Eligible Receipts</h3>
-                        <p className="text-sm text-muted-foreground mt-1">
-                          You need active warehouse receipts to apply for loans. Complete a commodity deposit first.
-                        </p>
-                        <Button 
-                          className="mt-4 gap-2"
-                          onClick={() => window.location.href = '/deposit'}
-                        >
-                          <PlusCircle className="h-4 w-4" />
-                          Make a Deposit
-                        </Button>
-                      </div>
-                    ) : (
-                      <div className="space-y-4">
-                        <div className="flex items-center justify-between p-4 bg-blue-50 rounded-lg border">
-                          <div>
-                            <h4 className="font-medium text-blue-900">Available Collateral Summary</h4>
-                            <p className="text-sm text-blue-700">
-                              Total Value: ₹{eligibleCollateralData.totalEligibleValue?.toLocaleString()} • 
-                              Max Loan: ₹{eligibleCollateralData.totalMaxLoanAmount?.toLocaleString()} • 
-                              {eligibleCollateralData.count} receipts
-                            </p>
+          )}
+
+          {/* Step 4: Confirmation */}
+          {currentStep === 4 && loanTerms && (
+            <div className="space-y-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <FileText className="h-5 w-5" />
+                    Review Application
+                  </CardTitle>
+                  <CardDescription>
+                    Please review all details before submitting your loan application
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  {/* Selected Receipts */}
+                  <div>
+                    <h4 className="font-medium mb-3">Selected Collateral</h4>
+                    <div className="grid gap-2">
+                      {selectedReceiptIds.map(receiptId => {
+                        const receipt = eligibleReceiptsData?.eligibleCollateral?.find((r: EligibleReceipt) => r.id === receiptId);
+                        return receipt ? (
+                          <div key={receiptId} className="flex items-center justify-between p-2 bg-gray-50 rounded">
+                            <span className="text-sm">{receipt.receiptNumber}</span>
+                            <span className="text-sm font-medium">₹{receipt.maxLoanAmount.toLocaleString()}</span>
                           </div>
-                          <Dialog open={showLoanDialog} onOpenChange={setShowLoanDialog}>
-                            <DialogTrigger asChild>
-                              <Button className="gap-2">
-                                <IndianRupee className="h-4 w-4" />
-                                Apply for Loan
-                              </Button>
-                            </DialogTrigger>
-                            <DialogContent className="max-w-md">
-                              <DialogHeader>
-                                <DialogTitle>Apply for Loan</DialogTitle>
-                                <DialogDescription>
-                                  Configure your loan application with selected receipts
-                                </DialogDescription>
-                              </DialogHeader>
-                              <div className="space-y-4">
-                                <div>
-                                  <Label htmlFor="amount">Requested Amount (₹)</Label>
-                                  <Input
-                                    id="amount"
-                                    type="number"
-                                    value={requestedAmount}
-                                    onChange={(e) => setRequestedAmount(e.target.value)}
-                                    placeholder={calculateTotalLoanAmount().toString()}
-                                  />
-                                  <p className="text-xs text-muted-foreground mt-1">
-                                    Max available: ₹{calculateTotalLoanAmount().toLocaleString()}
-                                  </p>
-                                </div>
-                                <div className="text-sm space-y-1">
-                                  <div className="flex justify-between">
-                                    <span>Interest Rate:</span>
-                                    <span>12% per annum</span>
-                                  </div>
-                                  <div className="flex justify-between">
-                                    <span>Tenure:</span>
-                                    <span>12 months</span>
-                                  </div>
-                                  <div className="flex justify-between">
-                                    <span>Selected Receipts:</span>
-                                    <span>{selectedReceipts.length}</span>
-                                  </div>
-                                </div>
-                                <Button 
-                                  onClick={handleApplyForLoanWithReceipts}
-                                  disabled={isApplyingLoan || selectedReceipts.length === 0}
-                                  className="w-full"
-                                >
-                                  {isApplyingLoan ? "Processing..." : "Submit Application"}
-                                </Button>
-                              </div>
-                            </DialogContent>
-                          </Dialog>
-                        </div>
+                        ) : null;
+                      })}
+                    </div>
+                  </div>
 
-                        <div className="grid gap-4">
-                          {eligibleCollateralData.eligibleCollateral.map((receipt: EligibleCollateral) => (
-                            <div key={receipt.id} className="border rounded-lg p-4">
-                              <div className="flex items-start gap-4">
-                                <Checkbox
-                                  checked={selectedReceipts.includes(receipt.id)}
-                                  onCheckedChange={(checked) => handleReceiptSelection(receipt.id, !!checked)}
-                                />
-                                <div className="flex-1">
-                                  <div className="flex items-center justify-between mb-2">
-                                    <div className="flex items-center gap-2">
-                                      <h4 className="font-medium">{receipt.receiptNumber}</h4>
-                                      {receipt.blockchainVerified && (
-                                        <Badge variant="secondary" className="text-xs">
-                                          <Shield className="h-3 w-3 mr-1" />
-                                          Blockchain Verified
-                                        </Badge>
-                                      )}
-                                    </div>
-                                    <div className="text-right">
-                                      <p className="text-lg font-bold text-green-600">
-                                        ₹{receipt.maxLoanAmount.toLocaleString()}
-                                      </p>
-                                      <p className="text-xs text-muted-foreground">Max loan amount</p>
-                                    </div>
-                                  </div>
-                                  
-                                  <div className="grid grid-cols-2 gap-4 text-sm">
-                                    <div>
-                                      <p className="text-muted-foreground">Commodity</p>
-                                      <p className="font-medium">{receipt.commodityName}</p>
-                                    </div>
-                                    <div>
-                                      <p className="text-muted-foreground">Quantity</p>
-                                      <p className="font-medium">{receipt.quantity} {receipt.measurementUnit}</p>
-                                    </div>
-                                    <div>
-                                      <p className="text-muted-foreground">Quality Grade</p>
-                                      <p className="font-medium">{receipt.qualityGrade}</p>
-                                    </div>
-                                    <div>
-                                      <p className="text-muted-foreground">Receipt Value</p>
-                                      <p className="font-medium">₹{receipt.receiptValue.toLocaleString()}</p>
-                                    </div>
-                                  </div>
+                  <Separator />
 
-                                  <div className="mt-3 flex items-center justify-between">
-                                    <div className="text-sm text-muted-foreground">
-                                      Warehouse: {receipt.warehouseName}
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                      <Badge variant="outline" className="text-xs">
-                                        {receipt.collateralRatio}% LTV
-                                      </Badge>
-                                      <Badge variant="default" className="text-xs">
-                                        {receipt.status}
-                                      </Badge>
-                                    </div>
-                                  </div>
-
-                                  {selectedReceipts.includes(receipt.id) && (
-                                    <div className="mt-3 p-2 bg-green-50 border border-green-200 rounded text-sm text-green-800">
-                                      <CheckCircle className="h-4 w-4 inline mr-2" />
-                                      Selected for loan application
-                                    </div>
-                                  )}
-                                </div>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-
-                        {selectedReceipts.length > 0 && (
-                          <div className="sticky bottom-4 p-4 bg-white border rounded-lg shadow-lg">
-                            <div className="flex items-center justify-between">
-                              <div>
-                                <p className="font-medium">
-                                  {selectedReceipts.length} receipts selected
-                                </p>
-                                <p className="text-sm text-muted-foreground">
-                                  Total available loan: ₹{calculateTotalLoanAmount().toLocaleString()}
-                                </p>
-                              </div>
-                              <Button onClick={() => setShowLoanDialog(true)} className="gap-2">
-                                <IndianRupee className="h-4 w-4" />
-                                Apply for ₹{calculateTotalLoanAmount().toLocaleString()}
-                              </Button>
-                            </div>
-                          </div>
-                        )}
+                  {/* Loan Terms */}
+                  <div>
+                    <h4 className="font-medium mb-3">Loan Terms</h4>
+                    <div className="grid grid-cols-2 gap-4 text-sm">
+                      <div className="flex justify-between">
+                        <span>Loan Amount:</span>
+                        <span className="font-medium">₹{loanTerms.loanAmount.toLocaleString()}</span>
                       </div>
-                    )}
-                  </CardContent>
-                </Card>
-              </TabsContent>
+                      <div className="flex justify-between">
+                        <span>Interest Rate:</span>
+                        <span className="font-medium">{loanTerms.interestRate}% p.a.</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Tenure:</span>
+                        <span className="font-medium">{loanTerms.tenureMonths} months</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Processing Fee:</span>
+                        <span className="font-medium">₹{Math.round(loanTerms.processingFee).toLocaleString()}</span>
+                      </div>
+                      <div className="flex justify-between col-span-2 text-lg font-bold border-t pt-2">
+                        <span>Monthly EMI:</span>
+                        <span>₹{loanTerms.monthlyEMI.toLocaleString()}</span>
+                      </div>
+                    </div>
+                  </div>
 
-              <TabsContent value={selectedTab} className="mt-4">
-                <Card>
-                  <CardHeader>
-                    <CardTitle>
-                      {selectedTab === "active" && "Active Loans"}
-                      {selectedTab === "pending" && "Pending Loan Applications"}
-                      {selectedTab === "repaid" && "Repaid Loans"}
-                      {selectedTab === "all" && "All Loans"}
-                    </CardTitle>
-                    <CardDescription>
-                      Showing {getFilteredLoans().length} {getFilteredLoans().length === 1 ? "loan" : "loans"}
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    {isLoading ? (
-                      <div className="text-center py-8">Loading loans...</div>
-                    ) : getFilteredLoans().length === 0 ? (
-                      <div className="text-center py-8 border rounded-lg bg-muted/10">
-                        <CircleDollarSign className="h-10 w-10 text-muted-foreground mx-auto mb-3" />
-                        <h3 className="text-lg font-medium text-muted-foreground">No Loans Found</h3>
-                        <p className="text-sm text-muted-foreground mt-1">
-                          You don't have any {selectedTab !== "all" && selectedTab} loans.
-                        </p>
-                        <Button 
-                          className="mt-4 gap-2"
-                          onClick={() => setShowNewLoanForm(true)}
-                        >
-                          <PlusCircle className="h-4 w-4" />
-                          Apply for a Loan
-                        </Button>
+                  <Separator />
+
+                  {/* Bank Details */}
+                  <div>
+                    <h4 className="font-medium mb-3">Disbursement Details</h4>
+                    <div className="grid grid-cols-2 gap-4 text-sm">
+                      <div className="flex justify-between">
+                        <span>Account Holder:</span>
+                        <span className="font-medium">{bankDetails.accountHolderName}</span>
                       </div>
-                    ) : (
-                      <div className="space-y-4">
-                        {getFilteredLoans().map((loan: Loan) => (
-                          <div key={loan.id} className="border rounded-lg p-4">
-                            <div className="flex flex-col md:flex-row justify-between">
-                              <div className="space-y-1">
-                                <div className="flex items-center gap-1">
-                                  <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium gap-1 ${getLoanStatusColor(loan.status)}`}>
-                                    {getLoanStatusIcon(loan.status)}
-                                    {loan.status.charAt(0).toUpperCase() + loan.status.slice(1)}
-                                  </span>
-                                </div>
-                                <h3 className="text-lg font-medium">
-                                  ₹{Number(loan.amount).toLocaleString()}
-                                </h3>
-                                <p className="text-sm text-muted-foreground">
-                                  {loan.interestRate}% interest • {format(new Date(loan.startDate || new Date()), "MMM d, yyyy")}
-                                </p>
-                              </div>
-                              <div className="md:text-right mt-3 md:mt-0">
-                                <div className="flex md:flex-col md:items-end gap-2">
-                                  <p className="text-sm font-medium">
-                                    Outstanding: ₹{Number(loan.outstandingAmount || 0).toLocaleString()}
-                                  </p>
-                                  <p className="text-xs text-muted-foreground">
-                                    Due by: {format(new Date(loan.endDate), "MMM d, yyyy")}
-                                  </p>
-                                </div>
-                              </div>
-                            </div>
-                            
-                            <div className="mt-3 text-sm">
-                              <p className="text-muted-foreground">
-                                Collateral: {
-                                  (loan.collateralReceiptIds as any[])?.length || 0
-                                } warehouse receipt{(loan.collateralReceiptIds as any[])?.length !== 1 ? 's' : ''}
-                              </p>
-                            </div>
-                            
-                            <div className="mt-3 flex gap-2">
-                              <Button variant="outline" size="sm">
-                                View Details
-                              </Button>
-                              {(loan.status === "active" || loan.status === "pending") && (
-                                <LoanRepaymentButton
-                                  loanId={loan.id}
-                                  amount={Number(loan.amount)}
-                                  outstandingAmount={loan.outstandingAmount}
-                                  status={loan.status}
-                                />
-                              )}
-                            </div>
-                          </div>
-                        ))}
+                      <div className="flex justify-between">
+                        <span>Bank:</span>
+                        <span className="font-medium">{bankDetails.bankName}</span>
                       </div>
-                    )}
-                  </CardContent>
-                </Card>
-              </TabsContent>
-            </Tabs>
-          </>
-        )}
+                      <div className="flex justify-between">
+                        <span>Account Number:</span>
+                        <span className="font-medium">***{bankDetails.accountNumber.slice(-4)}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>IFSC Code:</span>
+                        <span className="font-medium">{bankDetails.ifscCode}</span>
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Terms and Conditions */}
+              <Card className="border-yellow-200 bg-yellow-50">
+                <CardContent className="pt-6">
+                  <div className="flex items-start gap-3">
+                    <AlertCircle className="h-5 w-5 text-yellow-600 mt-0.5" />
+                    <div className="text-sm">
+                      <p className="font-medium text-yellow-900 mb-2">Terms & Conditions:</p>
+                      <ul className="text-yellow-800 space-y-1">
+                        <li>• I agree to the loan terms and conditions</li>
+                        <li>• The selected warehouse receipts will be pledged as collateral</li>
+                        <li>• EMI will be auto-debited from the provided account</li>
+                        <li>• Loan will be disbursed within 24 hours of approval</li>
+                        <li>• Interest rate is fixed for the entire tenure</li>
+                      </ul>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          )}
+
+          {/* Navigation */}
+          <div className="flex justify-between items-center mt-8">
+            <Button
+              variant="outline"
+              onClick={prevStep}
+              disabled={currentStep === 1}
+              data-testid="button-previous"
+            >
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Previous
+            </Button>
+
+            <div className="flex gap-2">
+              {currentStep < 4 ? (
+                <Button
+                  onClick={nextStep}
+                  disabled={
+                    (currentStep === 1 && !isStep1Valid()) ||
+                    (currentStep === 2 && !isStep2Valid()) ||
+                    (currentStep === 3 && !isStep3Valid())
+                  }
+                  data-testid="button-next"
+                >
+                  Next
+                  <ArrowRight className="h-4 w-4 ml-2" />
+                </Button>
+              ) : (
+                <Button
+                  onClick={handleSubmit}
+                  disabled={!isStep3Valid() || submitLoanMutation.isPending}
+                  className="bg-green-600 hover:bg-green-700"
+                  data-testid="button-submit"
+                >
+                  {submitLoanMutation.isPending ? (
+                    "Submitting..."
+                  ) : (
+                    <>
+                      <CreditCard className="h-4 w-4 mr-2" />
+                      Submit Application
+                    </>
+                  )}
+                </Button>
+              )}
+            </div>
+          </div>
+        </div>
       </div>
     </MainLayout>
   );

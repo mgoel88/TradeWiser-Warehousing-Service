@@ -2516,8 +2516,176 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // LOAN APPLICATION - WORKING
+  // ENHANCED LOAN APPLICATION - Multi-step form support
   apiRouter.post('/loans/apply', requireAuth, async (req: Request, res: Response) => {
+    try {
+      const userId = req.session!.userId as number;
+      const { 
+        receiptIds, 
+        requestedAmount, 
+        tenureMonths = 12, 
+        purpose = 'Working Capital',
+        bankDetails,
+        loanTerms
+      } = req.body;
+
+      // Validate required fields
+      if (!receiptIds || !Array.isArray(receiptIds) || receiptIds.length === 0) {
+        return res.status(400).json({
+          success: false,
+          message: 'At least one receipt ID is required'
+        });
+      }
+
+      if (!requestedAmount || requestedAmount < 10000) {
+        return res.status(400).json({
+          success: false,
+          message: 'Minimum loan amount is ₹10,000'
+        });
+      }
+
+      // Validate bank details
+      if (!bankDetails || !bankDetails.accountNumber || !bankDetails.ifscCode || !bankDetails.accountHolderName) {
+        return res.status(400).json({
+          success: false,
+          message: 'Complete bank details are required'
+        });
+      }
+
+      // Validate IFSC code format
+      if (bankDetails.ifscCode.length !== 11) {
+        return res.status(400).json({
+          success: false,
+          message: 'IFSC code must be 11 characters'
+        });
+      }
+
+      // Fetch and validate all receipts
+      const receipts = await Promise.all(
+        receiptIds.map(id => storage.getWarehouseReceipt(id))
+      );
+
+      const validReceipts = receipts.filter((receipt): receipt is NonNullable<typeof receipt> => 
+        receipt !== undefined &&
+        receipt !== null && 
+        receipt.ownerId === userId && 
+        receipt.status === 'active' && 
+        !receipt.liens
+      );
+
+      if (validReceipts.length !== receiptIds.length) {
+        return res.status(400).json({
+          success: false,
+          message: 'Some receipts are invalid, not owned by you, or already collateralized'
+        });
+      }
+
+      // Calculate total collateral value
+      const totalCollateralValue = validReceipts.reduce((sum, receipt) => {
+        return sum + parseFloat(receipt.valuation || '0');
+      }, 0);
+
+      const maxLoanAmount = Math.floor(totalCollateralValue * 0.8); // 80% LTV
+
+      if (requestedAmount > maxLoanAmount) {
+        return res.status(400).json({
+          success: false,
+          message: `Requested amount exceeds maximum available: ₹${maxLoanAmount.toLocaleString()}`
+        });
+      }
+
+      // Calculate EMI and terms
+      const interestRate = 12; // 12% annual
+      const monthlyRate = interestRate / 12 / 100;
+      const monthlyEMI = Math.round(
+        (requestedAmount * monthlyRate * Math.pow(1 + monthlyRate, tenureMonths)) /
+        (Math.pow(1 + monthlyRate, tenureMonths) - 1)
+      );
+      const totalAmount = monthlyEMI * tenureMonths;
+      const totalInterest = totalAmount - requestedAmount;
+      const processingFee = Math.round(requestedAmount * 0.005); // 0.5%
+
+      // Create loan record
+      const loan = await storage.createLoan({
+        userId: userId,
+        lendingPartnerId: 1,
+        lendingPartnerName: 'TradeWiser Direct Lending',
+        amount: requestedAmount.toString(),
+        interestRate: interestRate.toString(),
+        endDate: new Date(Date.now() + tenureMonths * 30 * 24 * 60 * 60 * 1000),
+        status: 'approved', // Auto-approve for demo
+        collateralReceiptIds: JSON.stringify(receiptIds),
+        outstandingAmount: requestedAmount.toString(),
+        purpose,
+        creditScore: 750,
+        repaymentSchedule: JSON.stringify({
+          monthlyEMI,
+          totalAmount,
+          totalInterest,
+          processingFee,
+          bankDetails,
+          startDate: new Date(),
+          nextPaymentDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+        })
+      });
+
+      // Update receipts to mark as collateralized
+      await Promise.all(receiptIds.map(async (receiptId: number) => {
+        await storage.updateWarehouseReceipt(receiptId, {
+          status: 'collateralized',
+          liens: JSON.stringify([{
+            type: 'loan_collateral',
+            loanId: loan.id,
+            amount: requestedAmount,
+            date: new Date().toISOString(),
+            bankDetails: {
+              accountNumber: bankDetails.accountNumber,
+              ifscCode: bankDetails.ifscCode,
+              accountHolderName: bankDetails.accountHolderName,
+              bankName: bankDetails.bankName
+            }
+          }])
+        });
+      }));
+
+      res.json({
+        success: true,
+        message: 'Loan approved successfully! Disbursement will be processed within 24 hours.',
+        loan: {
+          id: loan.id,
+          amount: requestedAmount,
+          status: 'approved',
+          interestRate,
+          tenureMonths,
+          monthlyEMI,
+          totalAmount,
+          totalInterest,
+          processingFee,
+          disbursementDetails: {
+            accountNumber: bankDetails.accountNumber,
+            ifscCode: bankDetails.ifscCode,
+            accountHolderName: bankDetails.accountHolderName,
+            bankName: bankDetails.bankName
+          },
+          collateralReceipts: validReceipts.map(receipt => ({
+            id: receipt.id,
+            receiptNumber: receipt.receiptNumber,
+            value: parseFloat(receipt.valuation || '0')
+          }))
+        }
+      });
+
+    } catch (error) {
+      console.error('Loan application error:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to process loan application. Please try again.'
+      });
+    }
+  });
+
+  // Legacy single receipt loan application (keeping for backward compatibility)
+  apiRouter.post('/loans/apply-legacy', requireAuth, async (req: Request, res: Response) => {
     try {
       const userId = req.session!.userId as number;
       const { receiptId, amount, durationMonths } = req.body;

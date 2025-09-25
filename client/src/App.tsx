@@ -45,8 +45,8 @@ function Router() {
       <Route path="/deposits/new" component={NewDepositPage} />
       <Route path="/warehouses" component={WarehousePage} />
       <Route path="/receipts" component={ReceiptsPage} />
-      <Route path="/loans" component={StreamlinedLoansPage} />
-      <Route path="/loans/legacy" component={LoansPage} />
+      <Route path="/loans" component={LoansPage} />
+      <Route path="/loans/streamlined" component={StreamlinedLoansPage} />
       <Route path="/loans/:id/repay" component={LoanRepaymentPage} />
       <Route path="/loan-repayment" component={LoanRepaymentPage} />
       <Route path="/payments" component={PaymentsPage} />
