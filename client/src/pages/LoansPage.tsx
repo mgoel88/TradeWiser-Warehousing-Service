@@ -139,10 +139,16 @@ export default function LoansPage() {
     }
   }, [requestedAmount]);
 
-  // Calculate maximum available loan amount
+  // Calculate maximum available loan amount from selected receipts
   const maxAvailableLoan = useMemo(() => {
     if (!eligibleReceiptsData?.eligibleCollateral) return 0;
     
+    // If no receipts are selected, return the total maximum from all eligible receipts
+    if (selectedReceiptIds.length === 0) {
+      return eligibleReceiptsData.totalMaxLoanAmount || 0;
+    }
+    
+    // Otherwise, return the sum of selected receipts
     return selectedReceiptIds.reduce((total, receiptId) => {
       const receipt = eligibleReceiptsData.eligibleCollateral.find((r: EligibleReceipt) => r.id === receiptId);
       return total + (receipt?.maxLoanAmount || 0);
@@ -152,7 +158,7 @@ export default function LoansPage() {
   // Submit loan application
   const submitLoanMutation = useMutation({
     mutationFn: async (application: LoanApplication) => {
-      const response = await apiRequest("/api/loans/apply", "POST", {
+      const response = await apiRequest("POST", "/api/loans/apply", {
         receiptIds: application.selectedReceiptIds,
         requestedAmount: application.requestedAmount,
         tenureMonths: 12,
