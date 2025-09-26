@@ -3592,5 +3592,163 @@ export async function registerRoutes(app: Express): Promise<Server> {
   globalThis.sendToWarehouseModule = sendToWarehouseModule;
   globalThis.requestQualityTesting = requestQualityTesting;
 
+  // =============================================
+  // DEMO PROGRESSION CONTROLS - FOR DEMONSTRATION PURPOSES
+  // =============================================
+
+  // Advance process to next stage manually (demo mode)
+  apiRouter.post("/processes/:processId/advance-stage", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const processId = parseInt(req.params.processId);
+      const { nextStage, demoMode } = req.body;
+
+      if (!demoMode) {
+        return res.status(400).json({ message: "This endpoint is only available in demo mode" });
+      }
+
+      // Get current process
+      const process = await storage.getProcess(processId);
+      if (!process) {
+        return res.status(404).json({ message: "Process not found" });
+      }
+
+      // Verify ownership
+      if (process.userId !== req.session.userId) {
+        return res.status(403).json({ message: "Unauthorized" });
+      }
+
+      // Update process stage
+      await storage.updateProcess(processId, {
+        currentStage: nextStage,
+        lastUpdated: new Date()
+      });
+
+      // Broadcast update to connected clients
+      if (typeof globalThis.broadcastProcessUpdate === 'function') {
+        globalThis.broadcastProcessUpdate(req.session.userId, processId, {
+          currentStage: nextStage,
+          message: `Stage advanced to: ${nextStage.replace('_', ' ').toUpperCase()}`,
+          timestamp: new Date().toISOString()
+        });
+      }
+
+      console.log(`Demo: Advanced process ${processId} to stage: ${nextStage}`);
+
+      res.setHeader('Content-Type', 'application/json');
+      res.json({ 
+        success: true, 
+        currentStage: nextStage,
+        message: `Advanced to ${nextStage}` 
+      });
+    } catch (error) {
+      console.error("Error advancing process stage:", error);
+      res.setHeader('Content-Type', 'application/json');
+      res.status(500).json({ message: "Failed to advance stage" });
+    }
+  });
+
+  // Jump to specific stage (demo mode)
+  apiRouter.post("/processes/:processId/jump-to-stage", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const processId = parseInt(req.params.processId);
+      const { targetStage, demoMode } = req.body;
+
+      if (!demoMode) {
+        return res.status(400).json({ message: "This endpoint is only available in demo mode" });
+      }
+
+      // Get current process
+      const process = await storage.getProcess(processId);
+      if (!process) {
+        return res.status(404).json({ message: "Process not found" });
+      }
+
+      // Verify ownership
+      if (process.userId !== req.session.userId) {
+        return res.status(403).json({ message: "Unauthorized" });
+      }
+
+      // Update process stage
+      await storage.updateProcess(processId, {
+        currentStage: targetStage,
+        lastUpdated: new Date()
+      });
+
+      // Broadcast update to connected clients
+      if (typeof globalThis.broadcastProcessUpdate === 'function') {
+        globalThis.broadcastProcessUpdate(req.session.userId, processId, {
+          currentStage: targetStage,
+          message: `Jumped to stage: ${targetStage.replace('_', ' ').toUpperCase()}`,
+          timestamp: new Date().toISOString()
+        });
+      }
+
+      console.log(`Demo: Jumped process ${processId} to stage: ${targetStage}`);
+
+      res.setHeader('Content-Type', 'application/json');
+      res.json({ 
+        success: true, 
+        currentStage: targetStage,
+        message: `Jumped to ${targetStage}` 
+      });
+    } catch (error) {
+      console.error("Error jumping to process stage:", error);
+      res.setHeader('Content-Type', 'application/json');
+      res.status(500).json({ message: "Failed to jump to stage" });
+    }
+  });
+
+  // Reset process to beginning (demo mode)
+  apiRouter.post("/processes/:processId/reset-stages", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const processId = parseInt(req.params.processId);
+      const { demoMode } = req.body;
+
+      if (!demoMode) {
+        return res.status(400).json({ message: "This endpoint is only available in demo mode" });
+      }
+
+      // Get current process
+      const process = await storage.getProcess(processId);
+      if (!process) {
+        return res.status(404).json({ message: "Process not found" });
+      }
+
+      // Verify ownership
+      if (process.userId !== req.session.userId) {
+        return res.status(403).json({ message: "Unauthorized" });
+      }
+
+      // Reset to initial stage
+      await storage.updateProcess(processId, {
+        currentStage: 'pickup_scheduled',
+        progress: 10,
+        lastUpdated: new Date()
+      });
+
+      // Broadcast update to connected clients
+      if (typeof globalThis.broadcastProcessUpdate === 'function') {
+        globalThis.broadcastProcessUpdate(req.session.userId, processId, {
+          currentStage: 'pickup_scheduled',
+          message: 'Process reset to beginning',
+          timestamp: new Date().toISOString()
+        });
+      }
+
+      console.log(`Demo: Reset process ${processId} to beginning`);
+
+      res.setHeader('Content-Type', 'application/json');
+      res.json({ 
+        success: true, 
+        currentStage: 'pickup_scheduled',
+        message: 'Process reset to beginning' 
+      });
+    } catch (error) {
+      console.error("Error resetting process:", error);
+      res.setHeader('Content-Type', 'application/json');
+      res.status(500).json({ message: "Failed to reset process" });
+    }
+  });
+
   return httpServer;
 }

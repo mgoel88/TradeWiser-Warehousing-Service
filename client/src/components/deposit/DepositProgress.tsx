@@ -15,6 +15,8 @@ import ProcessStatusVisualization from './ProcessStatusVisualization';
 import ProcessActions from './ProcessActions';
 import HelpOverlay from '../help/HelpOverlay';
 import HelpButton from '../help/HelpButton';
+import ManualProgressionControls from './ManualProgressionControls';
+import WarehouseEducationContent from './WarehouseEducationContent';
 
 interface DepositProgressProps {
   processId: number;
@@ -504,6 +506,17 @@ export default function DepositProgress({ processId }: DepositProgressProps) {
           processType={process.processType}
         />
         
+        {/* Manual Progression Controls (Demo) */}
+        <ManualProgressionControls
+          processId={processId}
+          currentStage={process.currentStage}
+          status={process.status}
+          onProgressUpdate={refetch}
+        />
+
+        {/* Warehouse Education Content */}
+        <WarehouseEducationContent currentStage={process.currentStage} />
+
         {/* Process Actions */}
         <ProcessActions
           status={process.status}
