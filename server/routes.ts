@@ -1,6 +1,6 @@
 import express, { type Express, Request, Response } from "express";
 import { createServer, type Server } from "http";
-import { WebSocketServer, WebSocket } from 'ws';
+// Removed WebSocket imports - using Server-Sent Events (SSE) instead
 import path from "path";
 import crypto from 'crypto';
 import { storage } from "./storage";
@@ -3417,159 +3417,89 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   const httpServer = createServer(app);
 
-  // Initialize WebSocket server on /ws path
-  const wss = new WebSocketServer({ 
-    server: httpServer, 
-    path: '/ws'
-  });
+  // Server-Sent Events (SSE) for real-time updates - More reliable than WebSockets
+  apiRouter.get("/events", requireAuth, (req: Request, res: Response) => {
+    // Set SSE headers
+    res.writeHead(200, {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache',
+      'Connection': 'keep-alive',
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Headers': 'Cache-Control'
+    });
 
-  // Map to store active connections by user ID, entity type, and entity ID
-  const connections = new Map<string, WebSocket[]>();
+    const userId = req.session.userId;
+    const clientId = Math.random().toString(36).substring(7);
+    
+    console.log(`SSE: Client ${clientId} connected for user ${userId}`);
+    
+    // Initialize SSE client storage
+    if (!globalThis.sseClients) {
+      globalThis.sseClients = new Map();
+    }
+    
+    if (!globalThis.sseClients.has(userId)) {
+      globalThis.sseClients.set(userId, new Set());
+    }
+    globalThis.sseClients.get(userId).add(res);
 
-  wss.on('connection', (ws: WebSocket) => {
-    console.log('WebSocket client connected');
-    const subscriptions: {userId: string, entityType: string, entityId: string}[] = [];
+    // Send initial connection event
+    try {
+      res.write(`data: ${JSON.stringify({
+        type: 'connected',
+        clientId,
+        timestamp: new Date().toISOString()
+      })}\n\n`);
+    } catch (error) {
+      console.error('Error sending SSE connection event:', error);
+    }
 
-    ws.on('message', (message: string) => {
+    // Keep connection alive with heartbeat every 30 seconds
+    const heartbeat = setInterval(() => {
       try {
-        const data = JSON.parse(message);
-
-        if (data.type === 'subscribe' && data.userId) {
-          const userId = data.userId.toString();
-          
-          if (data.processId) {
-            const processId = data.processId.toString();
-            const entityType = 'process';
-            addSubscription(ws, userId, entityType, processId, subscriptions);
-          }
-          else if (data.entityType && data.entityId) {
-            const entityType = data.entityType.toString();
-            const entityId = data.entityId.toString();
-            addSubscription(ws, userId, entityType, entityId, subscriptions);
-          }
-        }
-        else if (data.type === 'unsubscribe' && data.userId) {
-          const userId = data.userId.toString();
-
-          if (data.entityType && data.entityId) {
-            const entityType = data.entityType.toString(); 
-            const entityId = data.entityId.toString();
-            removeSubscription(ws, userId, entityType, entityId, subscriptions);
-          }
-          else if (data.processId) {
-            const processId = data.processId.toString();
-            const entityType = 'process';
-            removeSubscription(ws, userId, entityType, processId, subscriptions);
-          }
-        }
-      } catch (err) {
-        console.error('Error processing WebSocket message:', err);
+        res.write(`data: ${JSON.stringify({ 
+          type: 'heartbeat', 
+          timestamp: new Date().toISOString() 
+        })}\n\n`);
+      } catch (error) {
+        console.error('SSE heartbeat error:', error);
+        clearInterval(heartbeat);
       }
-    });
+    }, 30000);
 
-    ws.on('close', () => {
-      subscriptions.forEach(sub => {
-        const key = sub.userId + ":" + sub.entityType + ":" + sub.entityId;
-        const clients = connections.get(key) || [];
-        const index = clients.indexOf(ws);
-
-        if (index !== -1) {
-          clients.splice(index, 1);
-          if (clients.length === 0) {
-            connections.delete(key);
-          } else {
-            connections.set(key, clients);
-          }
-        }
-      });
-      console.log('WebSocket client disconnected');
-    });
-
-    function addSubscription(
-      ws: WebSocket,
-      userId: string,
-      entityType: string,
-      entityId: string,
-      subscriptions: {userId: string, entityType: string, entityId: string}[]
-    ) {
-      const key = userId + ":" + entityType + ":" + entityId;
-
-      if (!connections.has(key)) {
-        connections.set(key, []);
-      }
-
-      if (!connections.get(key)?.includes(ws)) {
-        connections.get(key)?.push(ws);
-      }
-
-      const existingSubscription = subscriptions.find(
-        s => s.userId === userId && s.entityType === entityType && s.entityId === entityId
-      );
-
-      if (!existingSubscription) {
-        subscriptions.push({ userId, entityType, entityId });
-      }
-
-      ws.send(JSON.stringify({
-        type: 'subscribed',
-        entityType,
-        entityId,
-        userId,
-        timestamp: new Date().toISOString()
-      }));
-
-      console.log("User " + userId + " subscribed to " + entityType + " " + entityId);
-    }
-
-    function removeSubscription(
-      ws: WebSocket,
-      userId: string,
-      entityType: string,
-      entityId: string,
-      subscriptions: {userId: string, entityType: string, entityId: string}[]
-    ) {
-      const key = userId + ":" + entityType + ":" + entityId;
-      const clients = connections.get(key) || [];
-      const index = clients.indexOf(ws);
-
-      if (index !== -1) {
-        clients.splice(index, 1);
-        if (clients.length === 0) {
-          connections.delete(key);
-        } else {
-          connections.set(key, clients);
+    // Handle client disconnect
+    const cleanup = () => {
+      console.log(`SSE: Client ${clientId} disconnected`);
+      clearInterval(heartbeat);
+      if (globalThis.sseClients && globalThis.sseClients.has(userId)) {
+        globalThis.sseClients.get(userId).delete(res);
+        if (globalThis.sseClients.get(userId).size === 0) {
+          globalThis.sseClients.delete(userId);
         }
       }
+    };
 
-      const subIndex = subscriptions.findIndex(
-        s => s.userId === userId && s.entityType === entityType && s.entityId === entityId
-      );
-
-      if (subIndex !== -1) {
-        subscriptions.splice(subIndex, 1);
-      }
-
-      ws.send(JSON.stringify({
-        type: 'unsubscribed',
-        entityType,
-        entityId,
-        userId,
-        timestamp: new Date().toISOString()
-      }));
-
-      console.log("User " + userId + " unsubscribed from " + entityType + " " + entityId);
-    }
+    req.on('close', cleanup);
+    req.on('aborted', cleanup);
+    res.on('close', cleanup);
   });
 
-  // Global broadcast function for webhook updates
-  globalThis.broadcastEntityUpdate = function(userId: number, entityType: string, entityId: number, updateData: any) {
-    const key = userId + ":" + entityType + ":" + entityId;
-    const clients = connections.get(key) || [];
+  // Map to store active connections - replaced WebSocket with SSE
+  const connections = new Map<string, any[]>();
 
-    if (clients.length === 0) {
+  // SSE-based real-time updates - No connection handling needed (HTTP-based)
+
+  // SSE broadcast function for real-time updates (replacing WebSocket)
+  globalThis.broadcastEntityUpdate = function(userId: number, entityType: string, entityId: number, updateData: any) {
+    console.log(`SSE: Broadcasting ${entityType} update to user ${userId}`);
+    
+    if (!globalThis.sseClients || !globalThis.sseClients.has(userId)) {
+      console.log(`SSE: No clients connected for user ${userId}`);
       return;
     }
 
+    const clients = globalThis.sseClients.get(userId);
+    
     const message = JSON.stringify({
       type: 'entity_update',
       entityType,
@@ -3579,14 +3509,58 @@ export async function registerRoutes(app: Express): Promise<Server> {
       timestamp: new Date().toISOString()
     });
 
+    const sseData = `data: ${message}\n\n`;
+    let sentCount = 0;
+
     clients.forEach(client => {
-      if (client.readyState === WebSocket.OPEN) {
-        client.send(message);
+      try {
+        client.write(sseData);
+        sentCount++;
+      } catch (error) {
+        console.error(`SSE: Error sending to client:`, error);
+        // Remove failed client
+        clients.delete(client);
       }
     });
 
-    console.log("Sent " + entityType + " update to " + clients.length + " clients for " + entityType + " " + entityId);
-  }
+    console.log(`SSE: Sent ${entityType} update to ${sentCount} clients for user ${userId}`);
+  };
+
+  // Process-specific broadcast function for manual progression controls
+  globalThis.broadcastProcessUpdate = function(userId: number, processId: number, updateData: any) {
+    console.log(`SSE: Broadcasting process update to user ${userId}, process ${processId}`);
+    
+    if (!globalThis.sseClients || !globalThis.sseClients.has(userId)) {
+      console.log(`SSE: No clients connected for user ${userId}`);
+      return;
+    }
+
+    const clients = globalThis.sseClients.get(userId);
+    
+    const message = JSON.stringify({
+      type: 'process_update',
+      processId,
+      userId,
+      update: updateData,
+      timestamp: new Date().toISOString()
+    });
+
+    const sseData = `data: ${message}\n\n`;
+    let sentCount = 0;
+
+    clients.forEach(client => {
+      try {
+        client.write(sseData);
+        sentCount++;
+      } catch (error) {
+        console.error(`SSE: Error sending process update:`, error);
+        // Remove failed client
+        clients.delete(client);
+      }
+    });
+
+    console.log(`SSE: Sent process update to ${sentCount} clients for user ${userId}`);
+  };
 
   // Make outbound API functions globally available
   globalThis.sendToWarehouseModule = sendToWarehouseModule;

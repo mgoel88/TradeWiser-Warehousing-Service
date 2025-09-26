@@ -77,29 +77,19 @@ export default function DepositProgress({ processId }: DepositProgressProps) {
   // Combined loading state
   const isLoading = processLoading || commodityLoading || warehouseLoading;
   
-  // Set up WebSocket connection for real-time updates
+  // Set up Server-Sent Events (SSE) for real-time updates - More reliable than WebSockets
   useEffect(() => {
-    // Only connect WebSocket when we have process data
+    // Only connect SSE when we have process data
     if (!process || !process.userId) return;
 
-    // Initialize WebSocket connection
-    const connectWebSocket = () => {
-      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-      const wsUrl = `${protocol}//${window.location.host}/ws`;
-      
+    // Initialize SSE connection
+    const connectSSE = () => {
       try {
-        const socket = new WebSocket(wsUrl);
+        const eventSource = new EventSource('/api/events');
         
-        socket.onopen = () => {
-          console.log('WebSocket connection established for process', processId);
+        eventSource.onopen = () => {
+          console.log('SSE: Connection established for process', processId);
           setIsLive(true);
-          
-          // Subscribe to updates for this process
-          socket.send(JSON.stringify({
-            type: 'subscribe',
-            userId: process.userId,
-            processId
-          }));
           
           toast({
             title: 'Live updates activated',
@@ -107,10 +97,10 @@ export default function DepositProgress({ processId }: DepositProgressProps) {
           });
         };
         
-        socket.onmessage = (event: MessageEvent) => {
+        eventSource.onmessage = (event: MessageEvent) => {
           try {
-            const data = JSON.parse(event.data as string);
-            console.log('WebSocket message received:', data);
+            const data = JSON.parse(event.data);
+            console.log('SSE: Message received:', data);
             
             if (data.type === 'process_update' && data.processId === processId) {
               // Update the cached data with the new process information
@@ -132,41 +122,41 @@ export default function DepositProgress({ processId }: DepositProgressProps) {
               }
               
               setLastUpdate(new Date());
+              
+              // Refetch process data to get latest state
+              refetch();
             }
           } catch (error) {
-            console.error('Error parsing WebSocket message:', error);
+            console.error('SSE: Error parsing message:', error);
           }
         };
         
-        socket.onclose = () => {
-          console.log('WebSocket connection closed');
+        eventSource.onerror = (error: Event) => {
+          console.error('SSE: Connection error:', error);
           setIsLive(false);
-          // Try to reconnect after a delay
-          setTimeout(connectWebSocket, 5000);
+          eventSource.close();
+          
+          // Auto-reconnect after 3 seconds (SSE has built-in reconnection)
+          setTimeout(connectSSE, 3000);
         };
         
-        socket.onerror = (error: Event) => {
-          console.error('WebSocket error:', error);
-          setIsLive(false);
-        };
-        
-        socketRef.current = socket;
+        socketRef.current = eventSource as any;
       } catch (error) {
-        console.error('Failed to establish WebSocket connection:', error);
+        console.error('SSE: Failed to establish connection:', error);
         setIsLive(false);
       }
     };
     
-    // Start WebSocket connection
-    connectWebSocket();
+    // Start SSE connection
+    connectSSE();
     
-    // Clean up WebSocket connection when component unmounts
+    // Clean up SSE connection when component unmounts
     return () => {
-      if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
+      if (socketRef.current) {
         socketRef.current.close();
       }
     };
-  }, [processId, queryClient, toast, process]);
+  }, [processId, queryClient, toast, process, refetch]);
   
   // Handle manual refresh
   const handleRefresh = async () => {
