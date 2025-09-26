@@ -3593,6 +3593,282 @@ export async function registerRoutes(app: Express): Promise<Server> {
   globalThis.requestQualityTesting = requestQualityTesting;
 
   // =============================================
+  // DEMO DATA GENERATION - FOR DEMONSTRATION PURPOSES
+  // =============================================
+
+  // Generate diverse warehouse receipts for demo
+  apiRouter.post("/demo/generate-receipts", requireAuth, async (req: Request, res: Response) => {
+    try {
+      console.log("Generating diverse warehouse receipts for demo...");
+      
+      const demoReceiptsData = [
+        {
+          receiptNumber: `WR${Date.now()}-001`,
+          commodityName: 'Wheat (गेहूं)',
+          quantity: '250',
+          measurementUnit: 'MT',
+          status: 'active' as const,
+          warehouseName: 'Karnal Premium Storage',
+          warehouseAddress: 'Grain Market Road, Karnal, Haryana',
+          qualityGrade: 'Grade A',
+          valuation: (250 * 1000 * 50).toString(),
+          blockchainHash: `0x${Math.random().toString(16).substring(2, 18)}`,
+          issuedDate: new Date(),
+          expiryDate: new Date(Date.now() + 6 * 30 * 24 * 60 * 60 * 1000),
+          liens: JSON.stringify({
+            collateralized: true,
+            loanAmount: 6250000, // 25% of value
+            lenderName: 'Punjab National Bank',
+            collateralPercentage: 80,
+            verificationCode: `WR-${req.session.userId}-${Math.random().toString(16).substring(2, 11).toUpperCase()}`
+          })
+        },
+        {
+          receiptNumber: `WR${Date.now()}-002`,
+          commodityName: 'Basmati Rice (बासमती चावल)',
+          quantity: '100',
+          measurementUnit: 'MT',
+          status: 'active' as const,
+          warehouseName: 'Delhi Central Warehouse',
+          warehouseAddress: 'Azadpur Mandi, Delhi',
+          qualityGrade: 'Super Grade',
+          valuation: (100 * 1000 * 75).toString(), // Premium pricing for Basmati
+          blockchainHash: `0x${Math.random().toString(16).substring(2, 18)}`,
+          issuedDate: new Date(Date.now() - 15 * 24 * 60 * 60 * 1000), // 15 days ago
+          expiryDate: new Date(Date.now() + 5 * 30 * 24 * 60 * 60 * 1000),
+          liens: JSON.stringify({
+            collateralized: false,
+            verificationCode: `WR-${req.session.userId}-${Math.random().toString(16).substring(2, 11).toUpperCase()}`
+          })
+        },
+        {
+          receiptNumber: `WR${Date.now()}-003`,
+          commodityName: 'Soybean (सोयाबीन)',
+          quantity: '500',
+          measurementUnit: 'MT',
+          status: 'active' as const,
+          warehouseName: 'Indore Commodity Hub',
+          warehouseAddress: 'Krishi Upaj Mandi, Indore, MP',
+          qualityGrade: 'Grade A',
+          valuation: (500 * 1000 * 45).toString(),
+          blockchainHash: `0x${Math.random().toString(16).substring(2, 18)}`,
+          issuedDate: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000), // 1 month ago
+          expiryDate: new Date(Date.now() + 4 * 30 * 24 * 60 * 60 * 1000),
+          liens: JSON.stringify({
+            collateralized: true,
+            loanAmount: 18000000, // 80% of value
+            lenderName: 'State Bank of India',
+            collateralPercentage: 80,
+            verificationCode: `WR-${req.session.userId}-${Math.random().toString(16).substring(2, 11).toUpperCase()}`
+          })
+        },
+        {
+          receiptNumber: `WR${Date.now()}-004`,
+          commodityName: 'Maize (मक्का)',
+          quantity: '150',
+          measurementUnit: 'MT',
+          status: 'active' as const,
+          warehouseName: 'Bihar Grain Storage',
+          warehouseAddress: 'Hajipur Industrial Area, Bihar',
+          qualityGrade: 'Grade B',
+          valuation: (150 * 1000 * 35).toString(),
+          blockchainHash: `0x${Math.random().toString(16).substring(2, 18)}`,
+          issuedDate: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000), // 1 week ago
+          expiryDate: new Date(Date.now() + 5 * 30 * 24 * 60 * 60 * 1000),
+          liens: JSON.stringify({
+            collateralized: false,
+            verificationCode: `WR-${req.session.userId}-${Math.random().toString(16).substring(2, 11).toUpperCase()}`
+          })
+        },
+        {
+          receiptNumber: `WR${Date.now()}-005`,
+          commodityName: 'Cotton (कपास)',
+          quantity: '75',
+          measurementUnit: 'MT',
+          status: 'active' as const,
+          warehouseName: 'Gujarat Cotton Warehouse',
+          warehouseAddress: 'Cotton Market, Rajkot, Gujarat',
+          qualityGrade: 'Premium',
+          valuation: (75 * 1000 * 85).toString(), // Premium cotton pricing
+          blockchainHash: `0x${Math.random().toString(16).substring(2, 18)}`,
+          issuedDate: new Date(Date.now() - 45 * 24 * 60 * 60 * 1000), // 45 days ago
+          expiryDate: new Date(Date.now() + 3 * 30 * 24 * 60 * 60 * 1000),
+          liens: JSON.stringify({
+            collateralized: true,
+            loanAmount: 4250000, // 66% of value
+            lenderName: 'HDFC Bank',
+            collateralPercentage: 70,
+            verificationCode: `WR-${req.session.userId}-${Math.random().toString(16).substring(2, 11).toUpperCase()}`
+          })
+        },
+        {
+          receiptNumber: `WR${Date.now()}-006`,
+          commodityName: 'Turmeric (हल्दी)',
+          quantity: '25',
+          measurementUnit: 'MT',
+          status: 'active' as const,
+          warehouseName: 'Erode Spice Warehouse',
+          warehouseAddress: 'Spice Market, Erode, Tamil Nadu',
+          qualityGrade: 'Export Quality',
+          valuation: (25 * 1000 * 120).toString(), // High value spice
+          blockchainHash: `0x${Math.random().toString(16).substring(2, 18)}`,
+          issuedDate: new Date(Date.now() - 20 * 24 * 60 * 60 * 1000),
+          expiryDate: new Date(Date.now() + 8 * 30 * 24 * 60 * 60 * 1000),
+          liens: JSON.stringify({
+            collateralized: false,
+            verificationCode: `WR-${req.session.userId}-${Math.random().toString(16).substring(2, 11).toUpperCase()}`
+          })
+        },
+        {
+          receiptNumber: `WR${Date.now()}-007`,
+          commodityName: 'Mustard Seed (सरसों)',
+          quantity: '200',
+          measurementUnit: 'MT',
+          status: 'active' as const,
+          warehouseName: 'Rajasthan Oilseed Storage',
+          warehouseAddress: 'Kota Mandi, Rajasthan',
+          qualityGrade: 'Grade A',
+          valuation: (200 * 1000 * 55).toString(),
+          blockchainHash: `0x${Math.random().toString(16).substring(2, 18)}`,
+          issuedDate: new Date(Date.now() - 60 * 24 * 60 * 60 * 1000), // 2 months ago
+          expiryDate: new Date(Date.now() + 2 * 30 * 24 * 60 * 60 * 1000),
+          liens: JSON.stringify({
+            collateralized: true,
+            loanAmount: 8800000, // 80% of value
+            lenderName: 'ICICI Bank',
+            collateralPercentage: 80,
+            verificationCode: `WR-${req.session.userId}-${Math.random().toString(16).substring(2, 11).toUpperCase()}`
+          })
+        },
+        {
+          receiptNumber: `WR${Date.now()}-008`,
+          commodityName: 'Chickpea (चना)',
+          quantity: '300',
+          measurementUnit: 'MT',
+          status: 'active' as const,
+          warehouseName: 'Maharashtra Pulse Center',
+          warehouseAddress: 'Latur Agricultural Market, Maharashtra',
+          qualityGrade: 'Grade A',
+          valuation: (300 * 1000 * 60).toString(),
+          blockchainHash: `0x${Math.random().toString(16).substring(2, 18)}`,
+          issuedDate: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000),
+          expiryDate: new Date(Date.now() + 6 * 30 * 24 * 60 * 60 * 1000),
+          liens: JSON.stringify({
+            collateralized: false,
+            verificationCode: `WR-${req.session.userId}-${Math.random().toString(16).substring(2, 11).toUpperCase()}`
+          })
+        },
+        {
+          receiptNumber: `WR${Date.now()}-009`,
+          commodityName: 'Groundnut (मूंगफली)',
+          quantity: '180',
+          measurementUnit: 'MT',
+          status: 'active' as const,
+          warehouseName: 'Andhra Pradesh Oilseed Hub',
+          warehouseAddress: 'Kurnool District Storage, AP',
+          qualityGrade: 'Premium',
+          valuation: (180 * 1000 * 70).toString(),
+          blockchainHash: `0x${Math.random().toString(16).substring(2, 18)}`,
+          issuedDate: new Date(Date.now() - 25 * 24 * 60 * 60 * 1000),
+          expiryDate: new Date(Date.now() + 4 * 30 * 24 * 60 * 60 * 1000),
+          liens: JSON.stringify({
+            collateralized: true,
+            loanAmount: 10080000, // 80% of value
+            lenderName: 'Axis Bank',
+            collateralPercentage: 80,
+            verificationCode: `WR-${req.session.userId}-${Math.random().toString(16).substring(2, 11).toUpperCase()}`
+          })
+        },
+        {
+          receiptNumber: `WR${Date.now()}-010`,
+          commodityName: 'Cumin (जीरा)',
+          quantity: '15',
+          measurementUnit: 'MT',
+          status: 'active' as const,
+          warehouseName: 'Unjha Spice Storage',
+          warehouseAddress: 'Unjha Spice Market, Gujarat',
+          qualityGrade: 'Export Grade',
+          valuation: (15 * 1000 * 200).toString(), // High value spice
+          blockchainHash: `0x${Math.random().toString(16).substring(2, 18)}`,
+          issuedDate: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000),
+          expiryDate: new Date(Date.now() + 12 * 30 * 24 * 60 * 60 * 1000), // Longer expiry for spices
+          liens: JSON.stringify({
+            collateralized: false,
+            verificationCode: `WR-${req.session.userId}-${Math.random().toString(16).substring(2, 11).toUpperCase()}`
+          })
+        },
+        {
+          receiptNumber: `WR${Date.now()}-011`,
+          commodityName: 'Jute (जूट)',
+          quantity: '120',
+          measurementUnit: 'MT',
+          status: 'active' as const,
+          warehouseName: 'West Bengal Fiber Storage',
+          warehouseAddress: 'Barrackpore Jute Mill Area, WB',
+          qualityGrade: 'Grade A',
+          valuation: (120 * 1000 * 40).toString(),
+          blockchainHash: `0x${Math.random().toString(16).substring(2, 18)}`,
+          issuedDate: new Date(Date.now() - 35 * 24 * 60 * 60 * 1000),
+          expiryDate: new Date(Date.now() + 3 * 30 * 24 * 60 * 60 * 1000),
+          liens: JSON.stringify({
+            collateralized: true,
+            loanAmount: 3360000, // 70% of value
+            lenderName: 'Bank of Baroda',
+            collateralPercentage: 70,
+            verificationCode: `WR-${req.session.userId}-${Math.random().toString(16).substring(2, 11).toUpperCase()}`
+          })
+        },
+        {
+          receiptNumber: `WR${Date.now()}-012`,
+          commodityName: 'Sesame Seeds (तिल)',
+          quantity: '50',
+          measurementUnit: 'MT',
+          status: 'active' as const,
+          warehouseName: 'Odisha Oilseed Storage',
+          warehouseAddress: 'Bhubaneswar Agricultural Hub, Odisha',
+          qualityGrade: 'Premium',
+          valuation: (50 * 1000 * 90).toString(),
+          blockchainHash: `0x${Math.random().toString(16).substring(2, 18)}`,
+          issuedDate: new Date(Date.now() - 18 * 24 * 60 * 60 * 1000),
+          expiryDate: new Date(Date.now() + 7 * 30 * 24 * 60 * 60 * 1000),
+          liens: JSON.stringify({
+            collateralized: false,
+            verificationCode: `WR-${req.session.userId}-${Math.random().toString(16).substring(2, 11).toUpperCase()}`
+          })
+        }
+      ];
+
+      const createdReceipts = [];
+      
+      for (const receiptData of demoReceiptsData) {
+        try {
+          const receipt = await storage.createWarehouseReceipt({
+            ...receiptData,
+            ownerId: req.session.userId
+          });
+          createdReceipts.push(receipt);
+          console.log(`Created demo receipt: ${receiptData.receiptNumber} - ${receiptData.commodityName}`);
+        } catch (error) {
+          console.warn(`Failed to create receipt ${receiptData.receiptNumber}:`, error);
+        }
+      }
+
+      console.log(`Successfully created ${createdReceipts.length} demo warehouse receipts`);
+
+      res.setHeader('Content-Type', 'application/json');
+      res.json({ 
+        success: true, 
+        message: `Created ${createdReceipts.length} diverse warehouse receipts`,
+        receipts: createdReceipts 
+      });
+    } catch (error) {
+      console.error("Error generating demo receipts:", error);
+      res.setHeader('Content-Type', 'application/json');
+      res.status(500).json({ message: "Failed to generate demo receipts" });
+    }
+  });
+
+  // =============================================
   // DEMO PROGRESSION CONTROLS - FOR DEMONSTRATION PURPOSES
   // =============================================
 
