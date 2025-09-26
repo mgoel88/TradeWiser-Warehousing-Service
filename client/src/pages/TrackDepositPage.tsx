@@ -355,9 +355,9 @@ export default function TrackDepositPage() {
               </CardContent>
             </Card>
 
-            {/* Details Grid */}
+            {/* Dynamic Stage-Based Information Cards */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              {/* Commodity Details */}
+              {/* Card 1: Always show commodity details as base */}
               {progressData.commodity && (
                 <Card>
                   <CardHeader>
@@ -389,84 +389,319 @@ export default function TrackDepositPage() {
                 </Card>
               )}
 
-              {/* Warehouse Information */}
-              {progressData.warehouse && (
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2 text-lg">
-                      <Building className="h-5 w-5 text-blue-500" />
-                      Warehouse Information
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-3">
-                    <div>
-                      <label className="text-sm font-medium text-gray-600">Name</label>
-                      <p className="text-gray-900">{progressData.warehouse.name}</p>
-                    </div>
-                    <Separator />
-                    <div>
-                      <label className="text-sm font-medium text-gray-600">Address</label>
-                      <p className="text-gray-900 flex items-start gap-1">
-                        <MapPin className="h-4 w-4 mt-0.5 text-gray-500 flex-shrink-0" />
-                        {progressData.warehouse.address}
-                      </p>
-                    </div>
-                    <Separator />
-                    <div>
-                      <label className="text-sm font-medium text-gray-600">Contact</label>
-                      <p className="text-gray-900 flex items-center gap-1">
-                        <Phone className="h-4 w-4 text-gray-500" />
-                        {progressData.warehouse.contact}
-                      </p>
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
+              {/* Card 2: Stage-dependent middle card */}
+              {(() => {
+                switch (progressData.currentStage) {
+                  case 'pickup_scheduled':
+                  case 'pickup_assigned':
+                    // Show pickup scheduling details
+                    return (
+                      <Card>
+                        <CardHeader>
+                          <CardTitle className="flex items-center gap-2 text-lg">
+                            <Clock className="h-5 w-5 text-blue-500" />
+                            Pickup Schedule
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-3">
+                          <div>
+                            <label className="text-sm font-medium text-gray-600">Scheduled Time</label>
+                            <p className="text-gray-900">Today, 2:30 PM - 4:00 PM</p>
+                          </div>
+                          <Separator />
+                          <div>
+                            <label className="text-sm font-medium text-gray-600">Pickup Location</label>
+                            <p className="text-gray-900 flex items-start gap-1">
+                              <MapPin className="h-4 w-4 mt-0.5 text-gray-500 flex-shrink-0" />
+                              {progressData.warehouse?.address || 'Farm Location'}
+                            </p>
+                          </div>
+                          <Separator />
+                          <div>
+                            <label className="text-sm font-medium text-gray-600">Instructions</label>
+                            <p className="text-gray-900">Vehicle will arrive at farm gate</p>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    );
 
-              {/* Transport Details */}
-              {progressData.transport && (
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2 text-lg">
-                      <Truck className="h-5 w-5 text-green-500" />
-                      Transport Details
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-3">
-                    <div>
-                      <label className="text-sm font-medium text-gray-600">Vehicle Number</label>
-                      <p className="text-gray-900 font-mono font-semibold">
-                        {progressData.transport.vehicleNumber}
-                      </p>
-                    </div>
-                    <Separator />
-                    <div>
-                      <label className="text-sm font-medium text-gray-600">Driver</label>
-                      <p className="text-gray-900 flex items-center gap-1">
-                        <Users className="h-4 w-4 text-gray-500" />
-                        {progressData.transport.driverName}
-                      </p>
-                    </div>
-                    <Separator />
-                    <div>
-                      <label className="text-sm font-medium text-gray-600">Driver Contact</label>
-                      <p className="text-gray-900 flex items-center gap-1">
-                        <Phone className="h-4 w-4 text-gray-500" />
-                        {progressData.transport.driverPhone}
-                      </p>
-                    </div>
-                    {progressData.transport.transportCompany && (
-                      <>
+                  case 'in_transit':
+                    // Show real-time tracking during transit
+                    return (
+                      <Card>
+                        <CardHeader>
+                          <CardTitle className="flex items-center gap-2 text-lg">
+                            <Truck className="h-5 w-5 text-yellow-500 animate-pulse" />
+                            Live Tracking
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-3">
+                          <div>
+                            <label className="text-sm font-medium text-gray-600">Current Location</label>
+                            <p className="text-gray-900">NH-44, Near Panipat Toll Plaza</p>
+                          </div>
+                          <Separator />
+                          <div>
+                            <label className="text-sm font-medium text-gray-600">Distance Remaining</label>
+                            <p className="text-gray-900 font-semibold text-blue-600">42.3 km</p>
+                          </div>
+                          <Separator />
+                          <div>
+                            <label className="text-sm font-medium text-gray-600">ETA</label>
+                            <p className="text-gray-900 font-semibold text-green-600">
+                              {new Date(new Date().getTime() + 85 * 60000).toLocaleTimeString()}
+                            </p>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    );
+
+                  case 'arrived_warehouse':
+                    // Show warehouse arrival and dock info
+                    return (
+                      <Card>
+                        <CardHeader>
+                          <CardTitle className="flex items-center gap-2 text-lg">
+                            <Building className="h-5 w-5 text-purple-500" />
+                            Warehouse Arrival
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-3">
+                          <div>
+                            <label className="text-sm font-medium text-gray-600">Dock Assignment</label>
+                            <p className="text-gray-900 font-semibold">Dock Bay #A-7</p>
+                          </div>
+                          <Separator />
+                          <div>
+                            <label className="text-sm font-medium text-gray-600">Unloading Status</label>
+                            <p className="text-gray-900">In Progress - 65% Complete</p>
+                          </div>
+                          <Separator />
+                          <div>
+                            <label className="text-sm font-medium text-gray-600">Storage Zone</label>
+                            <p className="text-gray-900">Zone B - Climate Controlled</p>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    );
+
+                  case 'quality_assessment':
+                    // Show quality assessment parameters
+                    return (
+                      <Card>
+                        <CardHeader>
+                          <CardTitle className="flex items-center gap-2 text-lg">
+                            <FlaskConical className="h-5 w-5 text-orange-500" />
+                            Quality Assessment
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-3">
+                          <div>
+                            <label className="text-sm font-medium text-gray-600">Moisture Content</label>
+                            <p className="text-gray-900 font-semibold text-blue-600">12.5% ✓ Good</p>
+                          </div>
+                          <Separator />
+                          <div>
+                            <label className="text-sm font-medium text-gray-600">Contamination Level</label>
+                            <p className="text-gray-900 font-semibold text-green-600">0.8% ✓ Excellent</p>
+                          </div>
+                          <Separator />
+                          <div>
+                            <label className="text-sm font-medium text-gray-600">Grade Assessment</label>
+                            <p className="text-gray-900 font-semibold text-green-600">Grade A Premium</p>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    );
+
+                  case 'pricing_complete':
+                    // Show pricing and valuation breakdown
+                    return (
+                      <Card>
+                        <CardHeader>
+                          <CardTitle className="flex items-center gap-2 text-lg">
+                            <Calculator className="h-5 w-5 text-indigo-500" />
+                            Valuation Details
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-3">
+                          <div>
+                            <label className="text-sm font-medium text-gray-600">Market Rate</label>
+                            <p className="text-gray-900 font-semibold">₹2,245/quintal</p>
+                          </div>
+                          <Separator />
+                          <div>
+                            <label className="text-sm font-medium text-gray-600">Quality Premium</label>
+                            <p className="text-gray-900 font-semibold text-green-600">+₹85/quintal (3.8%)</p>
+                          </div>
+                          <Separator />
+                          <div>
+                            <label className="text-sm font-medium text-gray-600">Final Valuation</label>
+                            <p className="text-gray-900 font-semibold text-green-600">
+                              ₹{((progressData.commodity?.estimatedValue || 500000)).toLocaleString()}
+                            </p>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    );
+
+                  case 'receipt_generated':
+                    // Show eWR and blockchain details
+                    return (
+                      <Card>
+                        <CardHeader>
+                          <CardTitle className="flex items-center gap-2 text-lg">
+                            <FileText className="h-5 w-5 text-green-500" />
+                            Electronic Receipt
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-3">
+                          <div>
+                            <label className="text-sm font-medium text-gray-600">eWR Number</label>
+                            <p className="text-gray-900 font-mono font-semibold">WR{Date.now().toString().slice(-8)}</p>
+                          </div>
+                          <Separator />
+                          <div>
+                            <label className="text-sm font-medium text-gray-600">Blockchain Hash</label>
+                            <p className="text-gray-900 font-mono text-sm">0x{Math.random().toString(16).substring(2, 18)}</p>
+                          </div>
+                          <Separator />
+                          <div>
+                            <label className="text-sm font-medium text-gray-600">Verification Status</label>
+                            <p className="text-gray-900 font-semibold text-green-600">✓ Verified & Secured</p>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    );
+
+                  default:
+                    // Fallback to warehouse information
+                    if (progressData.warehouse) {
+                      return (
+                        <Card>
+                          <CardHeader>
+                            <CardTitle className="flex items-center gap-2 text-lg">
+                              <Building className="h-5 w-5 text-blue-500" />
+                              Warehouse Information
+                            </CardTitle>
+                          </CardHeader>
+                          <CardContent className="space-y-3">
+                            <div>
+                              <label className="text-sm font-medium text-gray-600">Name</label>
+                              <p className="text-gray-900">{progressData.warehouse.name}</p>
+                            </div>
+                            <Separator />
+                            <div>
+                              <label className="text-sm font-medium text-gray-600">Address</label>
+                              <p className="text-gray-900 flex items-start gap-1">
+                                <MapPin className="h-4 w-4 mt-0.5 text-gray-500 flex-shrink-0" />
+                                {progressData.warehouse.address}
+                              </p>
+                            </div>
+                            <Separator />
+                            <div>
+                              <label className="text-sm font-medium text-gray-600">Contact</label>
+                              <p className="text-gray-900 flex items-center gap-1">
+                                <Phone className="h-4 w-4 text-gray-500" />
+                                {progressData.warehouse.contact}
+                              </p>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      );
+                    }
+                    return null;
+                }
+              })()}
+
+              {/* Card 3: Transport Details - Show when relevant, otherwise show contextual info */}
+              {(() => {
+                // Show transport details during pickup and transit stages
+                if (['pickup_scheduled', 'pickup_assigned', 'in_transit'].includes(progressData.currentStage) && progressData.transport) {
+                  return (
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="flex items-center gap-2 text-lg">
+                          <Truck className="h-5 w-5 text-green-500" />
+                          Transport Details
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent className="space-y-3">
+                        <div>
+                          <label className="text-sm font-medium text-gray-600">Vehicle Number</label>
+                          <p className="text-gray-900 font-mono font-semibold">
+                            {progressData.transport.vehicleNumber}
+                          </p>
+                        </div>
                         <Separator />
                         <div>
-                          <label className="text-sm font-medium text-gray-600">Transport Company</label>
-                          <p className="text-gray-900">{progressData.transport.transportCompany}</p>
+                          <label className="text-sm font-medium text-gray-600">Driver</label>
+                          <p className="text-gray-900 flex items-center gap-1">
+                            <Users className="h-4 w-4 text-gray-500" />
+                            {progressData.transport.driverName}
+                          </p>
                         </div>
-                      </>
-                    )}
-                  </CardContent>
-                </Card>
-              )}
+                        <Separator />
+                        <div>
+                          <label className="text-sm font-medium text-gray-600">Driver Contact</label>
+                          <p className="text-gray-900 flex items-center gap-1">
+                            <Phone className="h-4 w-4 text-gray-500" />
+                            {progressData.transport.driverPhone}
+                          </p>
+                        </div>
+                        {progressData.transport.transportCompany && (
+                          <>
+                            <Separator />
+                            <div>
+                              <label className="text-sm font-medium text-gray-600">Transport Company</label>
+                              <p className="text-gray-900">{progressData.transport.transportCompany}</p>
+                            </div>
+                          </>
+                        )}
+                      </CardContent>
+                    </Card>
+                  );
+                }
+
+                // Show warehouse info for warehouse-related stages
+                if (progressData.warehouse && ['arrived_warehouse', 'quality_assessment', 'pricing_complete', 'receipt_generated'].includes(progressData.currentStage)) {
+                  return (
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="flex items-center gap-2 text-lg">
+                          <Building className="h-5 w-5 text-blue-500" />
+                          Warehouse Information
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent className="space-y-3">
+                        <div>
+                          <label className="text-sm font-medium text-gray-600">Name</label>
+                          <p className="text-gray-900">{progressData.warehouse.name}</p>
+                        </div>
+                        <Separator />
+                        <div>
+                          <label className="text-sm font-medium text-gray-600">Address</label>
+                          <p className="text-gray-900 flex items-start gap-1">
+                            <MapPin className="h-4 w-4 mt-0.5 text-gray-500 flex-shrink-0" />
+                            {progressData.warehouse.address}
+                          </p>
+                        </div>
+                        <Separator />
+                        <div>
+                          <label className="text-sm font-medium text-gray-600">Contact</label>
+                          <p className="text-gray-900 flex items-center gap-1">
+                            <Phone className="h-4 w-4 text-gray-500" />
+                            {progressData.warehouse.contact}
+                          </p>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  );
+                }
+
+                // Default fallback card
+                return null;
+              })()}
             </div>
 
             {/* Start Tracking Button */}
