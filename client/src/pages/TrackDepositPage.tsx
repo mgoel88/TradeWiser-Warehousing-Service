@@ -2,7 +2,8 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'wouter';
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { useWebSocket } from "@/context/WebSocketContext";
+// WebSocket removed - using SSE instead
+const useWebSocket = () => ({ isConnected: false });
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { useRealTimeEntity } from "@/hooks/use-real-time-entity";

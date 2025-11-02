@@ -5,7 +5,12 @@
  * This hook uses the WebSocketContext to subscribe to updates and provides loading and error states.
  */
 import { useState, useEffect, useCallback } from 'react';
-import { useWebSocket } from '@/context/WebSocketContext';
+// WebSocket removed - using SSE instead
+const useWebSocket = () => ({ 
+  subscribe: () => {}, 
+  unsubscribe: () => {}, 
+  isConnected: false 
+});
 import { useQueryClient } from '@tanstack/react-query';
 import { useContext } from 'react';
 import { AuthContext } from '@/context/AuthContext';

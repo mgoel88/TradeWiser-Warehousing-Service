@@ -8364,3 +8364,30 @@ Session ID: m15nrtNnSWFmWGo0s7tS9D2s4YoV-3Ad, Session data: Session {
   }
 }
 2:58:33 PM [express] POST /api/auth/login 200 in 246ms :: {"success":true,"message":"Login successfu…
+🧹 Rate limiter cleanup: removed 0 expired entries
+🧹 Rate limiter cleanup: removed 0 expired entries
+🧹 Rate limiter cleanup: removed 0 expired entries
+🧹 Rate limiter cleanup: removed 0 expired entries
+🧹 Performed periodic cleanup of monitoring data
+🧹 Rate limiter cleanup: removed 0 expired entries
+🧹 Rate limiter cleanup: removed 0 expired entries
+🧹 Rate limiter cleanup: removed 0 expired entries
+🧹 Rate limiter cleanup: removed 0 expired entries
+🧹 Rate limiter cleanup: removed 0 expired entries
+🧹 Rate limiter cleanup: removed 0 expired entries
+🧹 Rate limiter cleanup: removed 0 expired entries
+🧹 Rate limiter cleanup: removed 0 expired entries
+🧹 Rate limiter cleanup: removed 0 expired entries
+🧹 Rate limiter cleanup: removed 0 expired entries
+🧹 Rate limiter cleanup: removed 0 expired entries
+Session ID: oOwU1Ka8TBGSWa9MmgwSF82RCRtyr2mU, Session data: Session {
+  cookie: {
+    path: '/',
+    _expires: 2025-11-03T20:26:43.013Z,
+    originalMaxAge: 86400000,
+    httpOnly: true,
+    secure: false,
+    sameSite: 'lax'
+  }
+}
+3:26:43 PM [express] GET /api/portfolio 401 in 1ms :: {"message":"Not authenticated"}

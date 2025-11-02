@@ -9,6 +9,8 @@ import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
 import { useMutation } from '@tanstack/react-query';
 import { apiRequest } from '@/lib/queryClient';
+import { useAuth } from '@/hooks/useAuth';
+import { useLocation } from 'wouter';
 import { Smartphone, User, Mail, Eye, EyeOff, Check, RefreshCw } from 'lucide-react';
 import { SiGoogle, SiFacebook } from 'react-icons/si';
 
@@ -33,6 +35,8 @@ export default function MobileAuthScreen({ onAuthSuccess }: { onAuthSuccess: (us
   const [isOTPSent, setIsOTPSent] = useState(false);
   const [countdown, setCountdown] = useState(0);
   const { toast } = useToast();
+  const { login } = useAuth();
+  const [, setLocation] = useLocation();
 
   // Phone/OTP state
   const [phoneData, setPhoneData] = useState({
@@ -199,7 +203,7 @@ export default function MobileAuthScreen({ onAuthSuccess }: { onAuthSuccess: (us
     verifyOTPMutation.mutate(requestData);
   };
 
-  const handleCredentialsAuth = () => {
+  const handleCredentialsAuth = async () => {
     if (credentialsData.isRegistering) {
       // Registration validation
       if (!credentialsData.fullName || !credentialsData.email || !credentialsData.username || !credentialsData.password) {
@@ -230,10 +234,21 @@ export default function MobileAuthScreen({ onAuthSuccess }: { onAuthSuccess: (us
         return;
       }
 
-      credentialsAuthMutation.mutate({
-        username: credentialsData.username,
-        password: credentialsData.password
-      });
+      // Use the login function from AuthContext
+      const success = await login(credentialsData.username, credentialsData.password);
+      if (success) {
+        toast({
+          title: "Welcome!",
+          description: "Login successful"
+        });
+        setLocation('/dashboard');
+      } else {
+        toast({
+          title: "Login Failed",
+          description: "Please check your credentials and try again",
+          variant: "destructive"
+        });
+      }
     }
   };
 

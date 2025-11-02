@@ -28,7 +28,7 @@ export default function DepositProgress({ processId }: DepositProgressProps) {
   const [isLive, setIsLive] = useState(false);
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
   const [isHelpOpen, setIsHelpOpen] = useState(false);
-  const socketRef = useRef<WebSocket | null>(null);
+  const socketRef = useRef<EventSource | null>(null);
   const queryClient = useQueryClient();
   const { toast } = useToast();
   

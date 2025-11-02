@@ -1,11 +1,24 @@
+nohup: ignoring input
 
-> rest-express@1.0.0 start /home/ubuntu/TradeWiser-Warehousing-Service
-> NODE_ENV=production node dist/index.js
+> rest-express@1.0.0 dev
+> tsx server/index.ts
 
-Registering API routes...
+Loaded 50 warehouses from database
+✅ Revolving Credit Router (JWT) loaded successfully
+✅ Using JWT authentication only (no sessions)
+Registering API routes with JWT authentication...
+🔍 Mounting revolving credit router directly on app
+✅ Revolving credit router mounted on app
 API routes registered successfully
-11:42:05 AM [express] serving on port 5000
+3:25:15 PM [express] serving on port 5000
+Test user already exists, skipping creation
 Test user created at startup: testuser/password123 (hashed)
-Created sample commodities for test user
 Created 3 sample warehouses
- ELIFECYCLE  Command failed.
+Created sample commodities for test user
+🔑 [AUTH.CLEAN] Generated tokens: [ 'accessToken', 'refreshToken', 'expiresIn' ]
+3:26:35 PM [express] POST /api/auth/login 200 in 255ms :: {"success":true,"message":"Login successfu…
+3:26:35 PM [express] GET /api/credit-line/details 401 in 2ms :: {"success":false,"message":"No authe…
+s
+🧹 Rate limiter cleanup: removed 0 expired entries
+3:26:35 PM [express] GET /api/portfolio 401 in 2ms :: {"success":false,"message":"No authentication …
+3:26:36 PM [express] GET /api/portfolio 401 in 1ms :: {"success":false,"message":"No authentication …
