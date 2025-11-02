@@ -1,155 +1,140 @@
-import { createContext, useEffect, useState, ReactNode } from "react";
-import { apiRequest } from "@/lib/queryClient";
-import { useToast } from "@/hooks/use-toast";
-import { User } from "@shared/schema";
+/**
+ * Authentication Context
+ * Clean JWT-based authentication for the frontend
+ */
+
+import React, { createContext, useContext, useState, useEffect } from 'react';
+import { apiClient } from '@/lib/api-client';
+
+interface User {
+  id: number;
+  username: string;
+  fullName: string;
+  email: string;
+  phone: string;
+  role: string;
+  kycVerified: boolean;
+}
 
 interface AuthContextType {
   user: User | null;
   isLoading: boolean;
   isAuthenticated: boolean;
-  login: (username: string, password: string) => Promise<boolean>;
-  register: (userData: any) => Promise<boolean>;
-  setAuthenticatedUser: (user: User) => void;
+  login: (username: string, password: string) => Promise<void>;
+  register: (data: RegisterData) => Promise<void>;
   logout: () => Promise<void>;
+  refreshUser: () => Promise<void>;
 }
 
-export const AuthContext = createContext<AuthContextType>({
-  user: null,
-  isLoading: true,
-  isAuthenticated: false,
-  login: async () => false,
-  register: async () => false,
-  setAuthenticatedUser: () => {},
-  logout: async () => {},
-});
+interface RegisterData {
+  username: string;
+  password: string;
+  fullName: string;
+  email: string;
+  phone: string;
+  role?: string;
+}
 
-export const AuthProvider = ({ children }: { children: ReactNode }) => {
+const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const { toast } = useToast();
 
+  // Load user on mount if token exists
   useEffect(() => {
-    // Check if user is already logged in
-    const checkAuthStatus = async () => {
-      try {
-        const response = await apiRequest('GET', '/api/auth/session');
-        const result = await response.json();
-
-        if (result.success && result.data?.user) {
-          setUser(result.data.user);
-        }
-      } catch (error) {
-        console.error("Auth check error:", error);
-        // User not authenticated, which is fine
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    checkAuthStatus();
+    if (apiClient.isAuthenticated()) {
+      refreshUser();
+    } else {
+      setIsLoading(false);
+    }
   }, []);
+
+  const refreshUser = async () => {
+    try {
+      if (!apiClient.isAuthenticated()) {
+        setUser(null);
+        setIsLoading(false);
+        return;
+      }
+
+      const data = await apiClient.get('/api/auth/me');
+      
+      if (data.success && data.data) {
+        setUser(data.data);
+      } else {
+        apiClient.clearTokens();
+        setUser(null);
+      }
+    } catch (error) {
+      console.error('Failed to fetch user:', error);
+      apiClient.clearTokens();
+      setUser(null);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const login = async (username: string, password: string): Promise<boolean> => {
     try {
-      setIsLoading(true);
-      const response = await apiRequest('POST', '/api/auth/login', { username, password });
-      const result = await response.json();
-
-      if (result.success && result.data?.user) {
-        setUser(result.data.user);
-        toast({
-          title: "Login successful",
-          description: `Welcome back, ${result.data.user.fullName}!`,
-        });
+      const data = await apiClient.login(username, password);
+      
+      if (data.success && data.data) {
+        setUser(data.data.user);
         return true;
+      } else {
+        throw new Error(data.message || 'Login failed');
       }
-      return false;
     } catch (error) {
-      console.error("Login error:", error);
-      toast({
-        title: "Login failed",
-        description: error instanceof Error ? error.message : "Invalid credentials",
-        variant: "destructive",
-      });
+      console.error('Login error:', error);
       return false;
-    } finally {
-      setIsLoading(false);
     }
   };
 
-  const register = async (userData: any): Promise<boolean> => {
+  const register = async (registerData: RegisterData): Promise<boolean> => {
     try {
-      setIsLoading(true);
-      const response = await apiRequest('POST', '/api/auth/register', userData);
-      const result = await response.json();
-
-      if (result.success && result.data?.user) {
-        setUser(result.data.user);
-        toast({
-          title: "Registration successful",
-          description: `Welcome to TradeWiser, ${result.data.user.fullName}!`,
-        });
+      const data = await apiClient.register(registerData);
+      
+      if (data.success && data.data) {
+        setUser(data.data.user);
         return true;
+      } else {
+        throw new Error(data.message || 'Registration failed');
       }
-      return false;
     } catch (error) {
-      console.error("Registration error:", error);
-      toast({
-        title: "Registration failed",
-        description: error instanceof Error ? error.message : "Could not create account",
-        variant: "destructive",
-      });
+      console.error('Registration error:', error);
       return false;
-    } finally {
-      setIsLoading(false);
     }
   };
 
-  // Function to set authenticated user directly (for OTP and social login)
-  const setAuthenticatedUser = (user: User): void => {
-    setUser(user);
+  const logout = async () => {
+    await apiClient.logout();
+    setUser(null);
   };
-
-  const logout = async (): Promise<void> => {
-    try {
-      setIsLoading(true);
-      
-      // Call logout API
-      await apiRequest('POST', '/api/auth/logout');
-      
-      // Always clear user state regardless of API response
-      setUser(null);
-      
-      // Clear localStorage
-      const username = user?.username;
-      localStorage.clear();
-      if (username) {
-        localStorage.setItem('lastUsername', username);
-      }
-      
-      toast({
-        title: "Logged out",
-        description: "You have been successfully logged out.",
-      });
-      
-    } catch (error) {
-      console.error("Logout error:", error);
-      // Even if logout fails on server, clear frontend state
-      setUser(null);
-      localStorage.clear();
-    } finally {
-      setIsLoading(false);
-      // Force page reload to landing page - this ensures clean state
-      window.location.replace('/');
-    }
-  };
-
-  // Determine if a user is authenticated
-  const isAuthenticated = !!user;
 
   return (
-    <AuthContext.Provider value={{ user, isLoading, isAuthenticated, login, register, setAuthenticatedUser, logout }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        isLoading,
+        isAuthenticated: !!user,
+        login,
+        register,
+        logout,
+        refreshUser
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );
-};
+}
+
+export { AuthContext };
+
+export function useAuth() {
+  const context = useContext(AuthContext);
+  if (context === undefined) {
+    throw new Error('useAuth must be used within an AuthProvider');
+  }
+  return context;
+}

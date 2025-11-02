@@ -1,40 +1,25 @@
+import 'dotenv/config';
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
-import session from "express-session";
-import MemoryStore from "memorystore";
+import cors from "cors";
 
 const app = express();
+
+// Enable CORS with credentials
+app.use(cors({
+  origin: true, // Allow all origins in development
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+}));
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
-// Create memory store for sessions
-const MemoryStoreSession = MemoryStore(session);
+console.log('✅ Using JWT authentication only (no sessions)');
 
-// Set up session middleware
-app.use(session({
-  secret: "tradewiser-session-secret",
-  resave: true,
-  saveUninitialized: true,
-  store: new MemoryStoreSession({
-    checkPeriod: 86400000 // prune expired entries every 24h
-  }),
-  cookie: { 
-    secure: false, // set to true in production with HTTPS
-    maxAge: 24 * 60 * 60 * 1000, // 24 hours
-    httpOnly: true,
-    sameSite: 'lax'
-  }
-}));
-
-// Add session debugging middleware
-app.use((req, res, next) => {
-  if (req.path.startsWith('/api/')) {
-    console.log(`Session ID: ${req.sessionID}, Session data:`, req.session);
-  }
-  next();
-});
-
+// Request logging middleware
 app.use((req, res, next) => {
   const start = Date.now();
   const path = req.path;

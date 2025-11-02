@@ -4,7 +4,7 @@ import { TimeSlotPicker } from "@/components/time-slot-picker";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useLocation } from "wouter";
-import { apiRequest } from "@/lib/queryClient";
+import { apiClient } from "@/lib/api-client";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
@@ -29,6 +29,7 @@ import HelpOverlay from "../help/HelpOverlay";
 import { CommoditySelector, type Commodity } from '@/components/ui/commodity-selector';
 import { WarehouseSelector } from '@/components/warehouse/WarehouseSelector';
 import commoditiesData from '@shared/commodities.json';
+import WarehouseReceiptCard from './WarehouseReceiptCard';
 
 // Create schema for the deposit form
 const depositCommoditySchema = z.object({
@@ -309,7 +310,8 @@ export default function DepositFlow({
     } else if (currentStep === DepositStep.ReviewSubmit) {
       setCurrentStep(DepositStep.SchedulePickup);
     } else if (currentStep === DepositStep.TrackDeposit) {
-      setCurrentStep(DepositStep.Confirmation);
+      // Skip confirmation page and go directly to tracking
+      setCurrentStep(DepositStep.TrackDeposit);
     }
   };
 
@@ -405,18 +407,7 @@ export default function DepositFlow({
 
       console.log("Creating deposit process:", processPayload);
 
-      const processResponse = await apiRequest(
-        "POST",
-        "/api/processes",
-        processPayload
-      );
-
-      if (!processResponse.ok) {
-        const errorData = await processResponse.json().catch(() => ({}));
-        throw new Error(errorData.message || "Failed to create deposit process");
-      }
-
-      const processResult = await processResponse.json();
+      const processResult = await apiClient.post("/api/processes", processPayload);
       console.log("Process created:", processResult);
 
       if (processResult && processResult.id) {
@@ -435,7 +426,8 @@ export default function DepositFlow({
         }
 
         // Move to confirmation step
-        setCurrentStep(DepositStep.Confirmation);
+        // Skip confirmation page and go directly to tracking
+      setCurrentStep(DepositStep.TrackDeposit);
 
         toast({
           title: "Deposit initiated successfully",

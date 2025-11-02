@@ -1,0 +1,11 @@
+
+> rest-express@1.0.0 start /home/ubuntu/TradeWiser-Warehousing-Service
+> NODE_ENV=production node dist/index.js
+
+Registering API routes...
+API routes registered successfully
+11:42:05 AM [express] serving on port 5000
+Test user created at startup: testuser/password123 (hashed)
+Created sample commodities for test user
+Created 3 sample warehouses
+ ELIFECYCLE  Command failed.

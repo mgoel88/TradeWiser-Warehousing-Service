@@ -198,6 +198,7 @@ export interface IStorage {
 
 // In-memory storage implementation
 export class MemStorage implements IStorage {
+  private db: any; // Database connection
   private users: Map<number, User>;
   private warehouses: Map<number, Warehouse>;
   private commodities: Map<number, Commodity>;
@@ -246,6 +247,7 @@ export class MemStorage implements IStorage {
   private currentCreditWithdrawalId: number;
   
   constructor() {
+    this.db = db; // Initialize database connection
     this.users = new Map();
     this.warehouses = new Map();
     this.commodities = new Map();
@@ -278,7 +280,13 @@ export class MemStorage implements IStorage {
     // Import bcrypt dynamically to avoid dependency issues
     import('bcrypt').then(bcrypt => {
       return bcrypt.hash('password123', 12);
-    }).then(hashedPassword => {
+    }).then(async (hashedPassword) => {
+      // Check if user already exists
+      const existingUser = await this.getUserByUsername('testuser');
+      if (existingUser) {
+        console.log('Test user already exists, skipping creation');
+        return existingUser;
+      }
       return this.createUser({
         username: 'testuser',
         password: hashedPassword,
@@ -565,58 +573,48 @@ export class MemStorage implements IStorage {
 
   // User operations
   async getUser(id: number): Promise<User | undefined> {
-    return this.users.get(id);
+    const [user] = await db.select().from(users).where(eq(users.id, id));
+    return user;
   }
 
   async getUserByUsername(username: string): Promise<User | undefined> {
-    return Array.from(this.users.values()).find(
-      (user) => user.username === username
-    );
+    const [user] = await db.select().from(users).where(eq(users.username, username));
+    return user;
   }
   
   async getUserByEmail(email: string): Promise<User | undefined> {
-    return Array.from(this.users.values()).find(
-      (user) => user.email === email
-    );
+    const [user] = await db.select().from(users).where(eq(users.email, email));
+    return user;
   }
 
   async getUserByPhone(phone: string): Promise<User | undefined> {
-    return Array.from(this.users.values()).find(
-      (user) => user.phone === phone
-    );
+    const [user] = await db.select().from(users).where(eq(users.phone, phone));
+    return user;
   }
 
   async getUserByGoogleId(googleId: string): Promise<User | undefined> {
-    return Array.from(this.users.values()).find(
-      (user) => user.googleId === googleId
-    );
+    const [user] = await db.select().from(users).where(eq(users.googleId, googleId));
+    return user;
   }
 
   async getUserByFacebookId(facebookId: string): Promise<User | undefined> {
-    return Array.from(this.users.values()).find(
-      (user) => user.facebookId === facebookId
-    );
+    const [user] = await db.select().from(users).where(eq(users.facebookId, facebookId));
+    return user;
   }
 
   async createUser(insertUser: InsertUser): Promise<User> {
-    const id = this.currentUserId++;
-    const now = new Date();
-    const user: User = { ...insertUser, id, createdAt: now };
-    this.users.set(id, user);
+    // Insert into database instead of in-memory storage
+    const [user] = await db.insert(users).values(insertUser).returning();
     return user;
   }
   
   async listUsers(): Promise<User[]> {
-    return Array.from(this.users.values());
+    return await db.select().from(users);
   }
   
   async updateUser(id: number, userData: Partial<InsertUser>): Promise<User | undefined> {
-    const user = await this.getUser(id);
-    if (!user) return undefined;
-    
-    const updatedUser: User = { ...user, ...userData };
-    this.users.set(id, updatedUser);
-    return updatedUser;
+    const [user] = await db.update(users).set(userData).where(eq(users.id, id)).returning();
+    return user;
   }
   
   // User Settings operations
@@ -711,7 +709,12 @@ export class MemStorage implements IStorage {
   
   // Warehouse operations
   async getWarehouse(id: number): Promise<Warehouse | undefined> {
-    return this.warehouses.get(id);
+    const [warehouse] = await this.db
+      .select()
+      .from(warehouses)
+      .where(eq(warehouses.id, id))
+      .limit(1);
+    return warehouse;
   }
   
   async createWarehouse(insertWarehouse: InsertWarehouse): Promise<Warehouse> {
@@ -723,7 +726,10 @@ export class MemStorage implements IStorage {
   }
   
   async listWarehouses(): Promise<Warehouse[]> {
-    return Array.from(this.warehouses.values());
+    return await this.db
+      .select()
+      .from(warehouses)
+      .orderBy(warehouses.name);
   }
   
   async listWarehousesByLocation(latitude: number, longitude: number, radius: number): Promise<Warehouse[]> {
@@ -749,15 +755,17 @@ export class MemStorage implements IStorage {
   }
 
   async getWarehousesByState(state: string): Promise<Warehouse[]> {
-    return Array.from(this.warehouses.values()).filter(
-      warehouse => warehouse.state.toLowerCase() === state.toLowerCase()
-    );
+    return await this.db
+      .select()
+      .from(warehouses)
+      .where(sql`LOWER(${warehouses.state}) = LOWER(${state})`);
   }
 
   async getWarehousesByDistrict(district: string): Promise<Warehouse[]> {
-    return Array.from(this.warehouses.values()).filter(
-      warehouse => warehouse.district?.toLowerCase() === district.toLowerCase()
-    );
+    return await this.db
+      .select()
+      .from(warehouses)
+      .where(sql`LOWER(${warehouses.district}) = LOWER(${district})`);
   }
 
   async getWarehousesByCommodity(commodity: string): Promise<Warehouse[]> {
@@ -819,26 +827,34 @@ export class MemStorage implements IStorage {
   }
   
   async createCommodity(insertCommodity: InsertCommodity): Promise<Commodity> {
-    const id = this.currentCommodityId++;
     const now = new Date();
-    const commodity: Commodity = { 
+    const commodityData = { 
       ...insertCommodity, 
-      id, 
-      depositDate: now, 
+      depositDate: insertCommodity.depositDate || now, 
       lastUpdated: now 
     };
-    this.commodities.set(id, commodity);
+    
+    const [commodity] = await this.db
+      .insert(commodities)
+      .values(commodityData)
+      .returning();
+    
     return commodity;
   }
   
   async listCommodities(): Promise<Commodity[]> {
-    return Array.from(this.commodities.values());
+    return await this.db
+      .select()
+      .from(commodities)
+      .orderBy(commodities.name);
   }
   
   async listCommoditiesByOwner(ownerId: number): Promise<Commodity[]> {
-    return Array.from(this.commodities.values()).filter(
-      commodity => commodity.ownerId === ownerId
-    );
+    return await this.db
+      .select()
+      .from(commodities)
+      .where(eq(commodities.ownerId, ownerId))
+      .orderBy(commodities.name);
   }
   
   async updateCommodity(id: number, commodityData: Partial<InsertCommodity>): Promise<Commodity | undefined> {
@@ -857,13 +873,21 @@ export class MemStorage implements IStorage {
   
   // Warehouse Receipt operations
   async getWarehouseReceipt(id: number): Promise<WarehouseReceipt | undefined> {
-    return this.warehouseReceipts.get(id);
+    const [receipt] = await this.db
+      .select()
+      .from(warehouseReceipts)
+      .where(eq(warehouseReceipts.id, id))
+      .limit(1);
+    return receipt;
   }
   
   async getWarehouseReceiptByNumber(receiptNumber: string): Promise<WarehouseReceipt | undefined> {
-    return Array.from(this.warehouseReceipts.values()).find(
-      receipt => receipt.receiptNumber === receiptNumber
-    );
+    const [receipt] = await this.db
+      .select()
+      .from(warehouseReceipts)
+      .where(eq(warehouseReceipts.receiptNumber, receiptNumber))
+      .limit(1);
+    return receipt;
   }
   
   async getWarehouseReceiptByExternalId(externalId: string, source: string): Promise<WarehouseReceipt | undefined> {
@@ -873,34 +897,60 @@ export class MemStorage implements IStorage {
   }
   
   async createWarehouseReceipt(insertReceipt: InsertWarehouseReceipt): Promise<WarehouseReceipt> {
-    const id = this.currentReceiptId++;
     const now = new Date();
     
     // FIXED: Ensure valuation defaults to Rs 50/kg if not provided (1 MT = 1000 kg)
     const quantity = parseFloat(insertReceipt.quantity?.toString() || '0');
     const defaultValuation = (quantity * 1000 * 50).toString();
     
-    const receipt: WarehouseReceipt = { 
-      ...insertReceipt, 
-      id, 
-      issuedDate: now,
+    // Prepare data with proper type conversions - only include non-null values
+    const receiptData: any = { 
+      receiptNumber: insertReceipt.receiptNumber,
+      quantity: insertReceipt.quantity?.toString() || '0',
       status: insertReceipt.status || 'active',
-      ownerId: insertReceipt.ownerId || null,
-      measurementUnit: insertReceipt.measurementUnit || null,
-      valuation: insertReceipt.valuation || defaultValuation  // FIXED: Proper valuation handling
+      issuedDate: insertReceipt.issuedDate || now,
+      valuation: insertReceipt.valuation || defaultValuation,
+      availableForCollateral: insertReceipt.availableForCollateral !== undefined ? insertReceipt.availableForCollateral : true,
+      collateralUsed: insertReceipt.collateralUsed?.toString() || '0'
     };
-    this.warehouseReceipts.set(id, receipt);
+    
+    // Only add optional fields if they have values
+    if (insertReceipt.commodityId) receiptData.commodityId = insertReceipt.commodityId;
+    if (insertReceipt.ownerId) receiptData.ownerId = insertReceipt.ownerId;
+    if (insertReceipt.warehouseId) receiptData.warehouseId = insertReceipt.warehouseId;
+    if (insertReceipt.blockchainHash) receiptData.blockchainHash = insertReceipt.blockchainHash;
+    if (insertReceipt.expiryDate) receiptData.expiryDate = insertReceipt.expiryDate;
+    if (insertReceipt.liens) receiptData.liens = insertReceipt.liens;
+    if (insertReceipt.externalId) receiptData.externalId = insertReceipt.externalId;
+    if (insertReceipt.externalSource) receiptData.externalSource = insertReceipt.externalSource;
+    if (insertReceipt.commodityName) receiptData.commodityName = insertReceipt.commodityName;
+    if (insertReceipt.qualityGrade) receiptData.qualityGrade = insertReceipt.qualityGrade;
+    if (insertReceipt.warehouseName) receiptData.warehouseName = insertReceipt.warehouseName;
+    if (insertReceipt.warehouseAddress) receiptData.warehouseAddress = insertReceipt.warehouseAddress;
+    if (insertReceipt.measurementUnit) receiptData.measurementUnit = insertReceipt.measurementUnit;
+    if (insertReceipt.attachmentUrl) receiptData.attachmentUrl = insertReceipt.attachmentUrl;
+    if (insertReceipt.smartContractId) receiptData.smartContractId = insertReceipt.smartContractId;
+    if (insertReceipt.metadata) receiptData.metadata = insertReceipt.metadata;
+    
+    const [receipt] = await this.db
+      .insert(warehouseReceipts)
+      .values(receiptData)
+      .returning();
+    
     return receipt;
   }
   
   async listWarehouseReceipts(): Promise<WarehouseReceipt[]> {
-    return Array.from(this.warehouseReceipts.values());
+    return await this.db
+      .select()
+      .from(warehouseReceipts);
   }
   
   async listWarehouseReceiptsByOwner(ownerId: number): Promise<WarehouseReceipt[]> {
-    return Array.from(this.warehouseReceipts.values()).filter(
-      receipt => receipt.ownerId === ownerId
-    );
+    return await this.db
+      .select()
+      .from(warehouseReceipts)
+      .where(eq(warehouseReceipts.ownerId, ownerId));
   }
   
   async listWarehouseReceiptsByCommodity(commodityId: number): Promise<WarehouseReceipt[]> {
@@ -963,9 +1013,10 @@ export class MemStorage implements IStorage {
   }
   
   async listLoansByUser(userId: number): Promise<Loan[]> {
-    return Array.from(this.loans.values()).filter(
-      loan => loan.userId === userId
-    );
+    return await this.db
+      .select()
+      .from(loans)
+      .where(eq(loans.userId, userId));
   }
   
   async updateLoan(id: number, loanData: Partial<InsertLoan>): Promise<Loan | undefined> {
@@ -1031,9 +1082,10 @@ export class MemStorage implements IStorage {
   }
   
   async listProcessesByUser(userId: number): Promise<Process[]> {
-    return Array.from(this.processes.values()).filter(
-      process => process.userId === userId
-    );
+    return await this.db
+      .select()
+      .from(processes)
+      .where(eq(processes.userId, userId));
   }
   
   async listProcessesByCommodity(commodityId: number): Promise<Process[]> {

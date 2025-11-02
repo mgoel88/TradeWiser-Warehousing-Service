@@ -1,0 +1,514 @@
+nohup: ignoring input
+Registering API routes...
+API routes registered successfully
+12:28:09 PM [express] serving on port 5000
+Test user created at startup: testuser/password123 (hashed)
+Created sample commodities for test user
+Created 3 sample warehouses
+Session ID: meqYQD7ZZwYgXdn9fennY3c1sRHPvln1, Session data: Session {
+  cookie: {
+    path: '/',
+    _expires: 2025-10-31T16:28:23.963Z,
+    originalMaxAge: 86400000,
+    httpOnly: true,
+    secure: false,
+    sameSite: 'lax'
+  }
+}
+12:28:24 PM [express] GET /api/portfolio 401 in 4ms :: {"message":"Not authenticated"}
+Session ID: meqYQD7ZZwYgXdn9fennY3c1sRHPvln1, Session data: Session {
+  cookie: {
+    path: '/',
+    _expires: 2025-10-31T16:28:24.125Z,
+    originalMaxAge: 86400000,
+    httpOnly: true,
+    secure: false,
+    sameSite: 'lax'
+  }
+}
+12:28:24 PM [express] GET /api/credit-line/details 401 in 2ms :: {"message":"Not authenticated"}
+Session ID: meqYQD7ZZwYgXdn9fennY3c1sRHPvln1, Session data: Session {
+  cookie: {
+    path: '/',
+    _expires: 2025-10-31T16:28:24.129Z,
+    originalMaxAge: 86400000,
+    httpOnly: true,
+    secure: false,
+    sameSite: 'lax'
+  }
+}
+12:28:24 PM [express] GET /api/auth/session 401 in 2ms :: {"success":false,"message":"Not authenticat…
+Session ID: meqYQD7ZZwYgXdn9fennY3c1sRHPvln1, Session data: Session {
+  cookie: {
+    path: '/',
+    _expires: 2025-10-31T16:28:24.134Z,
+    originalMaxAge: 86400000,
+    httpOnly: true,
+    secure: false,
+    sameSite: 'lax'
+  }
+}
+12:28:25 PM [express] GET /api/portfolio 401 in 1ms :: {"message":"Not authenticated"}
+Session ID: meqYQD7ZZwYgXdn9fennY3c1sRHPvln1, Session data: Session {
+  cookie: {
+    path: '/',
+    _expires: 2025-10-31T16:28:25.142Z,
+    originalMaxAge: 86400000,
+    httpOnly: true,
+    secure: false,
+    sameSite: 'lax'
+  }
+}
+12:28:27 PM [express] GET /api/portfolio 401 in 1ms :: {"message":"Not authenticated"}
+Session ID: meqYQD7ZZwYgXdn9fennY3c1sRHPvln1, Session data: Session {
+  cookie: {
+    path: '/',
+    _expires: 2025-10-31T16:28:27.159Z,
+    originalMaxAge: 86400000,
+    httpOnly: true,
+    secure: false,
+    sameSite: 'lax'
+  }
+}
+12:28:31 PM [express] GET /api/portfolio 401 in 1ms :: {"message":"Not authenticated"}
+Session ID: meqYQD7ZZwYgXdn9fennY3c1sRHPvln1, Session data: Session {
+  cookie: {
+    path: '/',
+    _expires: 2025-10-31T16:28:39.240Z,
+    originalMaxAge: 86400000,
+    httpOnly: true,
+    secure: false,
+    sameSite: 'lax'
+  }
+}
+GET /api/warehouses called
+Found 3 warehouses
+12:28:39 PM [express] GET /api/warehouses 200 in 1ms :: [{"name":"Delhi Central Warehouse","address":…
+Session ID: meqYQD7ZZwYgXdn9fennY3c1sRHPvln1, Session data: Session {
+  cookie: {
+    path: '/',
+    _expires: 2025-10-31T16:28:39.424Z,
+    originalMaxAge: 86400000,
+    httpOnly: true,
+    secure: false,
+    sameSite: 'lax'
+  }
+}
+12:28:39 PM [express] GET /api/auth/session 401 in 1ms :: {"success":false,"message":"Not authenticat…
+Session ID: tplT_O-h0OgRrR6P7k1wx1Ud3ghkYMrZ, Session data: Session {
+  cookie: {
+    path: '/',
+    _expires: 2025-10-31T16:28:55.260Z,
+    originalMaxAge: 86400000,
+    httpOnly: true,
+    secure: false,
+    sameSite: 'lax'
+  }
+}
+GET /api/warehouses called
+Found 3 warehouses
+12:28:55 PM [express] GET /api/warehouses 200 in 1ms :: [{"name":"Delhi Central Warehouse","address":…
+Session ID: tplT_O-h0OgRrR6P7k1wx1Ud3ghkYMrZ, Session data: Session {
+  cookie: {
+    path: '/',
+    _expires: 2025-10-31T16:28:55.872Z,
+    originalMaxAge: 86400000,
+    httpOnly: true,
+    secure: false,
+    sameSite: 'lax'
+  }
+}
+12:28:55 PM [express] GET /api/auth/session 401 in 1ms :: {"success":false,"message":"Not authenticat…
+Session ID: MwT72LN6M2JpHeLEAQ2USsQuSQAemu7W, Session data: Session {
+  cookie: {
+    path: '/',
+    _expires: 2025-10-31T16:29:00.637Z,
+    originalMaxAge: 86400000,
+    httpOnly: true,
+    secure: false,
+    sameSite: 'lax'
+  }
+}
+GET /api/warehouses called
+Found 3 warehouses
+12:29:01 PM [express] GET /api/warehouses 200 in 1ms :: [{"name":"Delhi Central Warehouse","address":…
+Session ID: MwT72LN6M2JpHeLEAQ2USsQuSQAemu7W, Session data: Session {
+  cookie: {
+    path: '/',
+    _expires: 2025-10-31T16:29:01.709Z,
+    originalMaxAge: 86400000,
+    httpOnly: true,
+    secure: false,
+    sameSite: 'lax'
+  }
+}
+12:29:01 PM [express] GET /api/auth/session 401 in 1ms :: {"success":false,"message":"Not authenticat…
+Session ID: MwT72LN6M2JpHeLEAQ2USsQuSQAemu7W, Session data: Session {
+  cookie: {
+    path: '/',
+    _expires: 2025-10-31T16:29:10.143Z,
+    originalMaxAge: 86400000,
+    httpOnly: true,
+    secure: false,
+    sameSite: 'lax'
+  }
+}
+12:29:10 PM [express] GET /api/auth/session 401 in 0ms :: {"success":false,"message":"Not authenticat…
+Session ID: MwT72LN6M2JpHeLEAQ2USsQuSQAemu7W, Session data: Session {
+  cookie: {
+    path: '/',
+    _expires: 2025-10-31T16:29:14.975Z,
+    originalMaxAge: 86400000,
+    httpOnly: true,
+    secure: false,
+    sameSite: 'lax'
+  }
+}
+12:29:17 PM [express] POST /api/auth/login 200 in 242ms :: {"success":true,"message":"Login successfu…
+Session ID: MwT72LN6M2JpHeLEAQ2USsQuSQAemu7W, Session data: Session {
+  cookie: {
+    path: '/',
+    _expires: 2025-10-31T16:29:17.066Z,
+    originalMaxAge: 86400000,
+    httpOnly: true,
+    secure: false,
+    sameSite: 'lax'
+  },
+  userId: 1
+}
+12:29:17 PM [express] GET /api/credit-line/details 200 in 2ms :: {"success":true,"data":{"totalLimit"…
+Session ID: MwT72LN6M2JpHeLEAQ2USsQuSQAemu7W, Session data: Session {
+  cookie: {
+    path: '/',
+    _expires: 2025-10-31T16:29:17.181Z,
+    originalMaxAge: 86400000,
+    httpOnly: true,
+    secure: false,
+    sameSite: 'lax'
+  },
+  userId: 1
+}
+12:29:17 PM [express] GET /api/portfolio 200 in 0ms :: {"success":true,"data":{"totalValue":0,"receip…
+Session ID: MwT72LN6M2JpHeLEAQ2USsQuSQAemu7W, Session data: Session {
+  cookie: {
+    path: '/',
+    _expires: 2025-10-31T16:29:20.623Z,
+    originalMaxAge: 86400000,
+    httpOnly: true,
+    secure: false,
+    sameSite: 'lax'
+  },
+  userId: 1
+}
+GET /api/warehouses called
+Found 3 warehouses
+12:29:21 PM [express] GET /api/warehouses 304 in 1ms :: [{"name":"Delhi Central Warehouse","address":…
+Session ID: MwT72LN6M2JpHeLEAQ2USsQuSQAemu7W, Session data: Session {
+  cookie: {
+    path: '/',
+    _expires: 2025-10-31T16:29:40.274Z,
+    originalMaxAge: 86400000,
+    httpOnly: true,
+    secure: false,
+    sameSite: 'lax'
+  },
+  userId: 1
+}
+12:29:41 PM [express] GET /api/portfolio 304 in 0ms :: {"success":true,"data":{"totalValue":0,"receip…
+Session ID: MwT72LN6M2JpHeLEAQ2USsQuSQAemu7W, Session data: Session {
+  cookie: {
+    path: '/',
+    _expires: 2025-10-31T16:30:19.787Z,
+    originalMaxAge: 86400000,
+    httpOnly: true,
+    secure: false,
+    sameSite: 'lax'
+  },
+  userId: 1
+}
+Creating new deposit process: {
+  type: 'deposit',
+  commodityName: 'Maize (मक्का)',
+  commodityType: 'Grains',
+  quantity: 1000,
+  warehouseId: 2,
+  deliveryMethod: 'managed_pickup',
+  scheduledDate: '2025-10-31',
+  scheduledTime: '12:00',
+  pickupAddress: 'Rohit Kunj, Saraswati Vihar Tehsil, North West Delhi, Delhi, 110034, India',
+  estimatedValue: 50000,
+  qualityParameters: { moisture: '', foreignMatter: '', brokenGrains: '' },
+  notes: ''
+}
+Created process: 1
+MOCK: Sending inward goods request to WMS: {
+  processId: 1,
+  commodityName: 'Maize (मक्का)',
+  quantity: 1000,
+  warehouseId: 2,
+  userId: 1
+}
+WMS response: { inventoryId: 'INV-1761841822973', status: 'inward_request_received' }
+MOCK: Requesting quality assessment from QA Tool: {
+  processId: 1,
+  commodityName: 'Maize (मक्का)',
+  quantity: 1000,
+  warehouseId: 2,
+  userId: 1
+}
+QA response: { assessmentId: 'QA-1761841822974', status: 'request_sent' }
+12:30:22 PM [express] POST /api/processes 201 in 1ms :: {"processType":"deposit","userId":1,"commodit…
+Session ID: MwT72LN6M2JpHeLEAQ2USsQuSQAemu7W, Session data: Session {
+  cookie: {
+    path: '/',
+    _expires: 2025-10-31T16:30:22.974Z,
+    originalMaxAge: 86400000,
+    httpOnly: true,
+    secure: false,
+    sameSite: 'lax'
+  },
+  userId: 1
+}
+12:30:23 PM [express] POST /api/deposits/1/start-tracking 200 in 1ms :: {"success":true,"data":{"proc…
+MOCK: Scheduling pickup via Logistics module: {
+  processId: 1,
+  origin: 'Rohit Kunj, Saraswati Vihar Tehsil, North West Delhi, Delhi, 110034, India',
+  destination: 'Port Area, Mumbai, undefined',
+  cargoType: 'Maize (मक्का)',
+  quantity: '1000',
+  userId: undefined
+}
+Logistics response: { trackingNumber: 'TRK-1761841827976', status: 'scheduled' }
+SSE: Broadcasting process update to user 1
+SSE: No clients connected for user 1
+Process 1 progressed to in_transit
+SSE: Broadcasting process update to user 1
+SSE: No clients connected for user 1
+Process 1 progressed to arrived_warehouse
+Session ID: MwT72LN6M2JpHeLEAQ2USsQuSQAemu7W, Session data: Session {
+  cookie: {
+    path: '/',
+    _expires: 2025-10-31T16:30:35.392Z,
+    originalMaxAge: 86400000,
+    httpOnly: true,
+    secure: false,
+    sameSite: 'lax'
+  },
+  userId: 1
+}
+12:30:35 PM [express] GET /api/auth/session 304 in 1ms :: {"success":true,"data":{"user":{"id":1,"ful…
+Session ID: MwT72LN6M2JpHeLEAQ2USsQuSQAemu7W, Session data: Session {
+  cookie: {
+    path: '/',
+    _expires: 2025-10-31T16:30:35.558Z,
+    originalMaxAge: 86400000,
+    httpOnly: true,
+    secure: false,
+    sameSite: 'lax'
+  },
+  userId: 1
+}
+12:30:35 PM [express] GET /api/deposits/1/progress 200 in 1ms :: {"id":1,"currentStage":"arrived_ware…
+MOCK: Sending inward goods request to WMS: {
+  processId: 1,
+  commodityName: 'Maize (मक्का)',
+  quantity: 1000,
+  warehouseId: 2,
+  userId: 1
+}
+WMS response: { inventoryId: 'INV-1761841842978', status: 'inward_request_received' }
+SSE: Broadcasting process update to user 1
+SSE: No clients connected for user 1
+Process 1 progressed to quality_assessment
+MOCK: Requesting quality assessment from QA Tool: {
+  processId: 1,
+  commodityName: 'Maize (मक्का)',
+  quantity: 1000,
+  warehouseId: 2,
+  userId: 1
+}
+QA response: { assessmentId: 'QA-1761841853076', status: 'request_sent' }
+SSE: Broadcasting process update to user 1
+SSE: No clients connected for user 1
+Process 1 progressed to pricing_complete
+SSE: Broadcasting process update to user 1
+SSE: No clients connected for user 1
+Process 1 progressed to receipt_generated
+MOCK: Issuing eWR to Depository (Finance Management System): {
+  receiptNumber: 'WR1761841868077-1',
+  commodityId: 2,
+  warehouseId: 2,
+  ownerId: 1,
+  quantity: '1000',
+  measurementUnit: 'MT',
+  status: 'active',
+  blockchainHash: '0x69e73c413de2f',
+  valuation: '50000',
+  commodityName: 'Maize (मक्का)',
+  qualityGrade: 'pending',
+  issuedDate: 2025-10-30T16:31:08.077Z,
+  expiryDate: 2026-10-30T16:31:08.077Z,
+  metadata: '{"type":"auto_generated","processCompleted":true,"autoGenerated":true,"timestamp":"2025-10-30T16:31:08.077Z"}'
+}
+Depository response: { depositoryId: 'DEP-1761841868078', status: 'issued_to_depository' }
+Auto-generated and pushed eWR WR1761841868077-1 to Depository for commodity 2
+🧹 Rate limiter cleanup: removed 0 expired entries
+🧹 Rate limiter cleanup: removed 0 expired entries
+🧹 Rate limiter cleanup: removed 0 expired entries
+Session ID: MwT72LN6M2JpHeLEAQ2USsQuSQAemu7W, Session data: Session {
+  cookie: {
+    path: '/',
+    _expires: 2025-10-31T16:35:39.156Z,
+    originalMaxAge: 86400000,
+    httpOnly: true,
+    secure: false,
+    sameSite: 'lax'
+  },
+  userId: 1
+}
+12:35:45 PM [express] GET /api/deposits/1/progress 200 in 1ms :: {"id":1,"currentStage":"receipt_gene…
+Session ID: MwT72LN6M2JpHeLEAQ2USsQuSQAemu7W, Session data: Session {
+  cookie: {
+    path: '/',
+    _expires: 2025-10-31T16:35:49.498Z,
+    originalMaxAge: 86400000,
+    httpOnly: true,
+    secure: false,
+    sameSite: 'lax'
+  },
+  userId: 1
+}
+GET /api/warehouses called
+Found 3 warehouses
+12:35:49 PM [express] GET /api/warehouses 304 in 1ms :: [{"name":"Delhi Central Warehouse","address":…
+Session ID: MwT72LN6M2JpHeLEAQ2USsQuSQAemu7W, Session data: Session {
+  cookie: {
+    path: '/',
+    _expires: 2025-10-31T16:35:49.849Z,
+    originalMaxAge: 86400000,
+    httpOnly: true,
+    secure: false,
+    sameSite: 'lax'
+  },
+  userId: 1
+}
+12:35:49 PM [express] GET /api/auth/session 304 in 1ms :: {"success":true,"data":{"user":{"id":1,"ful…
+Session ID: MwT72LN6M2JpHeLEAQ2USsQuSQAemu7W, Session data: Session {
+  cookie: {
+    path: '/',
+    _expires: 2025-10-31T16:36:24.524Z,
+    originalMaxAge: 86400000,
+    httpOnly: true,
+    secure: false,
+    sameSite: 'lax'
+  },
+  userId: 1
+}
+Creating new deposit process: {
+  type: 'deposit',
+  commodityName: 'Wheat (गेहूं)',
+  commodityType: 'Grains',
+  quantity: 1000,
+  warehouseId: 1,
+  deliveryMethod: 'managed_pickup',
+  scheduledDate: '2025-10-31',
+  scheduledTime: '15:00',
+  pickupAddress: 'Faridabad, Haryana, 121001, India',
+  estimatedValue: 50000,
+  qualityParameters: { moisture: '', foreignMatter: '', brokenGrains: '' },
+  notes: ''
+}
+Created process: 2
+MOCK: Sending inward goods request to WMS: {
+  processId: 2,
+  commodityName: 'Wheat (गेहूं)',
+  quantity: 1000,
+  warehouseId: 1,
+  userId: 1
+}
+WMS response: { inventoryId: 'INV-1761842187312', status: 'inward_request_received' }
+MOCK: Requesting quality assessment from QA Tool: {
+  processId: 2,
+  commodityName: 'Wheat (गेहूं)',
+  quantity: 1000,
+  warehouseId: 1,
+  userId: 1
+}
+QA response: { assessmentId: 'QA-1761842187312', status: 'request_sent' }
+12:36:27 PM [express] POST /api/processes 201 in 1ms :: {"processType":"deposit","userId":1,"commodit…
+Session ID: MwT72LN6M2JpHeLEAQ2USsQuSQAemu7W, Session data: Session {
+  cookie: {
+    path: '/',
+    _expires: 2025-10-31T16:36:27.312Z,
+    originalMaxAge: 86400000,
+    httpOnly: true,
+    secure: false,
+    sameSite: 'lax'
+  },
+  userId: 1
+}
+12:36:27 PM [express] POST /api/deposits/2/start-tracking 200 in 1ms :: {"success":true,"data":{"proc…
+MOCK: Scheduling pickup via Logistics module: {
+  processId: 2,
+  origin: 'Faridabad, Haryana, 121001, India',
+  destination: 'Industrial Area, New Delhi, undefined',
+  cargoType: 'Wheat (गेहूं)',
+  quantity: '1000',
+  userId: undefined
+}
+Logistics response: { trackingNumber: 'TRK-1761842192313', status: 'scheduled' }
+SSE: Broadcasting process update to user 1
+SSE: No clients connected for user 1
+Process 2 progressed to in_transit
+SSE: Broadcasting process update to user 1
+SSE: No clients connected for user 1
+Process 2 progressed to arrived_warehouse
+MOCK: Sending inward goods request to WMS: {
+  processId: 2,
+  commodityName: 'Wheat (गेहूं)',
+  quantity: 1000,
+  warehouseId: 1,
+  userId: 1
+}
+WMS response: { inventoryId: 'INV-1761842207315', status: 'inward_request_received' }
+SSE: Broadcasting process update to user 1
+SSE: No clients connected for user 1
+Process 2 progressed to quality_assessment
+MOCK: Requesting quality assessment from QA Tool: {
+  processId: 2,
+  commodityName: 'Wheat (गेहूं)',
+  quantity: 1000,
+  warehouseId: 1,
+  userId: 1
+}
+QA response: { assessmentId: 'QA-1761842217409', status: 'request_sent' }
+SSE: Broadcasting process update to user 1
+SSE: No clients connected for user 1
+Process 2 progressed to pricing_complete
+SSE: Broadcasting process update to user 1
+SSE: No clients connected for user 1
+Process 2 progressed to receipt_generated
+MOCK: Issuing eWR to Depository (Finance Management System): {
+  receiptNumber: 'WR1761842232412-1',
+  commodityId: 3,
+  warehouseId: 1,
+  ownerId: 1,
+  quantity: '1000',
+  measurementUnit: 'MT',
+  status: 'active',
+  blockchainHash: '0xbad7c2c9fef22',
+  valuation: '50000',
+  commodityName: 'Wheat (गेहूं)',
+  qualityGrade: 'pending',
+  issuedDate: 2025-10-30T16:37:12.413Z,
+  expiryDate: 2026-10-30T16:37:12.413Z,
+  metadata: '{"type":"auto_generated","processCompleted":true,"autoGenerated":true,"timestamp":"2025-10-30T16:37:12.413Z"}'
+}
+Depository response: { depositoryId: 'DEP-1761842232413', status: 'issued_to_depository' }
+Auto-generated and pushed eWR WR1761842232412-1 to Depository for commodity 3
+🧹 Rate limiter cleanup: removed 0 expired entries
+🧹 Rate limiter cleanup: removed 0 expired entries
+🧹 Rate limiter cleanup: removed 0 expired entries
+🧹 Rate limiter cleanup: removed 0 expired entries
+🧹 Rate limiter cleanup: removed 0 expired entries
+🧹 Rate limiter cleanup: removed 0 expired entries

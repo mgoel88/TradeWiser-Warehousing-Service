@@ -1,4 +1,4 @@
-import { pgTable, text, serial, numeric, timestamp, integer, json, boolean, pgEnum } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, numeric, timestamp, integer, json, boolean, pgEnum, date } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -608,3 +608,292 @@ export interface BankPayment {
   referenceNumber?: string;
   createdAt?: Date;
 }
+
+// ============================================
+// NEW: Unified OD-Based Credit Line System
+// ============================================
+
+// Credit line status enum
+export const creditLineStatusEnum = pgEnum('credit_line_status', ['active', 'suspended', 'closed', 'margin_call']);
+
+// Transaction type enum
+export const creditTransactionTypeEnum = pgEnum('credit_transaction_type', [
+  'withdrawal', 'repayment', 'interest_charge', 'margin_call', 'limit_adjustment'
+]);
+
+// Bank account verification status enum
+export const bankVerificationStatusEnum = pgEnum('bank_verification_status', ['pending', 'verified', 'failed']);
+
+// KYC status enum
+export const kycStatusEnum = pgEnum('kyc_status', ['pending', 'in_review', 'verified', 'rejected']);
+
+// Revolving Credit Accounts table - ONE account per user with multiple receipts as collateral
+export const revolvingCreditAccounts = pgTable('revolving_credit_accounts', {
+  id: serial('id').primaryKey(),
+  userId: integer('user_id').references(() => users.id).notNull().unique(), // One account per user
+  
+  // Unified credit facility across all warehouse receipts
+  totalCreditLimit: numeric('total_credit_limit', { precision: 14, scale: 2 }).default('0').notNull(),
+  utilizedAmount: numeric('utilized_amount', { precision: 14, scale: 2 }).default('0').notNull(),
+  availableCredit: numeric('available_credit', { precision: 14, scale: 2 }).default('0').notNull(),
+  
+  // Interest calculation
+  annualInterestRate: numeric('annual_interest_rate', { precision: 5, scale: 2 }).notNull().default('12.00'),
+  lastInterestCalculationDate: timestamp('last_interest_calculation_date').defaultNow(),
+  
+  // Status
+  status: creditLineStatusEnum('status').notNull().default('active'),
+  
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
+});
+
+// Warehouse Receipt Collateral - Links receipts to the revolving credit account
+export const warehouseReceiptCollateral = pgTable('warehouse_receipt_collateral', {
+  id: serial('id').primaryKey(),
+  creditAccountId: integer('credit_account_id').references(() => revolvingCreditAccounts.id).notNull(),
+  warehouseReceiptId: integer('warehouse_receipt_id').references(() => warehouseReceipts.id).notNull().unique(),
+  
+  // Valuation details
+  pledgedAmount: numeric('pledged_amount', { precision: 14, scale: 2 }).notNull(), // Original commodity value
+  currentMarketValue: numeric('current_market_value', { precision: 14, scale: 2 }).notNull(), // Updated via mark-to-market
+  creditLimit: numeric('credit_limit', { precision: 14, scale: 2 }).notNull(), // 80% LTV
+  ltvRatio: numeric('ltv_ratio', { precision: 5, scale: 4 }).notNull().default('0.80'),
+  
+  // Pledge status
+  isPledged: boolean('is_pledged').default(true),
+  pledgedAt: timestamp('pledged_at').defaultNow(),
+  unpledgedAt: timestamp('unpledged_at'),
+  
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
+});
+
+// Credit Transactions - All withdrawals and repayments
+export const creditTransactions = pgTable('credit_transactions', {
+  id: serial('id').primaryKey(),
+  creditAccountId: integer('credit_account_id').references(() => revolvingCreditAccounts.id).notNull(),
+  
+  transactionType: creditTransactionTypeEnum('transaction_type').notNull(),
+  amount: numeric('amount', { precision: 14, scale: 2 }).notNull(),
+  balanceAfter: numeric('balance_after', { precision: 14, scale: 2 }).notNull(), // Utilized amount after transaction
+  
+  description: text('description'),
+  
+  // Bank transfer details
+  bankAccountId: integer('bank_account_id').references(() => bankAccounts.id),
+  utrNumber: text('utr_number'),
+  
+  transactionDate: timestamp('transaction_date').defaultNow(),
+  status: text('status').default('pending'), // pending, completed, failed
+  
+  metadata: json('metadata'),
+});
+
+// Daily Interest Calculations - End-of-day interest on utilized amounts
+export const dailyInterestCalculations = pgTable('daily_interest_calculations', {
+  id: serial('id').primaryKey(),
+  creditAccountId: integer('credit_account_id').references(() => revolvingCreditAccounts.id).notNull(),
+  
+  calculationDate: date('calculation_date').notNull(),
+  principalAmount: numeric('principal_amount', { precision: 14, scale: 2 }).notNull(), // Utilized amount on that day
+  interestRate: numeric('interest_rate', { precision: 7, scale: 5 }).notNull(), // Daily rate
+  interestAmount: numeric('interest_amount', { precision: 14, scale: 2 }).notNull(),
+  
+  status: text('status').default('calculated'), // calculated, charged, waived
+  
+  createdAt: timestamp('created_at').defaultNow(),
+});
+
+// Commodity Price Updates - For mark-to-market adjustments
+export const commodityPriceUpdates = pgTable('commodity_price_updates', {
+  id: serial('id').primaryKey(),
+  
+  commodityType: text('commodity_type').notNull(),
+  pricePerUnit: numeric('price_per_unit', { precision: 10, scale: 2 }).notNull(),
+  marketSource: text('market_source'), // NCDEX, MCX, Local Mandi
+  
+  updateDate: date('update_date').notNull(),
+  createdAt: timestamp('created_at').defaultNow(),
+});
+
+// Bank accounts table
+export const bankAccounts = pgTable('bank_accounts', {
+  id: serial('id').primaryKey(),
+  userId: integer('user_id').references(() => users.id).notNull(),
+  
+  accountHolderName: text('account_holder_name').notNull(),
+  accountNumber: text('account_number').notNull(),
+  ifscCode: text('ifsc_code').notNull(),
+  bankName: text('bank_name').notNull(),
+  branchName: text('branch_name'),
+  
+  accountType: text('account_type'), // savings, current
+  isPrimary: boolean('is_primary').default(false),
+  
+  // Verification
+  verificationStatus: bankVerificationStatusEnum('verification_status').default('pending'),
+  verificationMethod: text('verification_method'), // penny_drop, manual
+  verifiedAt: timestamp('verified_at'),
+  
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
+});
+
+// KYC records table
+export const kycRecords = pgTable('kyc_records', {
+  id: serial('id').primaryKey(),
+  userId: integer('user_id').references(() => users.id).notNull().unique(),
+  
+  // Personal details
+  fullName: text('full_name').notNull(),
+  dateOfBirth: date('date_of_birth'),
+  address: text('address'),
+  city: text('city'),
+  state: text('state'),
+  pincode: text('pincode'),
+  
+  // Aadhaar
+  aadhaarNumber: text('aadhaar_number'),
+  aadhaarVerified: boolean('aadhaar_verified').default(false),
+  aadhaarVerifiedAt: timestamp('aadhaar_verified_at'),
+  
+  // PAN
+  panNumber: text('pan_number'),
+  panVerified: boolean('pan_verified').default(false),
+  panVerifiedAt: timestamp('pan_verified_at'),
+  
+  // Documents
+  documents: json('documents'), // Array of document URLs
+  
+  // Overall KYC status
+  kycStatus: kycStatusEnum('kyc_status').default('pending'),
+  kycCompletedAt: timestamp('kyc_completed_at'),
+  rejectionReason: text('rejection_reason'),
+  
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
+});
+
+// Demat account integration table
+export const dematAccounts = pgTable('demat_accounts', {
+  id: serial('id').primaryKey(),
+  userId: integer('user_id').references(() => users.id).notNull().unique(),
+  
+  dpId: text('dp_id').notNull(), // Depository Participant ID
+  clientId: text('client_id').notNull(), // Client ID
+  depositoryType: text('depository_type'), // CDSL, NSDL
+  
+  accountHolderName: text('account_holder_name').notNull(),
+  
+  // Verification
+  verificationStatus: text('verification_status').default('pending'),
+  verifiedAt: timestamp('verified_at'),
+  
+  // Integration details
+  isLinked: boolean('is_linked').default(false),
+  linkedAt: timestamp('linked_at'),
+  
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
+});
+
+// Commodity price history for mark-to-market
+export const commodityPrices = pgTable('commodity_prices', {
+  id: serial('id').primaryKey(),
+  commodityType: text('commodity_type').notNull(),
+  pricePerUnit: numeric('price_per_unit', { precision: 10, scale: 2 }).notNull(),
+  marketName: text('market_name'), // e.g., NCDEX, MCX, Local Mandi
+  effectiveDate: date('effective_date').notNull(),
+  createdAt: timestamp('created_at').defaultNow(),
+});
+
+// ============================================
+// Insert Schemas for New Tables
+// ============================================
+
+export const insertRevolvingCreditAccountSchema = createInsertSchema(revolvingCreditAccounts);
+export const insertWarehouseReceiptCollateralSchema = createInsertSchema(warehouseReceiptCollateral);
+export const insertCreditTransactionSchema = createInsertSchema(creditTransactions);
+export const insertDailyInterestCalculationSchema = createInsertSchema(dailyInterestCalculations);
+export const insertCommodityPriceUpdateSchema = createInsertSchema(commodityPriceUpdates);
+export const insertBankAccountSchema = createInsertSchema(bankAccounts);
+export const insertKycRecordSchema = createInsertSchema(kycRecords);
+export const insertDematAccountSchema = createInsertSchema(dematAccounts);
+export const insertCommodityPriceSchema = createInsertSchema(commodityPrices);
+
+// ============================================
+// Type Exports for New Tables
+// ============================================
+
+export type InsertRevolvingCreditAccount = z.infer<typeof insertRevolvingCreditAccountSchema>;
+export type RevolvingCreditAccount = typeof revolvingCreditAccounts.$inferSelect;
+
+export type InsertWarehouseReceiptCollateral = z.infer<typeof insertWarehouseReceiptCollateralSchema>;
+export type WarehouseReceiptCollateral = typeof warehouseReceiptCollateral.$inferSelect;
+
+export type InsertCreditTransaction = z.infer<typeof insertCreditTransactionSchema>;
+export type CreditTransaction = typeof creditTransactions.$inferSelect;
+
+export type InsertDailyInterestCalculation = z.infer<typeof insertDailyInterestCalculationSchema>;
+export type DailyInterestCalculation = typeof dailyInterestCalculations.$inferSelect;
+
+export type InsertCommodityPriceUpdate = z.infer<typeof insertCommodityPriceUpdateSchema>;
+export type CommodityPriceUpdate = typeof commodityPriceUpdates.$inferSelect;
+
+export type InsertBankAccount = z.infer<typeof insertBankAccountSchema>;
+export type BankAccount = typeof bankAccounts.$inferSelect;
+
+export type InsertKycRecord = z.infer<typeof insertKycRecordSchema>;
+export type KycRecord = typeof kycRecords.$inferSelect;
+
+export type InsertDematAccount = z.infer<typeof insertDematAccountSchema>;
+export type DematAccount = typeof dematAccounts.$inferSelect;
+
+export type InsertCommodityPrice = z.infer<typeof insertCommodityPriceSchema>;
+export type CommodityPrice = typeof commodityPrices.$inferSelect;
+
+// ============================================
+// Relations for Revolving Credit System
+// ============================================
+
+import { relations } from 'drizzle-orm';
+
+export const revolvingCreditAccountsRelations = relations(revolvingCreditAccounts, ({ one, many }) => ({
+  user: one(users, {
+    fields: [revolvingCreditAccounts.userId],
+    references: [users.id],
+  }),
+  collateralReceipts: many(warehouseReceiptCollateral),
+  transactions: many(creditTransactions),
+  interestCalculations: many(dailyInterestCalculations),
+}));
+
+export const warehouseReceiptCollateralRelations = relations(warehouseReceiptCollateral, ({ one }) => ({
+  creditAccount: one(revolvingCreditAccounts, {
+    fields: [warehouseReceiptCollateral.creditAccountId],
+    references: [revolvingCreditAccounts.id],
+  }),
+  warehouseReceipt: one(warehouseReceipts, {
+    fields: [warehouseReceiptCollateral.warehouseReceiptId],
+    references: [warehouseReceipts.id],
+  }),
+}));
+
+export const creditTransactionsRelations = relations(creditTransactions, ({ one }) => ({
+  creditAccount: one(revolvingCreditAccounts, {
+    fields: [creditTransactions.creditAccountId],
+    references: [revolvingCreditAccounts.id],
+  }),
+  bankAccount: one(bankAccounts, {
+    fields: [creditTransactions.bankAccountId],
+    references: [bankAccounts.id],
+  }),
+}));
+
+export const dailyInterestCalculationsRelations = relations(dailyInterestCalculations, ({ one }) => ({
+  creditAccount: one(revolvingCreditAccounts, {
+    fields: [dailyInterestCalculations.creditAccountId],
+    references: [revolvingCreditAccounts.id],
+  }),
+}));

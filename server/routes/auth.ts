@@ -1,180 +1,123 @@
-import { Request, Response, Router } from 'express';
+/**
+ * Authentication Routes
+ * Clean JWT-based authentication system
+ */
+
+import { Router, Request, Response } from 'express';
+import { z } from 'zod';
 import bcrypt from 'bcrypt';
 import { storage } from '../storage';
-import { otpService } from '../services/OTPService';
-import { socialAuthService } from '../services/SocialAuthService';
-import { z } from 'zod';
+import { generateTokenPair, verifyToken } from '../utils/jwt';
+import { authenticateJWT } from '../middleware/auth';
 
-const authRouter = Router();
+const router = Router();
 
 // Validation schemas
-const sendOTPSchema = z.object({
-  phone: z.string().min(10).max(15),
-  purpose: z.enum(['login', 'registration', 'password_reset']).default('login')
-});
-
-const verifyOTPSchema = z.object({
-  phone: z.string().min(10).max(15),
-  otp: z.string().length(6),
-  purpose: z.enum(['login', 'registration', 'password_reset']).default('login'),
-  userData: z.object({
-    fullName: z.string().min(2),
-    email: z.string().email().optional(),
-  }).optional()
+const registerSchema = z.object({
+  username: z.string().min(3).max(50),
+  password: z.string().min(8),
+  fullName: z.string().min(2),
+  email: z.string().email(),
+  phone: z.string().regex(/^\+?[1-9]\d{1,14}$/),
+  role: z.enum(['farmer', 'warehouse_operator', 'buyer', 'admin']).default('farmer')
 });
 
 const loginSchema = z.object({
-  username: z.string().min(3),
-  password: z.string().min(6)
+  username: z.string(),
+  password: z.string()
 });
 
-const registerSchema = z.object({
-  username: z.string().min(3),
-  password: z.string().min(6),
-  fullName: z.string().min(2),
-  email: z.string().email(),
-  phone: z.string().optional(),
-  role: z.enum(['farmer', 'trader', 'warehouse_owner', 'logistics_provider']).default('farmer')
-});
-
-const socialAuthSchema = z.object({
-  provider: z.enum(['google', 'facebook']),
-  token: z.string().min(10)
+const refreshTokenSchema = z.object({
+  refreshToken: z.string()
 });
 
 /**
- * PHONE/OTP AUTHENTICATION ROUTES
+ * POST /api/auth/register
+ * Register a new user
  */
-
-// Send OTP to phone number
-authRouter.post('/send-otp', async (req: Request, res: Response) => {
+router.post('/register', async (req: Request, res: Response) => {
   try {
-    const { phone, purpose } = sendOTPSchema.parse(req.body);
+    const data = registerSchema.parse(req.body);
 
-    // For registration, check if phone already exists
-    if (purpose === 'registration') {
-      const existingUser = await storage.getUserByPhone(phone);
-      if (existingUser) {
-        return res.status(400).json({
-          success: false,
-          message: 'Phone number already registered. Try logging in instead.'
-        });
-      }
-    }
-
-    const result = await otpService.sendOTP(phone, purpose);
-    
-    if (result.success) {
-      res.json({
-        success: true,
-        message: result.message,
-        data: { 
-          phone: phone,
-          expiresIn: 300 // 5 minutes
-        }
-      });
-    } else {
-      res.status(400).json({
-        success: false,
-        message: result.message
-      });
-    }
-  } catch (error) {
-    console.error('Send OTP error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to send OTP'
-    });
-  }
-});
-
-// Verify OTP and login/register
-authRouter.post('/verify-otp', async (req: Request, res: Response) => {
-  try {
-    const { phone, otp, purpose, userData } = verifyOTPSchema.parse(req.body);
-
-    const verification = await otpService.verifyOTP(phone, otp, purpose);
-    
-    if (!verification.success) {
+    // Check if user already exists
+    const existingUser = await storage.getUserByUsername(data.username);
+    if (existingUser) {
       return res.status(400).json({
         success: false,
-        message: verification.message
+        message: 'Username already exists'
       });
     }
 
-    let user;
-
-    if (purpose === 'registration') {
-      // Create new user
-      if (!userData) {
-        return res.status(400).json({
-          success: false,
-          message: 'User data required for registration'
-        });
-      }
-
-      user = await storage.createUser({
-        phone: phone,
-        fullName: userData.fullName,
-        email: userData.email,
-        authMethod: 'phone_otp',
-        phoneVerified: true,
-        role: 'farmer'
-      });
-    } else {
-      // Login existing user
-      user = await storage.getUserByPhone(phone);
-      if (!user) {
-        return res.status(404).json({
-          success: false,
-          message: 'No account found with this phone number. Please register first.'
-        });
-      }
-
-      // Update last login
-      await storage.updateUser(user.id, {
-        lastLogin: new Date(),
-        phoneVerified: true
+    // Check if email already exists
+    const existingEmail = await storage.getUserByEmail(data.email);
+    if (existingEmail) {
+      return res.status(400).json({
+        success: false,
+        message: 'Email already registered'
       });
     }
 
-    // Set session
-    req.session.userId = user.id;
-    req.session.save();
+    // Hash password
+    const hashedPassword = await bcrypt.hash(data.password, 12);
 
-    res.json({
+    // Create user
+    const user = await storage.createUser({
+      username: data.username,
+      password: hashedPassword,
+      fullName: data.fullName,
+      email: data.email,
+      phone: data.phone,
+      authMethod: 'username_password',
+      role: data.role,
+      kycVerified: false
+    });
+
+    // Generate JWT tokens
+    const tokens = generateTokenPair(user.id, user.email, user.role);
+
+    res.status(201).json({
       success: true,
-      message: purpose === 'registration' ? 'Account created successfully' : 'Login successful',
+      message: 'User registered successfully',
       data: {
         user: {
           id: user.id,
+          username: user.username,
           fullName: user.fullName,
           email: user.email,
           phone: user.phone,
           role: user.role,
-          authMethod: user.authMethod
-        }
+          kycVerified: user.kycVerified
+        },
+        ...tokens
       }
     });
 
   } catch (error) {
-    console.error('Verify OTP error:', error);
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({
+        success: false,
+        message: 'Validation error',
+        errors: error.errors
+      });
+    }
+
+    console.error('Registration error:', error);
     res.status(500).json({
       success: false,
-      message: 'OTP verification failed'
+      message: 'Registration failed'
     });
   }
 });
 
 /**
- * USERNAME/PASSWORD AUTHENTICATION ROUTES  
+ * POST /api/auth/login
+ * Login with username and password
  */
-
-// Traditional login
-authRouter.post('/login', async (req: Request, res: Response) => {
+router.post('/login', async (req: Request, res: Response) => {
   try {
     const { username, password } = loginSchema.parse(req.body);
 
+    // Get user
     const user = await storage.getUserByUsername(username);
     if (!user) {
       return res.status(401).json({
@@ -183,11 +126,8 @@ authRouter.post('/login', async (req: Request, res: Response) => {
       });
     }
 
-    // Verify password (assuming bcrypt hashing)
-    const isValidPassword = user.password ? 
-      await bcrypt.compare(password, user.password) : 
-      password === user.password; // Fallback for plain text (dev only)
-
+    // Verify password
+    const isValidPassword = await bcrypt.compare(password, user.password);
     if (!isValidPassword) {
       return res.status(401).json({
         success: false,
@@ -198,9 +138,9 @@ authRouter.post('/login', async (req: Request, res: Response) => {
     // Update last login
     await storage.updateUser(user.id, { lastLogin: new Date() });
 
-    // Set session
-    req.session.userId = user.id;
-    req.session.save();
+    // Generate JWT tokens
+    const tokens = generateTokenPair(user.id, user.email, user.role);
+    console.log('🔑 [AUTH.CLEAN] Generated tokens:', Object.keys(tokens));
 
     res.json({
       success: true,
@@ -208,16 +148,26 @@ authRouter.post('/login', async (req: Request, res: Response) => {
       data: {
         user: {
           id: user.id,
+          username: user.username,
           fullName: user.fullName,
           email: user.email,
           phone: user.phone,
           role: user.role,
-          authMethod: user.authMethod
-        }
+          kycVerified: user.kycVerified
+        },
+        ...tokens
       }
     });
 
   } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({
+        success: false,
+        message: 'Validation error',
+        errors: error.errors
+      });
+    }
+
     console.error('Login error:', error);
     res.status(500).json({
       success: false,
@@ -226,151 +176,75 @@ authRouter.post('/login', async (req: Request, res: Response) => {
   }
 });
 
-// Traditional registration
-authRouter.post('/register', async (req: Request, res: Response) => {
-  try {
-    const { username, password, fullName, email, phone, role } = registerSchema.parse(req.body);
-
-    // Check if username or email already exists
-    const existingUser = await storage.getUserByUsername(username) || 
-                         await storage.getUserByEmail(email);
-    
-    if (existingUser) {
-      return res.status(400).json({
-        success: false,
-        message: 'Username or email already exists'
-      });
-    }
-
-    // Hash password
-    const hashedPassword = await bcrypt.hash(password, 12);
-
-    // Create user
-    const user = await storage.createUser({
-      username,
-      password: hashedPassword,
-      fullName,
-      email,
-      phone,
-      authMethod: 'username_password',
-      emailVerified: false,
-      phoneVerified: false,
-      role
-    });
-
-    // Set session
-    req.session.userId = user.id;
-    req.session.save();
-
-    res.status(201).json({
-      success: true,
-      message: 'Account created successfully',
-      data: {
-        user: {
-          id: user.id,
-          fullName: user.fullName,
-          email: user.email,
-          phone: user.phone,
-          role: user.role,
-          authMethod: user.authMethod
-        }
-      }
-    });
-
-  } catch (error) {
-    console.error('Registration error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Registration failed'
-    });
-  }
-});
-
 /**
- * SOCIAL AUTHENTICATION ROUTES
+ * POST /api/auth/refresh
+ * Refresh access token using refresh token
  */
-
-// Social login (Google/Facebook)
-authRouter.post('/social-login', async (req: Request, res: Response) => {
+router.post('/refresh', async (req: Request, res: Response) => {
   try {
-    const { provider, token } = socialAuthSchema.parse(req.body);
+    const { refreshToken } = refreshTokenSchema.parse(req.body);
 
-    let user;
-
-    if (provider === 'google') {
-      const profile = await socialAuthService.verifyGoogleToken(token);
-      if (!profile) {
-        return res.status(400).json({
-          success: false,
-          message: 'Invalid Google token'
-        });
-      }
-      user = await socialAuthService.findOrCreateGoogleUser(profile);
-    } else if (provider === 'facebook') {
-      const profile = await socialAuthService.verifyFacebookToken(token);
-      if (!profile) {
-        return res.status(400).json({
-          success: false,
-          message: 'Invalid Facebook token'
-        });
-      }
-      user = await socialAuthService.findOrCreateFacebookUser(profile);
-    }
-
-    if (!user) {
-      return res.status(500).json({
+    // Verify refresh token
+    const payload = verifyToken(refreshToken) as any;
+    
+    if (!payload || !payload.userId) {
+      return res.status(401).json({
         success: false,
-        message: 'Social authentication failed'
+        message: 'Invalid refresh token'
       });
     }
 
-    // Set session
-    req.session.userId = user.id;
-    req.session.save();
+    // Get user to ensure they still exist
+    const user = await storage.getUser(payload.userId);
+    if (!user) {
+      return res.status(401).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    // Generate new token pair
+    const tokens = generateTokenPair(user.id, user.email, user.role);
 
     res.json({
       success: true,
-      message: 'Social login successful',
-      data: {
-        user: {
-          id: user.id,
-          fullName: user.fullName,
-          email: user.email,
-          phone: user.phone,
-          role: user.role,
-          authMethod: user.authMethod,
-          profileImageUrl: user.profileImageUrl
-        }
-      }
+      message: 'Token refreshed successfully',
+      data: tokens
     });
 
   } catch (error) {
-    console.error('Social login error:', error);
-    res.status(500).json({
+    console.error('Token refresh error:', error);
+    res.status(401).json({
       success: false,
-      message: 'Social authentication failed'
+      message: 'Invalid or expired refresh token'
     });
   }
 });
 
 /**
- * COMMON AUTHENTICATION ROUTES
+ * POST /api/auth/logout
+ * Logout (client-side token removal, server just confirms)
  */
+router.post('/logout', authenticateJWT, async (req: Request, res: Response) => {
+  // With JWT, logout is primarily client-side (remove tokens)
+  // Server can optionally blacklist tokens here if needed
+  
+  res.json({
+    success: true,
+    message: 'Logged out successfully'
+  });
+});
 
-// Get current session
-authRouter.get('/session', async (req: Request, res: Response) => {
+/**
+ * GET /api/auth/me
+ * Get current user profile
+ */
+router.get('/me', authenticateJWT, async (req: Request, res: Response) => {
   try {
-    if (!req.session.userId) {
-      return res.status(401).json({
-        success: false,
-        message: 'Not authenticated'
-      });
-    }
-
-    const user = await storage.getUser(req.session.userId);
+    const user = await storage.getUser(req.user!.userId);
+    
     if (!user) {
-      req.session.destroy(() => {});
-      return res.status(401).json({
+      return res.status(404).json({
         success: false,
         message: 'User not found'
       });
@@ -379,45 +253,26 @@ authRouter.get('/session', async (req: Request, res: Response) => {
     res.json({
       success: true,
       data: {
-        user: {
-          id: user.id,
-          fullName: user.fullName,
-          email: user.email,
-          phone: user.phone,
-          role: user.role,
-          authMethod: user.authMethod,
-          profileImageUrl: user.profileImageUrl,
-          kycVerified: user.kycVerified
-        }
+        id: user.id,
+        username: user.username,
+        fullName: user.fullName,
+        email: user.email,
+        phone: user.phone,
+        role: user.role,
+        kycVerified: user.kycVerified,
+        profileImageUrl: user.profileImageUrl,
+        businessDetails: user.businessDetails,
+        createdAt: user.createdAt
       }
     });
 
   } catch (error) {
-    console.error('Session check error:', error);
+    console.error('Get user error:', error);
     res.status(500).json({
       success: false,
-      message: 'Session check failed'
+      message: 'Failed to fetch user profile'
     });
   }
 });
 
-// Logout
-authRouter.post('/logout', (req: Request, res: Response) => {
-  req.session.destroy((err) => {
-    if (err) {
-      console.error('Logout error:', err);
-      return res.status(500).json({
-        success: false,
-        message: 'Logout failed'
-      });
-    }
-
-    res.clearCookie('connect.sid');
-    res.json({
-      success: true,
-      message: 'Logged out successfully'
-    });
-  });
-});
-
-export default authRouter;
+export default router;

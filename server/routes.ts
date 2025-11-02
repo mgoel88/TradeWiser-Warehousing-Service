@@ -4,6 +4,7 @@ import { createServer, type Server } from "http";
 import path from "path";
 import crypto from 'crypto';
 import { storage } from "./storage";
+import { warehouseService } from "./services/WarehouseService";
 import { insertUserSchema } from "@shared/schema";
 import { z } from "zod";
 import { fromZodError } from "zod-validation-error";
@@ -12,31 +13,21 @@ import IntegrationMonitoringService from "./services/IntegrationMonitoringServic
 import RetryService from "./services/RetryService";
 import { webhookRateLimiter, adminRateLimiter, generalRateLimiter } from "./middleware/rateLimiter";
 import authRouter from "./routes/auth";
+import revolvingCreditRouter from "./routes/revolvingCreditJWT";
 import { verifyPassword } from './auth';
-import 'express-session';
-
-declare module 'express-session' {
-  interface SessionData {
-    userId: number;
-  }
-}
+import { authenticateJWT } from "./middleware/auth";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   const apiRouter = express.Router();
+  
+  // JWT authentication middleware
+  const requireAuth = authenticateJWT;
   
   // Initialize monitoring and retry services
   const monitoringService = new IntegrationMonitoringService();
   const retryService = new RetryService();
   
-  console.log("Registering API routes...");
-
-  // Session validation middleware
-  const requireAuth = (req: Request, res: Response, next: any) => {
-    if (!req.session?.userId) {
-      return res.status(401).json({ message: "Not authenticated" });
-    }
-    next();
-  };
+  console.log("Registering API routes with JWT authentication...");
 
   // OLD Auth routes - REPLACED with comprehensive auth system at /api/auth
   /*
@@ -44,7 +35,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const userData = insertUserSchema.parse(req.body);
       const user = await storage.createUser(userData);
-      req.session.userId = user.id;
+      req.user!.userId = user.id;
       const { password, ...userWithoutPassword } = user;
       res.status(201).json(userWithoutPassword);
     } catch (error) {
@@ -59,6 +50,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   */
 
+  /* OLD SESSION-BASED AUTH - REPLACED WITH JWT
   apiRouter.post("/auth/login", async (req: Request, res: Response) => {
     try {
       console.log('=== LOGIN DEBUG ===');
@@ -88,7 +80,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ message: "Invalid credentials" });
       }
 
-      req.session.userId = user.id;
+      req.user!.userId = user.id;
       
       // Save the session to ensure userId is persisted - WITH ERROR HANDLING
       try {
@@ -98,7 +90,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               console.error('Session save error:', err);
               reject(err);
             } else {
-              console.log(`Session saved successfully for user ${user.id}, userId: ${req.session.userId}`);
+              console.log(`Session saved successfully for user ${user.id}, userId: ${req.user!.userId}`);
               resolve();
             }
           });
@@ -125,14 +117,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ message: "Server error" });
     }
   });
+  */
 
+  /* OLD SESSION CHECK - REPLACED WITH JWT
   apiRouter.get("/auth/session", async (req: Request, res: Response) => {
     try {
-      if (!req.session || !req.session.userId) {
+      if (!req.session || !req.user!.userId) {
         return res.status(401).json({ message: "Not authenticated" });
       }
 
-      const user = await storage.getUser(req.session.userId);
+      const user = await storage.getUser(req.user!.userId);
       
       if (!user) {
         return res.status(401).json({ message: "User not found" });
@@ -153,7 +147,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ message: "Server error" });
     }
   });
+  */
 
+  /* OLD SESSION LOGOUT - REPLACED WITH JWT
   apiRouter.post("/auth/logout", (req: Request, res: Response) => {
     req.session.destroy((err) => {
       if (err) {
@@ -163,6 +159,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(200).json({ message: "Logged out successfully" });
     });
   });
+  */
 
   // User settings routes
   apiRouter.get("/user/settings", requireAuth, async (req: Request, res: Response) => {
@@ -245,10 +242,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   apiRouter.post("/deposits", requireAuth, async (req: Request, res: Response) => {
     try {
       console.log("=== DEPOSIT CREATION DEBUG ===");
-      console.log('User ID from session:', req.session.userId);
+      console.log('User ID from session:', req.user!.userId);
       console.log('Request body:', JSON.stringify(req.body, null, 2));
 
-      const userId = req.session.userId as number;
+      const userId = req.user!.userId as number;
       const { 
         commodityName, 
         commodityType, 
@@ -283,6 +280,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         gradeAssigned: 'A',
         ownerId: userId,
         warehouseId: warehouseId,
+        status: 'active' as const,
+        channelType: 'green' as const,
         notes: `Deposit created on ${new Date().toISOString()}`,
         valuation: parseFloat(quantity.toString()) * 1000 * 50 // Default Rs 50/kg, 1000kg per MT
       };
@@ -296,6 +295,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         receiptNumber: `TW-${Date.now()}-${commodity.id}`,
         commodityId: commodity.id,
         commodityName: commodityName,
+        ownerId: userId,
         quantity: parseFloat(quantity.toString()),
         measurementUnit: measurementUnit || 'MT',
         warehouseId: warehouseId,
@@ -348,10 +348,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Nearby warehouses endpoint
+  // Intelligent warehouse selection endpoint with ranking algorithm
   apiRouter.get("/warehouses/nearby", async (req: Request, res: Response) => {
     try {
-      const { lat, lng, radius } = req.query;
+      const { lat, lng, commodity, quantity, limit } = req.query;
       
       if (!lat || !lng) {
         return res.status(400).json({ message: "Latitude and longitude are required" });
@@ -359,38 +359,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const latitude = parseFloat(lat as string);
       const longitude = parseFloat(lng as string);
-      const searchRadius = parseInt((radius as string) || "50"); // Default 50km radius
+      const commodityType = (commodity as string) || "";
+      const requiredQuantity = parseFloat((quantity as string) || "0");
+      const maxResults = parseInt((limit as string) || "10");
       
       if (isNaN(latitude) || isNaN(longitude)) {
         return res.status(400).json({ message: "Invalid latitude or longitude" });
       }
       
-      console.log(`Searching nearby warehouses: lat=${latitude}, lng=${longitude}, radius=${searchRadius}km`);
-      const warehouses = await storage.listWarehousesByLocation(latitude, longitude, searchRadius);
+      console.log(`Intelligent warehouse selection: lat=${latitude}, lng=${longitude}, commodity=${commodityType}, quantity=${requiredQuantity}`);
       
-      // Add distance calculation to each warehouse
-      const warehousesWithDistance = warehouses.map(warehouse => {
-        const warehouseLat = parseFloat(warehouse.latitude || '0');
-        const warehouseLng = parseFloat(warehouse.longitude || '0');
-        
-        // Haversine formula for accurate distance calculation
-        const R = 6371; // Earth's radius in kilometers
-        const dLat = (warehouseLat - latitude) * Math.PI / 180;
-        const dLng = (warehouseLng - longitude) * Math.PI / 180;
-        const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
-                  Math.cos(latitude * Math.PI / 180) * Math.cos(warehouseLat * Math.PI / 180) *
-                  Math.sin(dLng/2) * Math.sin(dLng/2);
-        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-        const distance = R * c;
-        
-        return {
-          ...warehouse,
-          distance: Math.round(distance * 10) / 10 // Round to 1 decimal place
-        };
-      }).sort((a, b) => a.distance - b.distance); // Sort by distance
+      // Use the new intelligent ranking algorithm
+      const rankedWarehouses = warehouseService.getRankedWarehouses(
+        latitude,
+        longitude,
+        commodityType,
+        requiredQuantity,
+        maxResults
+      );
       
-      console.log(`Found ${warehousesWithDistance.length} nearby warehouses`);
-      res.json(warehousesWithDistance);
+      // Format response with ranking details
+      const response = rankedWarehouses.map(item => ({
+        ...item.warehouse,
+        distance: Math.round(item.distance * 10) / 10,
+        score: Math.round(item.score * 10) / 10,
+        proximityScore: Math.round(item.proximityScore * 10) / 10,
+        availabilityScore: Math.round(item.availabilityScore * 10) / 10,
+        qualityScore: Math.round(item.qualityScore * 10) / 10
+      }));
+      
+      console.log(`Found and ranked ${response.length} warehouses`);
+      res.json(response);
     } catch (error) {
       console.error("Error fetching nearby warehouses:", error);
       res.status(500).json({ message: "Failed to fetch nearby warehouses" });
@@ -467,11 +466,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Commodity routes
   apiRouter.get("/commodities", async (req: Request, res: Response) => {
     try {
-      if (!req.session?.userId) {
+      if (!req.user || !req.user.userId) {
         return res.status(401).json({ message: "Not authenticated" });
       }
       
-      const commodities = await storage.listCommoditiesByOwner(req.session.userId);
+      const commodities = await storage.listCommoditiesByOwner(req.user!.userId);
       res.setHeader('Content-Type', 'application/json');
       res.json(commodities);
     } catch (error) {
@@ -484,7 +483,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get individual commodity
   apiRouter.get("/commodities/:id", async (req: Request, res: Response) => {
     try {
-      if (!req.session?.userId) {
+      if (!req.user || !req.user.userId) {
         return res.status(401).json({ message: "Not authenticated" });
       }
       
@@ -496,7 +495,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // Verify ownership
-      if (commodity.ownerId !== req.session.userId) {
+      if (commodity.ownerId !== req.user!.userId) {
         return res.status(403).json({ message: "Access denied" });
       }
       
@@ -510,9 +509,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Create new commodity
-  apiRouter.post("/commodities", async (req: Request, res: Response) => {
+  apiRouter.post("/commodities", authenticateJWT, async (req: Request, res: Response) => {
     try {
-      if (!req.session?.userId) {
+      if (!req.user || !req.user.userId) {
         return res.status(401).json({ message: "Not authenticated" });
       }
 
@@ -545,7 +544,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         qualityParameters: qualityParameters || {},
         gradeAssigned: gradeAssigned || "pending",
         warehouseId: parseInt(warehouseId),
-        ownerId: req.session.userId,
+        ownerId: req.user!.userId,
         status: "active" as const,
         channelType: "green" as const,
         valuation: valuation?.toString() || (parseFloat(quantity) * 1000 * 50).toString() // Rs 50 per kg default (MT to kg conversion)
@@ -586,13 +585,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Receipt routes
-  apiRouter.get("/receipts", async (req: Request, res: Response) => {
+  apiRouter.get("/receipts", requireAuth, async (req: Request, res: Response) => {
     try {
-      if (!req.session?.userId) {
-        return res.status(401).json({ message: "Not authenticated" });
-      }
       
-      const receipts = await storage.listWarehouseReceiptsByOwner(req.session.userId);
+      const receipts = await storage.listWarehouseReceiptsByOwner(req.user!.userId);
 
       // Enhance receipts with commodity and warehouse data
       const enhancedReceipts = await Promise.all(receipts.map(async (receipt) => {
@@ -842,11 +838,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Loans routes
   apiRouter.get("/loans", async (req: Request, res: Response) => {
     try {
-      if (!req.session?.userId) {
+      if (!req.user || !req.user.userId) {
         return res.status(401).json({ message: "Not authenticated" });
       }
       
-      const loans = await storage.listLoansByUser(req.session.userId);
+      const loans = await storage.listLoansByUser(req.user!.userId);
       res.setHeader('Content-Type', 'application/json');
       res.json(loans);
     } catch (error) {
@@ -860,11 +856,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Process routes (for deposits and workflows)
   apiRouter.get("/processes", async (req: Request, res: Response) => {
     try {
-      if (!req.session?.userId) {
+      if (!req.user || !req.user.userId) {
         return res.status(401).json({ message: "Not authenticated" });
       }
       
-      const processes = await storage.listProcessesByUser(req.session.userId);
+      const processes = await storage.listProcessesByUser(req.user!.userId);
       res.setHeader('Content-Type', 'application/json');
       res.json(processes);
     } catch (error) {
@@ -876,7 +872,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   apiRouter.get("/processes/:id", async (req: Request, res: Response) => {
     try {
-      if (!req.session?.userId) {
+      if (!req.user || !req.user.userId) {
         return res.status(401).json({ message: "Not authenticated" });
       }
       
@@ -897,9 +893,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Update process status
-  apiRouter.patch("/processes/:id", async (req: Request, res: Response) => {
+  apiRouter.patch("/processes/:id", authenticateJWT, async (req: Request, res: Response) => {
     try {
-      if (!req.session?.userId) {
+      if (!req.user || !req.user.userId) {
         return res.status(401).json({ message: "Not authenticated" });
       }
       
@@ -911,7 +907,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // Verify ownership
-      if (process.userId !== req.session.userId) {
+      if (process.userId !== req.user!.userId) {
         return res.status(403).json({ message: "Access denied" });
       }
       
@@ -929,9 +925,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Create warehouse receipts
-  apiRouter.post("/receipts", async (req: Request, res: Response) => {
+  apiRouter.post("/receipts", authenticateJWT, async (req: Request, res: Response) => {
     try {
-      if (!req.session?.userId) {
+      if (!req.user || !req.user.userId) {
         return res.status(401).json({ message: "Not authenticated" });
       }
 
@@ -947,12 +943,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ...rest,
         quantity,
         valuation: calculatedValuation,
-        ownerId: req.session.userId,
-        receiptNumber: `WR${Date.now()}-${req.session.userId}`,
+        ownerId: req.user!.userId,
+        receiptNumber: `WR${Date.now()}-${req.user!.userId}`,
         blockchainHash: `198324${Math.random().toString(16).substring(2, 18)}`,
         expiryDate: new Date(Date.now() + 6 * 30 * 24 * 60 * 60 * 1000), // 6 months from now
         liens: JSON.stringify({
-          verificationCode: `WR-${req.session.userId}-${Math.random().toString(16).substring(2, 11).toUpperCase()}-${Math.random().toString(16).substring(2, 6).toUpperCase()}`,
+          verificationCode: `WR-${req.user!.userId}-${Math.random().toString(16).substring(2, 11).toUpperCase()}-${Math.random().toString(16).substring(2, 6).toUpperCase()}`,
           processId: rest.processId || 0,
           commodityName: rest.commodityName || "Unknown",
           qualityGrade: "Grade A",
@@ -979,9 +975,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  apiRouter.post("/processes", async (req: Request, res: Response) => {
+  apiRouter.post("/processes", authenticateJWT, async (req: Request, res: Response) => {
     try {
-      if (!req.session?.userId) {
+      if (!req.user || !req.user.userId) {
         return res.status(401).json({ message: "Not authenticated" });
       }
 
@@ -1016,7 +1012,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         qualityParameters: {},
         gradeAssigned: "pending",
         warehouseId: parseInt(warehouseId),
-        ownerId: req.session.userId,
+        ownerId: req.user!.userId,
         status: "active",
         channelType: "green",
         valuation: estimatedValue?.toString() || (parseFloat(quantity) * 1000 * 50).toString()
@@ -1025,7 +1021,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Then create the process
       const processData = {
         processType: type || "deposit",
-        userId: req.session.userId,
+        userId: req.user!.userId,
         commodityId: commodity.id,
         warehouseId: parseInt(warehouseId),
         status: "in_progress" as const,
@@ -1045,121 +1041,51 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       console.log("Created process:", process.id);
 
-      // Send commodity data to warehouse module for processing
+      // --- WMS Integration (Initial Inward Goods Request) ---
       try {
-        if (typeof globalThis.sendToWarehouseModule === 'function') {
-          const warehouseData = {
-            processId: process.id,
-            commodity: {
-              id: commodity.id,
-              name: commodity.name,
-              type: commodity.type,
-              grade: commodity.gradeAssigned,
-              quantity: commodity.quantity,
-              measurementUnit: commodity.measurementUnit
-            },
-            warehouse: {
-              id: parseInt(warehouseId),
-              name: `Warehouse ${warehouseId}`,
-              location: 'Unknown'
-            },
-            owner: {
-              id: req.session.userId
-            },
-            pickupSchedule: {
-              date: scheduledDate,
-              time: scheduledTime,
-              address: pickupAddress
-            },
-            timestamp: new Date().toISOString()
-          };
-          
-          await globalThis.sendToWarehouseModule(warehouseData);
-          console.log(`Sent commodity ${commodity.id} to warehouse module for processing`);
-        }
+        const wmsResponse = await sendInwardGoodsToWMS({
+          processId: process.id,
+          commodityName: commodity.name,
+          quantity: parseFloat(commodity.quantity),
+          warehouseId: commodity.warehouseId,
+          userId: commodity.ownerId
+        });
+        console.log("WMS response:", wmsResponse);
+        // Update process with initial WMS inventory ID
+        await storage.updateProcess(process.id, {
+          wmsInventoryId: wmsResponse.inventoryId
+        });
       } catch (error) {
-        console.warn('Failed to send data to warehouse module:', error);
-        // Don't fail the entire request if warehouse integration fails
+        console.warn('Failed to send initial inward goods request to WMS:', error);
+        // Log error and potentially trigger retry
+        monitoringService.logIntegrationError('WMS', process.id, 'Error sending initial inward goods', error.message);
       }
 
-      // Request quality testing for the commodity
+      // --- QA Tool Integration (Initial Assessment Request) ---
       try {
-        if (typeof globalThis.requestQualityTesting === 'function') {
-          const qualityData = {
-            commodityId: commodity.id,
-            processId: process.id,
-            commodityType: commodity.type,
-            expectedGrade: commodity.gradeAssigned,
-            quantity: commodity.quantity,
-            harvestDate: new Date(),
-            storageConditions: 'Standard',
-            timestamp: new Date().toISOString()
-          };
-          
-          await globalThis.requestQualityTesting(qualityData);
-          console.log(`Requested quality testing for commodity ${commodity.id}`);
-        }
+        const qaResponse = await requestQualityAssessment({
+          processId: process.id,
+          commodityName: commodity.name,
+          quantity: parseFloat(commodity.quantity),
+          warehouseId: commodity.warehouseId,
+          userId: commodity.ownerId
+        });
+        console.log("QA response:", qaResponse);
+        // Update process with initial QA Assessment ID
+        await storage.updateProcess(process.id, {
+          qaAssessmentId: qaResponse.assessmentId
+        });
       } catch (error) {
         console.warn('Failed to request quality testing:', error);
-        // Don't fail the entire request if quality integration fails
+        monitoringService.logIntegrationError('QA', process.id, 'Error requesting assessment', error.message);
       }
       
-      // IMMEDIATE WAREHOUSE RECEIPT CREATION: Create receipt right after deposit confirmation
-      try {
-        console.log("Creating warehouse receipt for completed deposit...");
-        
-        const receiptData = {
-          receiptNumber: `WR${Date.now()}-${req.session.userId}`,
-          commodityId: commodity.id,
-          warehouseId: parseInt(warehouseId),
-          ownerId: req.session.userId,
-          quantity: quantity.toString(),
-          measurementUnit: "MT",
-          status: "active" as const,
-          blockchainHash: `0x${Math.random().toString(16).substring(2, 18)}`,
-          valuation: estimatedValue?.toString() || (parseFloat(quantity) * 1000 * 50).toString(),
-          issuedDate: new Date(),
-          expiryDate: new Date(Date.now() + 6 * 30 * 24 * 60 * 60 * 1000), // 6 months from now
-          commodityName: commodityName,
-          qualityGrade: "Grade A", // Default grade
-          warehouseName: `Warehouse ${warehouseId}`, // We'll enhance this later
-          warehouseAddress: "Warehouse Address", // We'll enhance this later
-          measurementUnit: "MT",
-          liens: JSON.stringify({
-            verificationCode: `WR-${req.session.userId}-${Math.random().toString(16).substring(2, 11).toUpperCase()}`,
-            processId: process.id,
-            depositDate: new Date().toISOString(),
-            qualityParameters: {
-              moisture: "12.5%",
-              foreignMatter: "1.2%",
-              brokenGrains: "2.8%"
-            }
-          }),
-          metadata: JSON.stringify({
-            processId: process.id,
-            depositMethod: deliveryMethod,
-            scheduledDate,
-            scheduledTime,
-            pickupAddress
-          })
-        };
-
-        const receipt = await storage.createWarehouseReceipt(receiptData);
-        console.log("Warehouse receipt created immediately:", receipt.id);
-        
-        // Update process to show eWR generation completed
-        await storage.updateProcess(process.id, {
-          currentStage: "ewr_generation_complete",
-          progress: 90
-        });
-        
-      } catch (error) {
-        console.warn("Failed to create immediate warehouse receipt:", error);
-        // Don't fail the entire request if receipt creation fails
-      }
+      // IMMEDIATE WAREHOUSE RECEIPT CREATION: This logic is being removed as it prematurely creates a receipt.
+      // The logic for immediate warehouse receipt creation has been removed.
+      // This is now handled by the progressToNextStage function when the process reaches the 'receipt_generated' stage.
 
       // AUTO-START TRACKING: Immediately start progression after process creation  
-      setTimeout(() => progressToNextStage(process.id), 15 * 60 * 1000); // 15 minutes
+      setTimeout(() => progressToNextStage(process.id), 5000); // 5 seconds for demo to start pickup scheduling
       
       res.setHeader('Content-Type', 'application/json');
       res.status(201).json(process);
@@ -1240,7 +1166,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Bypass route: Quality assessment (alias for complete-assessment)
   apiRouter.post("/bypass/quality-assessment/:processId", async (req: Request, res: Response) => {
     try {
-      if (!req.session?.userId) {
+      if (!req.user || !req.user.userId) {
         return res.status(401).json({ message: "Not authenticated" });
       }
 
@@ -1309,7 +1235,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Bypass route: Complete quality assessment and pricing flow (legacy alias)
   apiRouter.post("/bypass/complete-assessment/:processId", async (req: Request, res: Response) => {
     try {
-      if (!req.session?.userId) {
+      if (!req.user || !req.user.userId) {
         return res.status(401).json({ message: "Not authenticated" });
       }
 
@@ -1378,7 +1304,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Generate Electronic Warehouse Receipt (eWR)
   apiRouter.post("/bypass/generate-ewr/:processId", async (req: Request, res: Response) => {
     try {
-      if (!req.session?.userId) {
+      if (!req.user || !req.user.userId) {
         return res.status(401).json({ message: "Not authenticated" });
       }
 
@@ -1409,7 +1335,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         receiptNumber,
         commodityId: commodity.id,
         warehouseId: warehouse.id,
-        ownerId: req.session.userId,
+        ownerId: req.user!.userId,
         quantity: commodity.quantity,
         measurementUnit: commodity.measurementUnit,
         status: "active",
@@ -2478,6 +2404,81 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const nextStage = stageProgression[process.currentStage || 'pickup_scheduled'];
 
       if (nextStage) {
+        // --- Integration Logic based on current stage ---
+        const commodity = await storage.getCommodity(process.commodityId!);
+        if (!commodity) return;
+
+        if (process.currentStage === 'pickup_scheduled') {
+          // --- Transporter Module Integration (Schedule Pickup) ---
+          try {
+            const warehouse = await storage.getWarehouse(process.warehouseId);
+            const pickupAddress = process.metadata.pickupAddress || 'User Default Address';
+            const destinationAddress = `${warehouse.address}, ${warehouse.city}`;
+
+            const logisticsResponse = await schedulePickup({
+              processId: process.id,
+              origin: pickupAddress,
+              destination: destinationAddress,
+              cargoType: commodity.name,
+              quantity: commodity.quantity,
+              userId: process.ownerId
+            });
+
+            console.log("Logistics response:", logisticsResponse);
+            await storage.updateProcess(process.id, { 
+              trackingNumber: logisticsResponse.trackingNumber
+            });
+          } catch (e) {
+            console.error("Error scheduling pickup:", e);
+            await monitoringService.logIntegrationError('Logistics', process.id, 'Error scheduling pickup', e.message);
+            await storage.updateProcess(process.id, { status: 'pickup_scheduling_failed' });
+            return; // Stop progression on failure
+          }
+        }
+        
+        if (process.currentStage === 'arrived_warehouse') {
+          // --- WMS Integration (Send Inward Goods Request) ---
+          try {
+            const wmsResponse = await sendInwardGoodsToWMS({
+              processId: process.id,
+              commodityName: commodity.name,
+              quantity: parseFloat(commodity.quantity),
+              warehouseId: commodity.warehouseId,
+              userId: commodity.ownerId
+            });
+            console.log("WMS response:", wmsResponse);
+            await storage.updateProcess(process.id, {
+              wmsInventoryId: wmsResponse.inventoryId
+            });
+          } catch (error) {
+            console.warn('Failed to send initial inward goods request to WMS:', error);
+            monitoringService.logIntegrationError('WMS', process.id, 'Error sending initial inward goods', error.message);
+            // Non-critical failure, continue progression
+          }
+        }
+
+        if (process.currentStage === 'quality_assessment') {
+          // --- QA Tool Integration (Request Quality Assessment) ---
+          try {
+            const qaResponse = await requestQualityAssessment({
+              processId: process.id,
+              commodityName: commodity.name,
+              quantity: parseFloat(commodity.quantity),
+              warehouseId: commodity.warehouseId,
+              userId: commodity.ownerId
+            });
+            console.log("QA response:", qaResponse);
+            await storage.updateProcess(process.id, {
+              qaAssessmentId: qaResponse.assessmentId
+            });
+          } catch (error) {
+            console.warn('Failed to request quality testing:', error);
+            monitoringService.logIntegrationError('QA', process.id, 'Error requesting assessment', error.message);
+            // Non-critical failure, continue progression
+          }
+        }
+        
+        // --- Stage Progression Update ---
         const currentProgress = JSON.parse(process.stageProgress as string || '{}');
         await storage.updateProcess(processId, {
           currentStage: nextStage,
@@ -2512,8 +2513,49 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const delay = getStageDelay(nextStage);
           setTimeout(() => progressToNextStage(processId), delay);
         } else {
-          // Generate receipt when process complete
-          await generateWarehouseReceipt(process.commodityId!);
+          // --- Final Stage: Generate eWR and Push to Depository ---
+          try {
+            const receiptNumber = `WR${Date.now()}-${process.userId}`;
+            
+            const receiptData = {
+              receiptNumber,
+              commodityId: commodity.id,
+              warehouseId: commodity.warehouseId!,
+              ownerId: commodity.ownerId!,
+              quantity: commodity.quantity,
+              measurementUnit: commodity.measurementUnit || "MT",
+              status: "active" as const,
+              blockchainHash: `0x${Math.random().toString(16).substring(2, 18)}`,
+              valuation: commodity.valuation || (parseFloat(commodity.quantity) * 1000 * 50).toString(),
+              commodityName: commodity.name,
+              qualityGrade: commodity.gradeAssigned || "Standard",
+              issuedDate: new Date(),
+              expiryDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000), // 1 year
+              metadata: JSON.stringify({
+                type: 'auto_generated',
+                processCompleted: true,
+                autoGenerated: true,
+                timestamp: new Date().toISOString()
+              })
+            };
+
+            const receipt = await storage.createWarehouseReceipt(receiptData);
+            
+            // Push to Depository Application
+            const depositoryResponse = await issueElectronicWarehouseReceipt(receiptData);
+            
+            console.log("Depository response:", depositoryResponse);
+            await storage.updateProcess(process.id, { 
+              status: 'receipt_issued',
+              warehouseReceiptId: receipt.id,
+              depositoryId: depositoryResponse.depositoryId // Store the ID from the Depository
+            });
+            console.log(`Auto-generated and pushed eWR ${receiptNumber} to Depository for commodity ${commodity.id}`);
+          } catch (e) {
+            console.error("Error issuing eWR to Depository:", e);
+            await monitoringService.logIntegrationError('Depository', process.id, 'Error issuing eWR', e.message);
+            await storage.updateProcess(process.id, { status: 'ewr_issue_failed' });
+          }
         }
       }
     } catch (error) {
@@ -2534,40 +2576,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
     return delays[stage] || 15 * 1000;
   }
 
-  async function generateWarehouseReceipt(commodityId: number) {
-    try {
-      const commodity = await storage.getCommodity(commodityId);
-      if (!commodity) return;
+  // Placeholder functions for external services
+  async function schedulePickup(data: any) {
+    console.log("MOCK: Scheduling pickup via Logistics module:", data);
+    return { trackingNumber: `TRK-${Date.now()}`, status: 'scheduled' };
+  }
 
-      const receiptNumber = `WR${Date.now()}-${commodityId}`;
-      
-      const receiptData = {
-        receiptNumber,
-        commodityId: commodity.id,
-        warehouseId: commodity.warehouseId!,
-        ownerId: commodity.ownerId!,
-        quantity: commodity.quantity,
-        measurementUnit: commodity.measurementUnit || "MT",
-        status: "active" as const,
-        blockchainHash: `0x${Math.random().toString(16).substring(2, 18)}`,
-        valuation: commodity.valuation || (parseFloat(commodity.quantity) * 1000 * 50).toString(),
-        commodityName: commodity.name,
-        qualityGrade: commodity.gradeAssigned || "Standard",
-        issuedDate: new Date(),
-        expiryDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000), // 1 year
-        metadata: JSON.stringify({
-          type: 'auto_generated',
-          processCompleted: true,
-          autoGenerated: true,
-          timestamp: new Date().toISOString()
-        })
-      };
+  async function sendInwardGoodsToWMS(data: any) {
+    console.log("MOCK: Sending inward goods request to WMS:", data);
+    return { inventoryId: `INV-${Date.now()}`, status: 'inward_request_received' };
+  }
 
-      await storage.createWarehouseReceipt(receiptData);
-      console.log(`Auto-generated warehouse receipt ${receiptNumber} for commodity ${commodityId}`);
-    } catch (error) {
-      console.error('Error generating warehouse receipt:', error);
-    }
+  async function requestQualityAssessment(data: any) {
+    console.log("MOCK: Requesting quality assessment from QA Tool:", data);
+    return { assessmentId: `QA-${Date.now()}`, status: 'request_sent' };
+  }
+
+  async function issueElectronicWarehouseReceipt(data: any) {
+    console.log("MOCK: Issuing eWR to Depository (Finance Management System):", data);
+    return { depositoryId: `DEP-${Date.now()}`, status: 'issued_to_depository' };
   }
 
   // Get deposit progress endpoint for tracking
@@ -3403,15 +3430,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Enhanced Authentication System - Phone/OTP, Username/Password, Social Login
+  // Mount specific routers FIRST (more specific routes should be mounted before general ones)
   app.use("/api/auth", authRouter);
+  
+  // Mount revolving credit router
+  console.log('🔍 Mounting revolving credit router directly on app');
+  app.use("/api/revolving-credit", revolvingCreditRouter);
+  console.log('✅ Revolving credit router mounted on app');
 
-  // Mount API router on /api path
+  // Commodity routes
+  apiRouter.get("/commodities", async (req: Request, res: Response) => {
+    const commodities = await storage.listCommodities();
+    res.json(commodities);
+  });
+  
+  // Mount API router on /api path (general routes)
   app.use("/api", apiRouter);
   
+  // NO 404 handler here - let it fall through to the main app 404 handler
+  
   // Handle 404 for unknown API routes - this must be last
-  app.use('/api/*', (req, res) => {
-    res.status(404).json({ message: "API endpoint not found" });
-  });
+  // TEMPORARILY DISABLED FOR DEBUGGING
+  // app.use('/api/*', (req, res) => {
+  //   res.status(404).json({ message: "API endpoint not found" });
+  // });
 
   console.log("API routes registered successfully");
   
@@ -3428,7 +3470,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       'Access-Control-Allow-Headers': 'Cache-Control'
     });
 
-    const userId = req.session.userId;
+    const userId = req.user!.userId;
     const clientId = Math.random().toString(36).substring(7);
     
     console.log(`SSE: Client ${clientId} connected for user ${userId}`);
@@ -3594,7 +3636,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             loanAmount: 6250000, // 25% of value
             lenderName: 'Punjab National Bank',
             collateralPercentage: 80,
-            verificationCode: `WR-${req.session.userId}-${Math.random().toString(16).substring(2, 11).toUpperCase()}`
+            verificationCode: `WR-${req.user!.userId}-${Math.random().toString(16).substring(2, 11).toUpperCase()}`
           })
         },
         {
@@ -3612,7 +3654,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           expiryDate: new Date(Date.now() + 5 * 30 * 24 * 60 * 60 * 1000),
           liens: JSON.stringify({
             collateralized: false,
-            verificationCode: `WR-${req.session.userId}-${Math.random().toString(16).substring(2, 11).toUpperCase()}`
+            verificationCode: `WR-${req.user!.userId}-${Math.random().toString(16).substring(2, 11).toUpperCase()}`
           })
         },
         {
@@ -3633,7 +3675,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             loanAmount: 18000000, // 80% of value
             lenderName: 'State Bank of India',
             collateralPercentage: 80,
-            verificationCode: `WR-${req.session.userId}-${Math.random().toString(16).substring(2, 11).toUpperCase()}`
+            verificationCode: `WR-${req.user!.userId}-${Math.random().toString(16).substring(2, 11).toUpperCase()}`
           })
         },
         {
@@ -3651,7 +3693,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           expiryDate: new Date(Date.now() + 5 * 30 * 24 * 60 * 60 * 1000),
           liens: JSON.stringify({
             collateralized: false,
-            verificationCode: `WR-${req.session.userId}-${Math.random().toString(16).substring(2, 11).toUpperCase()}`
+            verificationCode: `WR-${req.user!.userId}-${Math.random().toString(16).substring(2, 11).toUpperCase()}`
           })
         },
         {
@@ -3672,7 +3714,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             loanAmount: 4250000, // 66% of value
             lenderName: 'HDFC Bank',
             collateralPercentage: 70,
-            verificationCode: `WR-${req.session.userId}-${Math.random().toString(16).substring(2, 11).toUpperCase()}`
+            verificationCode: `WR-${req.user!.userId}-${Math.random().toString(16).substring(2, 11).toUpperCase()}`
           })
         },
         {
@@ -3690,7 +3732,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           expiryDate: new Date(Date.now() + 8 * 30 * 24 * 60 * 60 * 1000),
           liens: JSON.stringify({
             collateralized: false,
-            verificationCode: `WR-${req.session.userId}-${Math.random().toString(16).substring(2, 11).toUpperCase()}`
+            verificationCode: `WR-${req.user!.userId}-${Math.random().toString(16).substring(2, 11).toUpperCase()}`
           })
         },
         {
@@ -3711,7 +3753,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             loanAmount: 8800000, // 80% of value
             lenderName: 'ICICI Bank',
             collateralPercentage: 80,
-            verificationCode: `WR-${req.session.userId}-${Math.random().toString(16).substring(2, 11).toUpperCase()}`
+            verificationCode: `WR-${req.user!.userId}-${Math.random().toString(16).substring(2, 11).toUpperCase()}`
           })
         },
         {
@@ -3729,7 +3771,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           expiryDate: new Date(Date.now() + 6 * 30 * 24 * 60 * 60 * 1000),
           liens: JSON.stringify({
             collateralized: false,
-            verificationCode: `WR-${req.session.userId}-${Math.random().toString(16).substring(2, 11).toUpperCase()}`
+            verificationCode: `WR-${req.user!.userId}-${Math.random().toString(16).substring(2, 11).toUpperCase()}`
           })
         },
         {
@@ -3750,7 +3792,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             loanAmount: 10080000, // 80% of value
             lenderName: 'Axis Bank',
             collateralPercentage: 80,
-            verificationCode: `WR-${req.session.userId}-${Math.random().toString(16).substring(2, 11).toUpperCase()}`
+            verificationCode: `WR-${req.user!.userId}-${Math.random().toString(16).substring(2, 11).toUpperCase()}`
           })
         },
         {
@@ -3768,7 +3810,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           expiryDate: new Date(Date.now() + 12 * 30 * 24 * 60 * 60 * 1000), // Longer expiry for spices
           liens: JSON.stringify({
             collateralized: false,
-            verificationCode: `WR-${req.session.userId}-${Math.random().toString(16).substring(2, 11).toUpperCase()}`
+            verificationCode: `WR-${req.user!.userId}-${Math.random().toString(16).substring(2, 11).toUpperCase()}`
           })
         },
         {
@@ -3789,7 +3831,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             loanAmount: 3360000, // 70% of value
             lenderName: 'Bank of Baroda',
             collateralPercentage: 70,
-            verificationCode: `WR-${req.session.userId}-${Math.random().toString(16).substring(2, 11).toUpperCase()}`
+            verificationCode: `WR-${req.user!.userId}-${Math.random().toString(16).substring(2, 11).toUpperCase()}`
           })
         },
         {
@@ -3807,7 +3849,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           expiryDate: new Date(Date.now() + 7 * 30 * 24 * 60 * 60 * 1000),
           liens: JSON.stringify({
             collateralized: false,
-            verificationCode: `WR-${req.session.userId}-${Math.random().toString(16).substring(2, 11).toUpperCase()}`
+            verificationCode: `WR-${req.user!.userId}-${Math.random().toString(16).substring(2, 11).toUpperCase()}`
           })
         }
       ];
@@ -3818,7 +3860,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         try {
           const receipt = await storage.createWarehouseReceipt({
             ...receiptData,
-            ownerId: req.session.userId
+            ownerId: req.user!.userId
           });
           createdReceipts.push(receipt);
           console.log(`Created demo receipt: ${receiptData.receiptNumber} - ${receiptData.commodityName}`);
@@ -3863,7 +3905,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Verify ownership
-      if (process.userId !== req.session.userId) {
+      if (process.userId !== req.user!.userId) {
         return res.status(403).json({ message: "Unauthorized" });
       }
 
@@ -3875,7 +3917,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Broadcast update to connected clients
       if (typeof globalThis.broadcastProcessUpdate === 'function') {
-        globalThis.broadcastProcessUpdate(req.session.userId, processId, {
+        globalThis.broadcastProcessUpdate(req.user!.userId, processId, {
           currentStage: nextStage,
           message: `Stage advanced to: ${nextStage.replace('_', ' ').toUpperCase()}`,
           timestamp: new Date().toISOString()
@@ -3914,7 +3956,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Verify ownership
-      if (process.userId !== req.session.userId) {
+      if (process.userId !== req.user!.userId) {
         return res.status(403).json({ message: "Unauthorized" });
       }
 
@@ -3926,7 +3968,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Broadcast update to connected clients
       if (typeof globalThis.broadcastProcessUpdate === 'function') {
-        globalThis.broadcastProcessUpdate(req.session.userId, processId, {
+        globalThis.broadcastProcessUpdate(req.user!.userId, processId, {
           currentStage: targetStage,
           message: `Jumped to stage: ${targetStage.replace('_', ' ').toUpperCase()}`,
           timestamp: new Date().toISOString()
@@ -3965,7 +4007,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Verify ownership
-      if (process.userId !== req.session.userId) {
+      if (process.userId !== req.user!.userId) {
         return res.status(403).json({ message: "Unauthorized" });
       }
 
@@ -3978,7 +4020,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Broadcast update to connected clients
       if (typeof globalThis.broadcastProcessUpdate === 'function') {
-        globalThis.broadcastProcessUpdate(req.session.userId, processId, {
+        globalThis.broadcastProcessUpdate(req.user!.userId, processId, {
           currentStage: 'pickup_scheduled',
           message: 'Process reset to beginning',
           timestamp: new Date().toISOString()

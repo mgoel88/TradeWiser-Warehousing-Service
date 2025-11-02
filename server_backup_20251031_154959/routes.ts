@@ -1,0 +1,4082 @@
+import express, { type Express, Request, Response } from "express";
+import { createServer, type Server } from "http";
+// Removed WebSocket imports - using Server-Sent Events (SSE) instead
+import path from "path";
+import crypto from 'crypto';
+import { storage } from "./storage";
+import { warehouseService } from "./services/WarehouseService";
+import { insertUserSchema } from "@shared/schema";
+import { z } from "zod";
+import { fromZodError } from "zod-validation-error";
+import multer from "multer";
+import IntegrationMonitoringService from "./services/IntegrationMonitoringService";
+import RetryService from "./services/RetryService";
+import { webhookRateLimiter, adminRateLimiter, generalRateLimiter } from "./middleware/rateLimiter";
+import authRouter from "./routes/authJWT";
+import revolvingCreditRouter from "./routes/revolvingCreditJWT";
+import { verifyPassword } from './auth';
+import 'express-session';
+import session from 'express-session';
+
+declare module 'express-session' {
+  interface SessionData {
+    userId: number;
+  }
+}
+
+export async function registerRoutes(app: Express): Promise<Server> {
+  const apiRouter = express.Router();
+  
+  // Session middleware is now configured in index.ts
+  // Initialize monitoring and retry services
+  const monitoringService = new IntegrationMonitoringService();
+  const retryService = new RetryService();
+  
+  console.log("Registering API routes...");
+
+  // Session validation middleware
+  const requireAuth = (req: Request, res: Response, next: any) => {
+    console.log('🔐 [requireAuth] Session check:', {
+      sessionExists: !!req.session,
+      userId: req.session?.userId,
+      sessionID: req.sessionID,
+      cookies: req.headers.cookie
+    });
+    
+    if (!req.session?.userId) {
+      console.log('❌ [requireAuth] Authentication failed - no userId in session');
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+    
+    console.log('✅ [requireAuth] Authentication successful - userId:', req.session.userId);
+    next();
+  };
+
+  // OLD Auth routes - REPLACED with comprehensive auth system at /api/auth
+  /*
+  apiRouter.post("/auth/register", async (req: Request, res: Response) => {
+    try {
+      const userData = insertUserSchema.parse(req.body);
+      const user = await storage.createUser(userData);
+      req.session.userId = user.id;
+      const { password, ...userWithoutPassword } = user;
+      res.status(201).json(userWithoutPassword);
+    } catch (error) {
+      console.error("Registration error:", error);
+      if (error instanceof z.ZodError) {
+        const validationError = fromZodError(error);
+        res.status(400).json({ message: validationError.message });
+      } else {
+        res.status(500).json({ message: "Server error" });
+      }
+    }
+  });
+  */
+
+  /* OLD SESSION-BASED AUTH - REPLACED WITH JWT
+  apiRouter.post("/auth/login", async (req: Request, res: Response) => {
+    try {
+      console.log('=== LOGIN DEBUG ===');
+      console.log('Request body:', JSON.stringify(req.body, null, 2));
+      
+      const { username, password } = req.body;
+      console.log('Extracted credentials:', { username, password: password ? '***' : 'MISSING' });
+      
+      if (!username || !password) {
+        console.log('VALIDATION FAILED: Missing username or password');
+        return res.status(400).json({ message: "Username and password are required" });
+      }
+
+      const user = await storage.getUserByUsername(username);
+      console.log('User found:', user ? `ID: ${user.id}, Username: ${user.username}` : 'NOT FOUND');
+      
+      if (!user) {
+        console.log("Login attempt failed: Username not found");
+        return res.status(401).json({ message: "Invalid credentials" });
+      }
+
+      console.log('Password verification using secure hash comparison');
+      const isValidPassword = verifyPassword(password, user.password);
+      
+      if (!isValidPassword) {
+        console.log("Login attempt failed: Invalid password");
+        return res.status(401).json({ message: "Invalid credentials" });
+      }
+
+      req.session.userId = user.id;
+      
+      // Save the session to ensure userId is persisted - WITH ERROR HANDLING
+      try {
+        await new Promise<void>((resolve, reject) => {
+          req.session.save((err) => {
+            if (err) {
+              console.error('Session save error:', err);
+              reject(err);
+            } else {
+              console.log(`Session saved successfully for user ${user.id}, userId: ${req.session.userId}`);
+              resolve();
+            }
+          });
+        });
+        console.log('Session save completed successfully');
+      } catch (sessionError) {
+        console.error('Session save failed, continuing anyway:', sessionError);
+        // Don't fail the login if session save fails - just log it
+      }
+      
+      // Seed demo bank accounts for demo purposes
+      try {
+        await storage.seedDemoBankAccounts(user.id);
+        console.log(`Demo bank accounts seeded for user ${user.id}`);
+      } catch (error) {
+        console.error(`Failed to seed demo bank accounts for user ${user.id}:`, error);
+        // Don't fail the login if bank account seeding fails
+      }
+      
+      const { password: _, ...userWithoutPassword } = user;
+      res.status(200).json(userWithoutPassword);
+    } catch (error) {
+      console.error("Login error:", error);
+      res.status(500).json({ message: "Server error" });
+    }
+  });
+  */
+
+  /* OLD SESSION CHECK - REPLACED WITH JWT
+  apiRouter.get("/auth/session", async (req: Request, res: Response) => {
+    try {
+      if (!req.session || !req.session.userId) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+
+      const user = await storage.getUser(req.session.userId);
+      
+      if (!user) {
+        return res.status(401).json({ message: "User not found" });
+      }
+
+      // Ensure demo bank accounts are seeded for existing sessions
+      try {
+        await storage.seedDemoBankAccounts(user.id);
+      } catch (error) {
+        console.error(`Failed to seed demo bank accounts for user ${user.id}:`, error);
+        // Don't fail the session check if bank account seeding fails
+      }
+
+      const { password, ...userWithoutPassword } = user;
+      res.status(200).json(userWithoutPassword);
+    } catch (error) {
+      console.error("Session check error:", error);
+      res.status(500).json({ message: "Server error" });
+    }
+  });
+  */
+
+  /* OLD SESSION LOGOUT - REPLACED WITH JWT
+  apiRouter.post("/auth/logout", (req: Request, res: Response) => {
+    req.session.destroy((err) => {
+      if (err) {
+        console.error("Logout error:", err);
+        return res.status(500).json({ message: "Failed to logout" });
+      }
+      res.status(200).json({ message: "Logged out successfully" });
+    });
+  });
+  */
+
+  // User settings routes
+  apiRouter.get("/user/settings", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const userId = req.session!.userId as number;
+      const settings = await storage.getUserSettings(userId);
+      res.json(settings);
+    } catch (error) {
+      console.error("Error fetching user settings:", error);
+      // Return default settings if none exist
+      const defaultSettings = {
+        notifications: {
+          email: true,
+          sms: true,
+          push: true,
+          depositUpdates: true,
+          receiptGeneration: true,
+          loanAlerts: true,
+          priceAlerts: false
+        },
+        preferences: {
+          language: 'en-in',
+          currency: 'INR',
+          timezone: 'Asia/Kolkata',
+          theme: 'light',
+          dashboardLayout: 'default'
+        },
+        security: {
+          twoFactorEnabled: false,
+          sessionTimeout: 60,
+          loginNotifications: true
+        }
+      };
+      res.json(defaultSettings);
+    }
+  });
+
+  apiRouter.patch("/user/settings", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const userId = req.session!.userId as number;
+      const settingsUpdate = req.body;
+      
+      const updatedSettings = await storage.updateUserSettings(userId, settingsUpdate);
+      res.json(updatedSettings);
+    } catch (error) {
+      console.error("Error updating user settings:", error);
+      res.status(500).json({ message: "Failed to update settings" });
+    }
+  });
+
+  apiRouter.post("/user/change-password", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const userId = req.session!.userId as number;
+      const { currentPassword, newPassword } = req.body;
+
+      if (!currentPassword || !newPassword) {
+        return res.status(400).json({ message: "Current password and new password are required" });
+      }
+
+      if (newPassword.length < 8) {
+        return res.status(400).json({ message: "New password must be at least 8 characters long" });
+      }
+
+      // Get current user to verify password
+      const user = await storage.getUser(userId);
+      if (!user || user.password !== currentPassword) {
+        return res.status(400).json({ message: "Current password is incorrect" });
+      }
+
+      // Update password
+      await storage.updateUserPassword(userId, newPassword);
+      res.json({ message: "Password updated successfully" });
+    } catch (error) {
+      console.error("Error changing password:", error);
+      res.status(500).json({ message: "Failed to change password" });
+    }
+  });
+
+  // Deposit Creation Route - POST /api/deposits  
+  apiRouter.post("/deposits", requireAuth, async (req: Request, res: Response) => {
+    try {
+      console.log("=== DEPOSIT CREATION DEBUG ===");
+      console.log('User ID from session:', req.session.userId);
+      console.log('Request body:', JSON.stringify(req.body, null, 2));
+
+      const userId = req.session.userId as number;
+      const { 
+        commodityName, 
+        commodityType, 
+        quantity, 
+        measurementUnit, 
+        warehouseId, 
+        deliveryDate,
+        deliveryTime,
+        pickupAddress 
+      } = req.body;
+
+      // Validate required fields
+      if (!commodityName || !quantity || !warehouseId) {
+        return res.status(400).json({ 
+          message: "Missing required fields: commodityName, quantity, warehouseId" 
+        });
+      }
+
+      // Get warehouse details for validation
+      const warehouse = await storage.getWarehouse(warehouseId);
+      if (!warehouse) {
+        return res.status(404).json({ message: "Warehouse not found" });
+      }
+
+      // Create commodity first
+      const commodityData = {
+        name: commodityName,
+        type: commodityType || 'Grains',
+        quantity: parseFloat(quantity.toString()),
+        measurementUnit: measurementUnit || 'MT',
+        qualityParameters: {},
+        gradeAssigned: 'A',
+        ownerId: userId,
+        warehouseId: warehouseId,
+        notes: `Deposit created on ${new Date().toISOString()}`,
+        valuation: parseFloat(quantity.toString()) * 1000 * 50 // Default Rs 50/kg, 1000kg per MT
+      };
+
+      console.log('Creating commodity:', commodityData);
+      const commodity = await storage.createCommodity(commodityData);
+      console.log('Commodity created:', commodity.id);
+
+      // Create warehouse receipt
+      const receiptData = {
+        receiptNumber: `TW-${Date.now()}-${commodity.id}`,
+        commodityId: commodity.id,
+        commodityName: commodityName,
+        quantity: parseFloat(quantity.toString()),
+        measurementUnit: measurementUnit || 'MT',
+        warehouseId: warehouseId,
+        issuedDate: new Date(),
+        status: 'active' as const,
+        valuation: commodityData.valuation,
+        smartContractId: `SC-${commodity.id}-${Date.now().toString(16)}`,
+        blockchainHash: `0x${Math.random().toString(16).substr(2, 40)}`,
+        metadata: {
+          deliveryDate: deliveryDate,
+          deliveryTime: deliveryTime,
+          pickupAddress: pickupAddress,
+          channelType: 'green',
+          createdAt: new Date().toISOString()
+        }
+      };
+
+      console.log('Creating warehouse receipt:', receiptData);
+      const receipt = await storage.createWarehouseReceipt(receiptData);
+      console.log('Warehouse receipt created:', receipt.id);
+
+      res.status(201).json({
+        success: true,
+        commodity: commodity,
+        receipt: receipt,
+        message: "Deposit created successfully"
+      });
+
+    } catch (error) {
+      console.error("Deposit creation error:", error);
+      res.status(500).json({ 
+        message: "Failed to create deposit",
+        error: error instanceof Error ? error.message : String(error)
+      });
+    }
+  });
+
+  // Warehouse routes
+  apiRouter.get("/warehouses", async (req: Request, res: Response) => {
+    try {
+      console.log("GET /api/warehouses called");
+      const warehouses = await storage.listWarehouses();
+      console.log(`Found ${warehouses.length} warehouses`);
+      res.setHeader('Content-Type', 'application/json');
+      return res.json(warehouses);
+    } catch (error) {
+      console.error("Error fetching warehouses:", error);
+      res.setHeader('Content-Type', 'application/json');
+      return res.status(500).json({ message: "Failed to fetch warehouses" });
+    }
+  });
+
+  // Intelligent warehouse selection endpoint with ranking algorithm
+  apiRouter.get("/warehouses/nearby", async (req: Request, res: Response) => {
+    try {
+      const { lat, lng, commodity, quantity, limit } = req.query;
+      
+      if (!lat || !lng) {
+        return res.status(400).json({ message: "Latitude and longitude are required" });
+      }
+      
+      const latitude = parseFloat(lat as string);
+      const longitude = parseFloat(lng as string);
+      const commodityType = (commodity as string) || "";
+      const requiredQuantity = parseFloat((quantity as string) || "0");
+      const maxResults = parseInt((limit as string) || "10");
+      
+      if (isNaN(latitude) || isNaN(longitude)) {
+        return res.status(400).json({ message: "Invalid latitude or longitude" });
+      }
+      
+      console.log(`Intelligent warehouse selection: lat=${latitude}, lng=${longitude}, commodity=${commodityType}, quantity=${requiredQuantity}`);
+      
+      // Use the new intelligent ranking algorithm
+      const rankedWarehouses = warehouseService.getRankedWarehouses(
+        latitude,
+        longitude,
+        commodityType,
+        requiredQuantity,
+        maxResults
+      );
+      
+      // Format response with ranking details
+      const response = rankedWarehouses.map(item => ({
+        ...item.warehouse,
+        distance: Math.round(item.distance * 10) / 10,
+        score: Math.round(item.score * 10) / 10,
+        proximityScore: Math.round(item.proximityScore * 10) / 10,
+        availabilityScore: Math.round(item.availabilityScore * 10) / 10,
+        qualityScore: Math.round(item.qualityScore * 10) / 10
+      }));
+      
+      console.log(`Found and ranked ${response.length} warehouses`);
+      res.json(response);
+    } catch (error) {
+      console.error("Error fetching nearby warehouses:", error);
+      res.status(500).json({ message: "Failed to fetch nearby warehouses" });
+    }
+  });
+
+  apiRouter.get("/warehouses/:id", async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id);
+      const warehouse = await storage.getWarehouse(id);
+      
+      if (!warehouse) {
+        return res.status(404).json({ message: "Warehouse not found" });
+      }
+      
+      res.json(warehouse);
+    } catch (error) {
+      console.error("Error fetching warehouse:", error);
+      res.status(500).json({ message: "Failed to fetch warehouse" });
+    }
+  });
+
+  // Enhanced warehouse query endpoints - fix route ordering
+  apiRouter.get("/warehouses/by-state/:state", async (req: Request, res: Response) => {
+    try {
+      const state = decodeURIComponent(req.params.state);
+      console.log(`Fetching warehouses for state: ${state}`);
+      const warehouses = await storage.getWarehousesByState(state);
+      console.log(`Found ${warehouses.length} warehouses in ${state}`);
+      res.json(warehouses);
+    } catch (error) {
+      console.error("Error fetching warehouses by state:", error);
+      res.status(500).json({ message: "Failed to fetch warehouses by state", error: error instanceof Error ? error.message : String(error) });
+    }
+  });
+
+  apiRouter.get("/warehouses/by-district/:district", async (req: Request, res: Response) => {
+    try {
+      const district = req.params.district;
+      const warehouses = await storage.getWarehousesByDistrict(district);
+      res.json(warehouses);
+    } catch (error) {
+      console.error("Error fetching warehouses by district:", error);
+      res.status(500).json({ message: "Failed to fetch warehouses by district" });
+    }
+  });
+
+  apiRouter.get("/warehouses/by-commodity/:commodity", async (req: Request, res: Response) => {
+    try {
+      const commodity = req.params.commodity;
+      const warehouses = await storage.getWarehousesByCommodity(commodity);
+      res.json(warehouses);
+    } catch (error) {
+      console.error("Error fetching warehouses by commodity:", error);
+      res.status(500).json({ message: "Failed to fetch warehouses by commodity" });
+    }
+  });
+
+  // Seed mandi warehouses endpoint
+  apiRouter.post("/warehouses/seed-mandi-data", async (req: Request, res: Response) => {
+    try {
+      // Clear existing warehouses first (optional, can be removed if needed)
+      const seededCount = await storage.seedMandiWarehouses();
+      res.json({ 
+        message: `Successfully seeded ${seededCount} mandi-based warehouses`,
+        count: seededCount 
+      });
+    } catch (error) {
+      console.error("Error seeding mandi warehouses:", error);
+      res.status(500).json({ message: "Failed to seed mandi warehouses" });
+    }
+  });
+
+  // Commodity routes
+  apiRouter.get("/commodities", async (req: Request, res: Response) => {
+    try {
+      if (!req.session?.userId) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+      
+      const commodities = await storage.listCommoditiesByOwner(req.session.userId);
+      res.setHeader('Content-Type', 'application/json');
+      res.json(commodities);
+    } catch (error) {
+      console.error("Error fetching commodities:", error);
+      res.setHeader('Content-Type', 'application/json');
+      res.status(500).json({ message: "Failed to fetch commodities" });
+    }
+  });
+
+  // Get individual commodity
+  apiRouter.get("/commodities/:id", async (req: Request, res: Response) => {
+    try {
+      if (!req.session?.userId) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+      
+      const id = parseInt(req.params.id);
+      const commodity = await storage.getCommodity(id);
+      
+      if (!commodity) {
+        return res.status(404).json({ message: "Commodity not found" });
+      }
+      
+      // Verify ownership
+      if (commodity.ownerId !== req.session.userId) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      
+      res.setHeader('Content-Type', 'application/json');
+      res.json(commodity);
+    } catch (error) {
+      console.error("Error fetching commodity:", error);
+      res.setHeader('Content-Type', 'application/json');
+      res.status(500).json({ message: "Failed to fetch commodity" });
+    }
+  });
+
+  // Create new commodity
+  apiRouter.post("/commodities", async (req: Request, res: Response) => {
+    try {
+      if (!req.session?.userId) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+
+      console.log("Creating new commodity:", req.body);
+      
+      const {
+        name,
+        type,
+        quantity,
+        measurementUnit,
+        qualityParameters,
+        gradeAssigned,
+        warehouseId,
+        notes,
+        valuation
+      } = req.body;
+
+      // Validate required fields
+      if (!name || !type || !quantity || !warehouseId) {
+        return res.status(400).json({
+          message: "Missing required fields: name, type, quantity, warehouseId"
+        });
+      }
+
+      const commodityData = {
+        name,
+        type,
+        quantity: quantity.toString(),
+        measurementUnit: measurementUnit || "MT",
+        qualityParameters: qualityParameters || {},
+        gradeAssigned: gradeAssigned || "pending",
+        warehouseId: parseInt(warehouseId),
+        ownerId: req.session.userId,
+        status: "active" as const,
+        channelType: "green" as const,
+        valuation: valuation?.toString() || (parseFloat(quantity) * 1000 * 50).toString() // Rs 50 per kg default (MT to kg conversion)
+      };
+
+      const commodity = await storage.createCommodity(commodityData);
+      
+      console.log("Commodity created:", commodity.id);
+      
+      res.setHeader('Content-Type', 'application/json');
+      res.status(201).json(commodity);
+    } catch (error) {
+      console.error("Error creating commodity:", error);
+      res.setHeader('Content-Type', 'application/json');
+      res.status(500).json({ message: "Failed to create commodity" });
+    }
+  });
+
+  // Configure multer for file uploads
+  const upload = multer({
+    dest: 'uploads/', 
+    limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit
+    fileFilter: (req, file, cb) => {
+      const allowedExtensions = /\.(jpeg|jpg|png|pdf|csv|xlsx|xls)$/i;
+      const allowedMimes = /image\/(jpeg|jpg|png)|application\/(pdf|vnd\.ms-excel|vnd\.openxmlformats-officedocument\.spreadsheetml\.sheet|octet-stream)|text\/csv/;
+      
+      const fileType = allowedExtensions.test(file.originalname.toLowerCase());
+      const mimeType = allowedMimes.test(file.mimetype);
+      
+      // For CSV files with generic MIME type, rely more on extension
+      if ((fileType && file.originalname.toLowerCase().endsWith('.csv')) || (mimeType && fileType)) {
+        return cb(null, true);
+      } else {
+        console.log("File rejected:", {filename: file.originalname, mimetype: file.mimetype});
+        cb(new Error('Only image, PDF, CSV, and Excel files are allowed'));
+      }
+    }
+  });
+
+  // Receipt routes
+  apiRouter.get("/receipts", async (req: Request, res: Response) => {
+    try {
+      console.log('📋 [/receipts] Session check:', {
+        sessionExists: !!req.session,
+        sessionID: req.sessionID,
+        userId: req.session?.userId,
+        sessionData: JSON.stringify(req.session),
+        cookies: req.headers.cookie
+      });
+      
+      if (!req.session?.userId) {
+        console.log('❌ [/receipts] No userId in session - authentication failed');
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+      
+      console.log('✅ [/receipts] Authentication successful - userId:', req.session.userId);
+      
+      const receipts = await storage.listWarehouseReceiptsByOwner(req.session.userId);
+
+      // Enhance receipts with commodity and warehouse data
+      const enhancedReceipts = await Promise.all(receipts.map(async (receipt) => {
+        // Get the liens field as a properly typed object
+        const liens: Record<string, any> = typeof receipt.liens === 'object' && receipt.liens !== null 
+          ? (receipt.liens as any) 
+          : {};
+
+        // Get related entities
+        let commodity = null;
+        let warehouse = null;
+
+        if (receipt.commodityId) {
+          try {
+            commodity = await storage.getCommodity(receipt.commodityId);
+          } catch (error) {
+            console.log("Could not find commodity with ID:", receipt.commodityId);
+          }
+        }
+
+        if (receipt.warehouseId) {
+          try {
+            warehouse = await storage.getWarehouse(receipt.warehouseId);
+          } catch (error) {
+            console.log("Could not find warehouse with ID:", receipt.warehouseId);
+          }
+        }
+
+        // Return an enhanced receipt with client-expected fields
+        return {
+          ...receipt,
+          // Add fields that the client might expect, sourced from liens and related entities
+          commodityName: commodity ? commodity.name : receipt.commodityName || liens.commodityName || 'Unknown Commodity',
+          qualityGrade: liens.qualityGrade || 'Standard',
+          warehouseName: warehouse ? warehouse.name : receipt.warehouseName || liens.warehouseName || 'Unknown Warehouse',
+          warehouseAddress: warehouse ? warehouse.address : liens.warehouseAddress || 'Unknown Address',
+          // Add a metadata field for compatibility with client code
+          metadata: {
+            verificationCode: liens.verificationCode || '',
+            processId: liens.processId || 0,
+            depositDate: liens.depositDate || receipt.issuedDate,
+            expiryDate: liens.expiryDate || receipt.expiryDate
+          }
+        };
+      }));
+
+      res.setHeader('Content-Type', 'application/json');
+      res.json(enhancedReceipts);
+    } catch (error) {
+      console.error("Error fetching receipts:", error);
+      res.setHeader('Content-Type', 'application/json');
+      res.status(500).json({ message: "Failed to fetch receipts" });
+    }
+  });
+
+  // Import external warehouse receipt via file upload (Orange Channel)
+  apiRouter.post("/receipts/upload", requireAuth, upload.single('file'), async (req: Request, res: Response) => {
+    try {
+      console.log("Processing external receipt upload...");
+      
+      if (!req.file) {
+        return res.status(400).json({ message: "No file uploaded" });
+      }
+
+      const userId = req.session!.userId;
+      
+      // For demo purposes, we'll simulate document parsing and create an external receipt
+      // In production, this would involve OCR, PDF parsing, etc.
+      
+      const mockParsedData = {
+        receiptNumber: `EXT-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+        externalSource: req.file.originalname.split('.')[0] || 'external_warehouse',
+        commodityName: 'wheat', // Would be extracted from document
+        quantity: '50', // Would be extracted from document  
+        measurementUnit: 'MT',
+        warehouseId: 1, // Default external warehouse
+        status: 'active' as const,
+        channelType: 'orange' as const, // Orange channel for external imports
+        valuation: '125000', // Would be calculated based on extracted data
+        issuedDate: new Date(),
+        expiryDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000), // 1 year from now
+        blockchainHash: `0x${Math.random().toString(16).substring(2, 18)}`,
+        liens: {
+          externalImport: true,
+          originalWarehouse: req.file.originalname.split('.')[0],
+          uploadedFile: req.file.filename,
+          verificationStatus: 'pending_verification'
+        }
+      };
+
+      // Create the warehouse receipt
+      const receipt = await storage.createWarehouseReceipt({
+        receiptNumber: mockParsedData.receiptNumber,
+        commodityId: null, // No commodity for external imports initially
+        warehouseId: mockParsedData.warehouseId,
+        ownerId: userId,
+        quantity: mockParsedData.quantity,
+        measurementUnit: mockParsedData.measurementUnit,
+        status: mockParsedData.status,
+        blockchainHash: mockParsedData.blockchainHash,
+        valuation: mockParsedData.valuation,
+        externalId: mockParsedData.receiptNumber,
+        externalSource: mockParsedData.externalSource,
+        commodityName: mockParsedData.commodityName,
+        warehouseName: `External-${mockParsedData.externalSource}`,
+        attachmentUrl: req.file.path,
+        metadata: JSON.stringify({
+          type: 'external_receipt',
+          originalFilename: req.file.originalname,
+          uploadedFilename: req.file.filename,
+          uploadPath: req.file.path,
+          timestamp: new Date().toISOString(),
+          insuranceCoverage: (parseFloat(mockParsedData.valuation) * 0.6).toString(),
+          issuedDate: mockParsedData.issuedDate,
+          expiryDate: mockParsedData.expiryDate
+        }),
+        liens: JSON.stringify(mockParsedData.liens)
+      });
+
+      console.log("External receipt imported:", receipt.id);
+      
+      res.setHeader('Content-Type', 'application/json');
+      res.status(201).json({
+        success: true,
+        receipt: receipt,
+        message: 'External warehouse receipt successfully imported via Orange Channel',
+        extractedData: mockParsedData,
+        verificationStatus: 'pending_verification'
+      });
+
+    } catch (error) {
+      console.error("Error importing external receipt:", error);
+      res.setHeader('Content-Type', 'application/json');
+      res.status(500).json({ 
+        message: "Failed to import external receipt",
+        error: error instanceof Error ? error.message : "Unknown error"
+      });
+    }
+  });
+
+  // Query external receipts (Orange Channel)
+  apiRouter.get("/receipts/external", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const userId = req.session!.userId as number;
+      
+      // Get all warehouse receipts for orange channel (external imports)
+      const allReceipts = await storage.listWarehouseReceiptsByOwner(userId);
+      const externalReceipts = allReceipts.filter(receipt => 
+        receipt.externalSource || 
+        (receipt.metadata && typeof receipt.metadata === 'string' && receipt.metadata.includes('external_receipt'))
+      );
+      
+      res.setHeader('Content-Type', 'application/json');
+      res.json(externalReceipts);
+    } catch (error) {
+      console.error("Error fetching external receipts:", error);
+      res.setHeader('Content-Type', 'application/json');
+      res.status(500).json({ message: "Failed to fetch external receipts" });
+    }
+  });
+
+  // Query disputed receipts (Red Channel)
+  apiRouter.get("/receipts/disputed", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const userId = req.session!.userId;
+      
+      // For now, return mock disputed receipts data since we don't have a disputes table
+      // In production, this would query a disputes table with foreign key to receipts
+      const mockDisputed = [
+        {
+          id: 1,
+          receiptNumber: 'WR577619-1',
+          commodityName: 'Wheat',
+          quantity: '25.5',
+          valuation: '637500',
+          disputeReason: 'Quality parameters do not match expected standards',
+          disputeType: 'quality',
+          status: 'under_review',
+          priority: 'high',
+          createdAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
+          resolutionNote: null
+        },
+        {
+          id: 2,
+          receiptNumber: 'EXT-1757324-456',
+          commodityName: 'Rice',
+          quantity: '15.0',
+          valuation: '375000',
+          disputeReason: 'Quantity discrepancy found during verification',
+          disputeType: 'quantity',
+          status: 'resolved',
+          priority: 'medium',
+          createdAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
+          resolvedAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(),
+          resolutionNote: 'Discrepancy resolved through re-weighing. Quantity confirmed accurate.'
+        }
+      ];
+      
+      res.setHeader('Content-Type', 'application/json');
+      res.json(mockDisputed);
+    } catch (error) {
+      console.error("Error fetching disputed receipts:", error);
+      res.setHeader('Content-Type', 'application/json');
+      res.status(500).json({ message: "Failed to fetch disputed receipts" });
+    }
+  });
+
+  // Submit new dispute (Red Channel)
+  apiRouter.post("/receipts/dispute", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const userId = req.session!.userId;
+      const { receiptNumber, disputeType, priority, description, evidence } = req.body;
+      
+      if (!receiptNumber || !disputeType || !description) {
+        return res.status(400).json({ message: "Receipt number, dispute type, and description are required" });
+      }
+      
+      // For demo purposes, we'll simulate creating a dispute
+      // In production, this would create entries in a disputes table
+      const dispute = {
+        id: Date.now(),
+        receiptNumber,
+        disputeType,
+        priority: priority || 'medium',
+        disputeReason: description,
+        evidence: evidence || null,
+        status: 'disputed',
+        createdAt: new Date().toISOString(),
+        userId
+      };
+      
+      console.log("Dispute filed:", dispute);
+      
+      res.setHeader('Content-Type', 'application/json');
+      res.status(201).json({
+        success: true,
+        dispute,
+        message: 'Dispute filed successfully and sent to Red Channel for review'
+      });
+    } catch (error) {
+      console.error("Error filing dispute:", error);
+      res.setHeader('Content-Type', 'application/json');
+      res.status(500).json({ message: "Failed to file dispute" });
+    }
+  });
+
+  // Loans routes
+  apiRouter.get("/loans", async (req: Request, res: Response) => {
+    try {
+      if (!req.session?.userId) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+      
+      const loans = await storage.listLoansByUser(req.session.userId);
+      res.setHeader('Content-Type', 'application/json');
+      res.json(loans);
+    } catch (error) {
+      console.error("Error fetching loans:", error);
+      res.setHeader('Content-Type', 'application/json');
+      res.status(500).json({ message: "Failed to fetch loans" });
+    }
+  });
+
+
+  // Process routes (for deposits and workflows)
+  apiRouter.get("/processes", async (req: Request, res: Response) => {
+    try {
+      if (!req.session?.userId) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+      
+      const processes = await storage.listProcessesByUser(req.session.userId);
+      res.setHeader('Content-Type', 'application/json');
+      res.json(processes);
+    } catch (error) {
+      console.error("Error fetching processes:", error);
+      res.setHeader('Content-Type', 'application/json');
+      res.status(500).json({ message: "Failed to fetch processes" });
+    }
+  });
+
+  apiRouter.get("/processes/:id", async (req: Request, res: Response) => {
+    try {
+      if (!req.session?.userId) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+      
+      const id = parseInt(req.params.id);
+      const process = await storage.getProcess(id);
+      
+      if (!process) {
+        return res.status(404).json({ message: "Process not found" });
+      }
+      
+      res.setHeader('Content-Type', 'application/json');
+      res.json(process);
+    } catch (error) {
+      console.error("Error fetching process:", error);
+      res.setHeader('Content-Type', 'application/json');
+      res.status(500).json({ message: "Failed to fetch process" });
+    }
+  });
+
+  // Update process status
+  apiRouter.patch("/processes/:id", async (req: Request, res: Response) => {
+    try {
+      if (!req.session?.userId) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+      
+      const id = parseInt(req.params.id);
+      const process = await storage.getProcess(id);
+      
+      if (!process) {
+        return res.status(404).json({ message: "Process not found" });
+      }
+      
+      // Verify ownership
+      if (process.userId !== req.session.userId) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      
+      console.log("Updating process:", id, req.body);
+      
+      const updatedProcess = await storage.updateProcess(id, req.body);
+      
+      res.setHeader('Content-Type', 'application/json');
+      res.json(updatedProcess);
+    } catch (error) {
+      console.error("Error updating process:", error);
+      res.setHeader('Content-Type', 'application/json');
+      res.status(500).json({ message: "Failed to update process" });
+    }
+  });
+
+  // Create warehouse receipts
+  apiRouter.post("/receipts", async (req: Request, res: Response) => {
+    try {
+      if (!req.session?.userId) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+
+      console.log("Creating warehouse receipt:", req.body);
+      
+      // FIXED: Ensure valuation defaults to Rs 50/kg if not provided (1 MT = 1000 kg)
+      const { quantity, valuation, ...rest } = req.body;
+      const calculatedValuation = (valuation && parseFloat(valuation) > 0) 
+        ? valuation 
+        : (parseFloat(quantity) * 1000 * 50).toString();
+      
+      const receiptData = {
+        ...rest,
+        quantity,
+        valuation: calculatedValuation,
+        ownerId: req.session.userId,
+        receiptNumber: `WR${Date.now()}-${req.session.userId}`,
+        blockchainHash: `198324${Math.random().toString(16).substring(2, 18)}`,
+        expiryDate: new Date(Date.now() + 6 * 30 * 24 * 60 * 60 * 1000), // 6 months from now
+        liens: JSON.stringify({
+          verificationCode: `WR-${req.session.userId}-${Math.random().toString(16).substring(2, 11).toUpperCase()}-${Math.random().toString(16).substring(2, 6).toUpperCase()}`,
+          processId: rest.processId || 0,
+          commodityName: rest.commodityName || "Unknown",
+          qualityGrade: "Grade A",
+          qualityParameters: {
+            moisture: "0.0%",
+            foreignMatter: "0.0%", 
+            brokenGrains: "0.0%"
+          }
+        }),
+        createdAt: new Date(),
+        updatedAt: new Date()
+      };
+
+      const receipt = await storage.createWarehouseReceipt(receiptData);
+      
+      console.log("Warehouse receipt created:", receipt.id);
+      
+      res.setHeader('Content-Type', 'application/json');
+      res.status(201).json(receipt);
+    } catch (error) {
+      console.error("Error creating warehouse receipt:", error);
+      res.setHeader('Content-Type', 'application/json');
+      res.status(500).json({ message: "Failed to create warehouse receipt" });
+    }
+  });
+
+  apiRouter.post("/processes", async (req: Request, res: Response) => {
+    try {
+      if (!req.session?.userId) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+
+      console.log("Creating new deposit process:", req.body);
+      
+      const { 
+        type,
+        commodityName,
+        commodityType,
+        quantity,
+        warehouseId,
+        deliveryMethod,
+        scheduledDate,
+        scheduledTime,
+        pickupAddress,
+        estimatedValue 
+      } = req.body;
+
+      // Validate required fields
+      if (!commodityName || !commodityType || !quantity || !warehouseId) {
+        return res.status(400).json({ 
+          message: "Missing required fields: commodityName, commodityType, quantity, warehouseId" 
+        });
+      }
+
+      // First create the commodity record
+      const commodity = await storage.createCommodity({
+        name: commodityName,
+        type: commodityType,
+        quantity: quantity.toString(),
+        measurementUnit: "MT",
+        qualityParameters: {},
+        gradeAssigned: "pending",
+        warehouseId: parseInt(warehouseId),
+        ownerId: req.session.userId,
+        status: "active",
+        channelType: "green",
+        valuation: estimatedValue?.toString() || (parseFloat(quantity) * 1000 * 50).toString()
+      });
+
+      // Then create the process
+      const processData = {
+        processType: type || "deposit",
+        userId: req.session.userId,
+        commodityId: commodity.id,
+        warehouseId: parseInt(warehouseId),
+        status: "in_progress" as const,
+        currentStage: "pickup_scheduled",
+        progress: 10,
+        estimatedCompletion: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days from now
+        metadata: {
+          deliveryMethod,
+          scheduledDate,
+          scheduledTime,
+          pickupAddress,
+          estimatedValue
+        }
+      };
+
+      const process = await storage.createProcess(processData);
+      
+      console.log("Created process:", process.id);
+
+      // --- WMS Integration (Initial Inward Goods Request) ---
+      try {
+        const wmsResponse = await sendInwardGoodsToWMS({
+          processId: process.id,
+          commodityName: commodity.name,
+          quantity: parseFloat(commodity.quantity),
+          warehouseId: commodity.warehouseId,
+          userId: commodity.ownerId
+        });
+        console.log("WMS response:", wmsResponse);
+        // Update process with initial WMS inventory ID
+        await storage.updateProcess(process.id, {
+          wmsInventoryId: wmsResponse.inventoryId
+        });
+      } catch (error) {
+        console.warn('Failed to send initial inward goods request to WMS:', error);
+        // Log error and potentially trigger retry
+        monitoringService.logIntegrationError('WMS', process.id, 'Error sending initial inward goods', error.message);
+      }
+
+      // --- QA Tool Integration (Initial Assessment Request) ---
+      try {
+        const qaResponse = await requestQualityAssessment({
+          processId: process.id,
+          commodityName: commodity.name,
+          quantity: parseFloat(commodity.quantity),
+          warehouseId: commodity.warehouseId,
+          userId: commodity.ownerId
+        });
+        console.log("QA response:", qaResponse);
+        // Update process with initial QA Assessment ID
+        await storage.updateProcess(process.id, {
+          qaAssessmentId: qaResponse.assessmentId
+        });
+      } catch (error) {
+        console.warn('Failed to request quality testing:', error);
+        monitoringService.logIntegrationError('QA', process.id, 'Error requesting assessment', error.message);
+      }
+      
+      // IMMEDIATE WAREHOUSE RECEIPT CREATION: This logic is being removed as it prematurely creates a receipt.
+      // The logic for immediate warehouse receipt creation has been removed.
+      // This is now handled by the progressToNextStage function when the process reaches the 'receipt_generated' stage.
+
+      // AUTO-START TRACKING: Immediately start progression after process creation  
+      setTimeout(() => progressToNextStage(process.id), 5000); // 5 seconds for demo to start pickup scheduling
+      
+      res.setHeader('Content-Type', 'application/json');
+      res.status(201).json(process);
+    } catch (error) {
+      console.error("Error creating process:", error);
+      res.setHeader('Content-Type', 'application/json');
+      res.status(500).json({ message: "Failed to create deposit process" });
+    }
+  });
+
+  // Bypass demo routes for quality assessment and pricing when external services unavailable
+  
+  // Mock quality assessment results based on commodity type
+  const generateMockQualityResults = (commodityType: string) => {
+    const baseResults: Record<string, any> = {
+      cereals: {
+        moisture: 12.5,
+        foreignMatter: 1.2,
+        brokenGrains: 2.8,
+        weeviled: 0.5,
+        grade: 'A',
+        score: 87
+      },
+      pulses: {
+        moisture: 10.2,
+        foreignMatter: 0.8,
+        damaged: 1.5,
+        weeviled: 0.3,
+        grade: 'A',
+        score: 89
+      },
+      oilseeds: {
+        moisture: 8.5,
+        foreignMatter: 1.1,
+        oilContent: 42.3,
+        freefattyAcid: 1.2,
+        grade: 'A',
+        score: 85
+      },
+      vegetables: {
+        moisture: 85.2,
+        freshness: 92,
+        damage: 3.5,
+        pesticide: 0.1,
+        grade: 'A',
+        score: 88
+      }
+    };
+    
+    return baseResults[commodityType.toLowerCase()] || baseResults.vegetables;
+  };
+  
+  // Mock pricing calculation based on quality results
+  const calculateMockPricing = (commodity: any, qualityResults: any) => {
+    const baseRates: Record<string, number> = {
+      cereals: 2500,
+      pulses: 4500,
+      oilseeds: 3200,
+      vegetables: 1800,
+      spices: 8500
+    };
+    
+    const baseRate = baseRates[commodity.type.toLowerCase()] || 2000;
+    const qualityMultiplier = qualityResults.score / 100;
+    const marketRate = baseRate * qualityMultiplier;
+    
+    return {
+      baseRate,
+      qualityScore: qualityResults.score,
+      qualityMultiplier: qualityMultiplier.toFixed(2),
+      marketRate: Math.round(marketRate),
+      totalValue: Math.round(marketRate * parseFloat(commodity.quantity)),
+      currency: 'INR',
+      pricePerUnit: 'MT'
+    };
+  };
+
+  // Bypass route: Quality assessment (alias for complete-assessment)
+  apiRouter.post("/bypass/quality-assessment/:processId", async (req: Request, res: Response) => {
+    try {
+      if (!req.session?.userId) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+
+      const processId = parseInt(req.params.processId);
+      const process = await storage.getProcess(processId);
+      
+      if (!process) {
+        return res.status(404).json({ message: "Process not found" });
+      }
+
+      // Get commodity details
+      const commodity = await storage.getCommodity(process.commodityId!);
+      if (!commodity) {
+        return res.status(404).json({ message: "Commodity not found" });
+      }
+
+      // Generate mock quality assessment results
+      const qualityResults = generateMockQualityResults(commodity.type);
+      
+      // Calculate mock pricing
+      const pricingData = calculateMockPricing(commodity, qualityResults);
+      
+      // Update commodity with quality and pricing data
+      await storage.updateCommodity(commodity.id, {
+        qualityParameters: qualityResults,
+        gradeAssigned: qualityResults.grade,
+        valuation: pricingData.totalValue.toString(),
+        status: "processing"
+      });
+
+      // Update process to final stages
+      const updatedProcess = await storage.updateProcess(processId, {
+        status: "in_progress" as const,
+        currentStage: "ewr_generation",
+        stageProgress: {
+          pickup_scheduled: 'completed',
+          arrived_at_warehouse: 'completed',
+          weighing_complete: 'completed',
+          moisture_analysis: 'completed',
+          visual_ai_scan: 'completed',
+          qa_assessment_complete: 'completed',
+          pricing_calculated: 'completed',
+          ewr_generation: 'in_progress'
+        }
+      });
+
+      console.log(`Completed bypass assessment for process ${processId}`);
+      
+      res.setHeader('Content-Type', 'application/json');
+      res.json({
+        processId,
+        status: 'completed',
+        qualityAssessment: qualityResults,
+        pricing: pricingData,
+        process: updatedProcess,
+        message: 'Quality assessment and pricing completed using bypass demo service'
+      });
+
+    } catch (error) {
+      console.error("Error in bypass assessment:", error);
+      res.setHeader('Content-Type', 'application/json');
+      res.status(500).json({ message: "Failed to complete bypass assessment" });
+    }
+  });
+
+  // Bypass route: Complete quality assessment and pricing flow (legacy alias)
+  apiRouter.post("/bypass/complete-assessment/:processId", async (req: Request, res: Response) => {
+    try {
+      if (!req.session?.userId) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+
+      const processId = parseInt(req.params.processId);
+      const process = await storage.getProcess(processId);
+      
+      if (!process) {
+        return res.status(404).json({ message: "Process not found" });
+      }
+
+      // Get commodity details
+      const commodity = await storage.getCommodity(process.commodityId!);
+      if (!commodity) {
+        return res.status(404).json({ message: "Commodity not found" });
+      }
+
+      // Generate mock quality assessment results
+      const qualityResults = generateMockQualityResults(commodity.type);
+      
+      // Calculate mock pricing
+      const pricingData = calculateMockPricing(commodity, qualityResults);
+      
+      // Update commodity with quality and pricing data
+      await storage.updateCommodity(commodity.id, {
+        qualityParameters: qualityResults,
+        gradeAssigned: qualityResults.grade,
+        valuation: pricingData.totalValue.toString(),
+        status: "processing"
+      });
+
+      // Update process to final stages
+      const updatedProcess = await storage.updateProcess(processId, {
+        status: "in_progress" as const,
+        currentStage: "ewr_generation",
+        stageProgress: {
+          pickup_scheduled: 'completed',
+          arrived_at_warehouse: 'completed',
+          weighing_complete: 'completed',
+          moisture_analysis: 'completed',
+          visual_ai_scan: 'completed',
+          qa_assessment_complete: 'completed',
+          pricing_calculated: 'completed',
+          ewr_generation: 'in_progress'
+        }
+      });
+
+      console.log(`Completed bypass assessment for process ${processId}`);
+      
+      res.setHeader('Content-Type', 'application/json');
+      res.json({
+        processId,
+        status: 'completed',
+        qualityAssessment: qualityResults,
+        pricing: pricingData,
+        process: updatedProcess,
+        message: 'Quality assessment and pricing completed using bypass demo service'
+      });
+
+    } catch (error) {
+      console.error("Error in bypass assessment:", error);
+      res.setHeader('Content-Type', 'application/json');
+      res.status(500).json({ message: "Failed to complete bypass assessment" });
+    }
+  });
+
+  // Generate Electronic Warehouse Receipt (eWR)
+  apiRouter.post("/bypass/generate-ewr/:processId", async (req: Request, res: Response) => {
+    try {
+      if (!req.session?.userId) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+
+      const processId = parseInt(req.params.processId);
+      const process = await storage.getProcess(processId);
+      
+      if (!process) {
+        return res.status(404).json({ message: "Process not found" });
+      }
+
+      const commodity = await storage.getCommodity(process.commodityId!);
+      const warehouse = await storage.getWarehouse(process.warehouseId!);
+      
+      if (!commodity || !warehouse) {
+        return res.status(404).json({ message: "Commodity or warehouse not found" });
+      }
+
+      // Generate unique receipt number
+      const receiptNumber = `eWR-${Date.now()}-${process.commodityId}`;
+      
+      // FIXED: Ensure proper valuation calculation (1 MT = 1000 kg × Rs 50/kg)
+      const calculatedValuation = commodity.valuation && parseFloat(commodity.valuation) > 0 
+        ? commodity.valuation 
+        : (parseFloat(commodity.quantity) * 1000 * 50).toString();
+
+      // Create warehouse receipt
+      const receipt = await storage.createWarehouseReceipt({
+        receiptNumber,
+        commodityId: commodity.id,
+        warehouseId: warehouse.id,
+        ownerId: req.session.userId,
+        quantity: commodity.quantity,
+        measurementUnit: commodity.measurementUnit,
+        status: "active",
+        blockchainHash: `0x${Math.random().toString(16).substring(2, 18)}`,
+        valuation: calculatedValuation,
+        warehouseName: warehouse.name,
+        metadata: JSON.stringify({
+          type: 'quality_certificate',
+          url: `/documents/quality_cert_${receiptNumber}.pdf`,
+          timestamp: new Date().toISOString(),
+          storageLocation: `${warehouse.name}-${Math.floor(Math.random() * 100)}`,
+          insuranceCoverage: (parseFloat(commodity.valuation || (parseFloat(commodity.quantity) * 1000 * 50).toString()) * 0.8).toString()
+        })
+      });
+
+      // Complete the process
+      await storage.updateProcess(processId, {
+        status: "completed" as const,
+        currentStage: "ewr_generated",
+        stageProgress: {
+          pickup_scheduled: 'completed',
+          arrived_at_warehouse: 'completed',
+          weighing_complete: 'completed',
+          moisture_analysis: 'completed',
+          visual_ai_scan: 'completed',
+          qa_assessment_complete: 'completed',
+          pricing_calculated: 'completed',
+          ewr_generation: 'completed'
+        }
+      });
+
+      console.log(`Generated eWR ${receiptNumber} for process ${processId}`);
+
+      res.setHeader('Content-Type', 'application/json');
+      res.json({
+        receipt,
+        process: await storage.getProcess(processId),
+        message: 'Electronic Warehouse Receipt generated successfully'
+      });
+
+    } catch (error) {
+      console.error("Error generating eWR:", error);
+      res.setHeader('Content-Type', 'application/json');
+      res.status(500).json({ message: "Failed to generate electronic warehouse receipt" });
+    }
+  });
+
+  // Webhook authentication middleware
+  const authenticateWebhook = (req: Request, res: Response, next: Function) => {
+    const apiKey = req.headers['x-api-key'];
+    const expectedKeys = (process.env.WEBHOOK_API_KEYS || 'warehouse-key-123,quality-key-456').split(',');
+    
+    if (!apiKey || !expectedKeys.includes(apiKey as string)) {
+      return res.status(401).json({ message: 'Invalid or missing API key' });
+    }
+    
+    // Verify request signature if present
+    const signature = req.headers['x-signature'];
+    const timestamp = req.headers['x-timestamp'];
+    
+    if (signature && timestamp) {
+      const payload = JSON.stringify(req.body) + timestamp;
+      const secret = process.env.WEBHOOK_SECRET || 'tradewiser-webhook-secret';
+      const expectedSignature = crypto.createHmac('sha256', secret).update(payload).digest('hex');
+      
+      if (signature !== expectedSignature) {
+        return res.status(401).json({ message: 'Invalid request signature' });
+      }
+    }
+    
+    next();
+  };
+
+  // Outbound API functions
+  const sendToWarehouseModule = async (data: any) => {
+    try {
+      const warehouseApiUrl = process.env.WAREHOUSE_MODULE_URL || 'http://localhost:3001';
+      const apiKey = process.env.WAREHOUSE_MODULE_API_KEY || 'warehouse-api-key';
+      
+      const response = await fetch(`${warehouseApiUrl}/api/process-commodity`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiKey}`,
+          'User-Agent': 'TradeWiser-Platform/1.0'
+        },
+        body: JSON.stringify(data)
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Warehouse module responded with status: ${response.status}`);
+      }
+      
+      const result = await response.json();
+      console.log('Sent to warehouse module:', result);
+      return result;
+    } catch (error) {
+      console.error('Failed to send to warehouse module:', error);
+      throw error;
+    }
+  };
+
+  const requestQualityTesting = async (commodityData: any) => {
+    try {
+      const qualityApiUrl = process.env.QUALITY_MODULE_URL || 'http://localhost:3002';
+      const apiKey = process.env.QUALITY_MODULE_API_KEY || 'quality-api-key';
+      
+      const response = await fetch(`${qualityApiUrl}/api/analyze-quality`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiKey}`,
+          'User-Agent': 'TradeWiser-Platform/1.0'
+        },
+        body: JSON.stringify(commodityData)
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Quality module responded with status: ${response.status}`);
+      }
+      
+      const result = await response.json();
+      console.log('Quality testing requested:', result);
+      return result;
+    } catch (error) {
+      console.error('Failed to request quality testing:', error);
+      throw error;
+    }
+  };
+
+  // WEBHOOK ENDPOINTS
+
+  // Webhook: Warehouse Status Updates
+  apiRouter.post("/webhooks/warehouse/status-update", webhookRateLimiter, authenticateWebhook, async (req: Request, res: Response) => {
+    const startTime = Date.now();
+    try {
+      const { processId, status, stage, metadata, timestamp } = req.body;
+      
+      if (!processId || !status) {
+        return res.status(400).json({ message: 'processId and status are required' });
+      }
+
+      // Update process status
+      const process = await storage.getProcess(processId);
+      if (!process) {
+        return res.status(404).json({ message: 'Process not found' });
+      }
+
+      // Update process with new status and stage information
+      const updatedProcess = await storage.updateProcess(processId, {
+        currentStage: stage || process.currentStage,
+        stageProgress: {
+          ...process.stageProgress,
+          [stage]: status
+        },
+        metadata: JSON.stringify({
+          ...JSON.parse(process.metadata || '{}'),
+          ...metadata,
+          lastWarehouseUpdate: timestamp || new Date().toISOString()
+        })
+      });
+
+      // Broadcast WebSocket update to subscribed clients
+      if (typeof globalThis.broadcastEntityUpdate === 'function') {
+        globalThis.broadcastEntityUpdate(
+          process.ownerId!,
+          'process', 
+          processId,
+          {
+            type: 'status_update',
+            processId,
+            status,
+            stage,
+            metadata,
+            timestamp: timestamp || new Date().toISOString()
+          }
+        );
+      }
+
+      console.log(`Warehouse status update for process ${processId}: ${stage} -> ${status}`);
+      
+      const responseTime = Date.now() - startTime;
+      monitoringService.recordWebhookRequest('/api/webhooks/warehouse/status-update', true, responseTime);
+
+      res.json({
+        success: true,
+        processId,
+        status,
+        stage,
+        message: 'Status updated successfully',
+        timestamp: new Date().toISOString()
+      });
+
+    } catch (error) {
+      console.error('Webhook error - warehouse status update:', error);
+      const responseTime = Date.now() - startTime;
+      monitoringService.recordWebhookRequest('/api/webhooks/warehouse/status-update', false, responseTime, 
+        error instanceof Error ? error.message : String(error), 'business', 500);
+      res.status(500).json({ message: 'Failed to process warehouse status update' });
+    }
+  });
+
+  // Webhook: IoT Weight & Quality Data
+  apiRouter.post("/webhooks/warehouse/weight-update", authenticateWebhook, async (req: Request, res: Response) => {
+    try {
+      const { processId, commodityId, actualWeight, measurementUnit, qualityGrade, moistureContent, timestamp } = req.body;
+      
+      if (!processId && !commodityId) {
+        return res.status(400).json({ message: 'processId or commodityId is required' });
+      }
+
+      let commodity, process;
+
+      // Get process and commodity data
+      if (processId) {
+        process = await storage.getProcess(processId);
+        if (process) {
+          commodity = await storage.getCommodity(process.commodityId!);
+        }
+      } else {
+        commodity = await storage.getCommodity(commodityId);
+      }
+
+      if (!commodity) {
+        return res.status(404).json({ message: 'Commodity not found' });
+      }
+
+      // Update commodity with actual weight and quality data
+      const updatedCommodity = await storage.updateCommodity(commodity.id, {
+        quantity: actualWeight || commodity.quantity,
+        measurementUnit: measurementUnit || commodity.measurementUnit,
+        quality: qualityGrade || commodity.quality,
+        metadata: JSON.stringify({
+          ...JSON.parse(commodity.metadata || '{}'),
+          actualWeight,
+          moistureContent,
+          qualityGrade,
+          iotUpdate: timestamp || new Date().toISOString()
+        })
+      });
+
+      // Recalculate valuation based on actual weight
+      const newValuation = actualWeight ? 
+        (parseFloat(actualWeight) * 1000 * 50).toString() : 
+        commodity.valuation;
+
+      if (actualWeight && newValuation !== commodity.valuation) {
+        await storage.updateCommodity(commodity.id, { 
+          valuation: newValuation
+        });
+      }
+
+      // Check if quality assessment is complete and trigger receipt generation
+      if (qualityGrade && actualWeight && process) {
+        // Update process to indicate weight and quality are complete
+        await storage.updateProcess(process.id, {
+          currentStage: "pricing_calculated",
+          stageProgress: {
+            ...process.stageProgress,
+            weighing_complete: 'completed',
+            qa_assessment_complete: 'completed',
+            pricing_calculated: 'completed'
+          }
+        });
+
+        // Auto-generate warehouse receipt if conditions are met
+        if (qualityGrade === 'Premium' || qualityGrade === 'A' || qualityGrade === 'Good') {
+          const warehouse = await storage.getWarehouse(process.warehouseId!);
+          const receiptNumber = `WR${Date.now()}-${commodity.id}`;
+          
+          const receipt = await storage.createWarehouseReceipt({
+            receiptNumber,
+            commodityId: commodity.id,
+            warehouseId: warehouse?.id || 1,
+            ownerId: commodity.ownerId,
+            quantity: actualWeight || commodity.quantity,
+            measurementUnit: measurementUnit || commodity.measurementUnit,
+            status: "active",
+            blockchainHash: `0x${crypto.randomBytes(8).toString('hex')}`,
+            valuation: newValuation || commodity.valuation,
+            warehouseName: warehouse?.name || 'IoT Warehouse',
+            metadata: JSON.stringify({
+              type: 'iot_generated',
+              actualWeight,
+              qualityGrade,
+              moistureContent,
+              autoGenerated: true,
+              timestamp: timestamp || new Date().toISOString()
+            })
+          });
+
+          console.log(`Auto-generated warehouse receipt ${receiptNumber} for commodity ${commodity.id}`);
+        }
+      }
+
+      // Broadcast WebSocket update
+      if (typeof globalThis.broadcastEntityUpdate === 'function') {
+        globalThis.broadcastEntityUpdate(
+          commodity.ownerId,
+          'commodity',
+          commodity.id,
+          {
+            type: 'weight_quality_update',
+            commodityId: commodity.id,
+            actualWeight,
+            qualityGrade,
+            moistureContent,
+            newValuation,
+            timestamp: timestamp || new Date().toISOString()
+          }
+        );
+
+        if (process) {
+          globalThis.broadcastEntityUpdate(
+            process.ownerId!,
+            'process',
+            process.id,
+            {
+              type: 'iot_update',
+              processId: process.id,
+              actualWeight,
+              qualityGrade,
+              timestamp: timestamp || new Date().toISOString()
+            }
+          );
+        }
+      }
+
+      console.log(`IoT weight/quality update for commodity ${commodity.id}: ${actualWeight}${measurementUnit}, grade: ${qualityGrade}`);
+
+      res.json({
+        success: true,
+        commodityId: commodity.id,
+        processId: process?.id,
+        actualWeight,
+        qualityGrade,
+        newValuation,
+        receiptGenerated: qualityGrade && actualWeight && process,
+        message: 'Weight and quality data updated successfully',
+        timestamp: new Date().toISOString()
+      });
+
+    } catch (error) {
+      console.error('Webhook error - weight/quality update:', error);
+      res.status(500).json({ message: 'Failed to process weight/quality update' });
+    }
+  });
+
+  // Webhook: Quality Testing Results
+  apiRouter.post("/webhooks/quality/results", authenticateWebhook, async (req: Request, res: Response) => {
+    try {
+      const { 
+        commodityId, 
+        processId, 
+        qualityScore, 
+        grade, 
+        parameters, 
+        defects, 
+        recommendations,
+        certificationUrl,
+        timestamp 
+      } = req.body;
+      
+      if (!commodityId && !processId) {
+        return res.status(400).json({ message: 'commodityId or processId is required' });
+      }
+
+      let commodity, process;
+
+      // Get commodity and process data
+      if (processId) {
+        process = await storage.getProcess(processId);
+        if (process) {
+          commodity = await storage.getCommodity(process.commodityId!);
+        }
+      } else {
+        commodity = await storage.getCommodity(commodityId);
+      }
+
+      if (!commodity) {
+        return res.status(404).json({ message: 'Commodity not found' });
+      }
+
+      // Update commodity with quality assessment results
+      const updatedCommodity = await storage.updateCommodity(commodity.id, {
+        quality: grade || commodity.quality,
+        metadata: JSON.stringify({
+          ...JSON.parse(commodity.metadata || '{}'),
+          qualityAssessment: {
+            score: qualityScore,
+            grade,
+            parameters,
+            defects,
+            recommendations,
+            certificationUrl,
+            timestamp: timestamp || new Date().toISOString()
+          }
+        })
+      });
+
+      // Recalculate market valuation based on quality grade
+      let qualityMultiplier = 1.0;
+      switch (grade?.toLowerCase()) {
+        case 'premium': qualityMultiplier = 1.3; break;
+        case 'a': case 'good': qualityMultiplier = 1.1; break;
+        case 'b': case 'fair': qualityMultiplier = 0.9; break;
+        case 'c': case 'poor': qualityMultiplier = 0.7; break;
+        default: qualityMultiplier = 1.0;
+      }
+
+      const baseValuation = parseFloat(commodity.quantity) * 1000 * 50;
+      const newValuation = (baseValuation * qualityMultiplier).toString();
+
+      await storage.updateCommodity(commodity.id, { 
+        valuation: newValuation
+      });
+
+      // Update process if exists
+      if (process) {
+        await storage.updateProcess(process.id, {
+          currentStage: "qa_assessment_complete",
+          stageProgress: {
+            ...process.stageProgress,
+            visual_ai_scan: 'completed',
+            qa_assessment_complete: 'completed'
+          },
+          metadata: JSON.stringify({
+            ...JSON.parse(process.metadata || '{}'),
+            qualityResults: {
+              score: qualityScore,
+              grade,
+              parameters,
+              defects,
+              recommendations,
+              timestamp: timestamp || new Date().toISOString()
+            }
+          })
+        });
+      }
+
+      // Auto-generate receipt for high-quality commodities
+      let receipt = null;
+      if (qualityScore >= 80 || ['premium', 'a', 'good'].includes(grade?.toLowerCase())) {
+        const warehouse = process ? await storage.getWarehouse(process.warehouseId!) : null;
+        const receiptNumber = `QC${Date.now()}-${commodity.id}`;
+        
+        receipt = await storage.createWarehouseReceipt({
+          receiptNumber,
+          commodityId: commodity.id,
+          warehouseId: warehouse?.id || 1,
+          ownerId: commodity.ownerId,
+          quantity: commodity.quantity,
+          measurementUnit: commodity.measurementUnit,
+          status: "active",
+          blockchainHash: `0x${crypto.randomBytes(8).toString('hex')}`,
+          valuation: newValuation,
+          warehouseName: warehouse?.name || 'Quality Certified Warehouse',
+          metadata: JSON.stringify({
+            type: 'quality_certified',
+            qualityScore,
+            grade,
+            certificationUrl,
+            autoGenerated: true,
+            timestamp: timestamp || new Date().toISOString()
+          })
+        });
+
+        console.log(`Auto-generated quality-certified receipt ${receiptNumber} for commodity ${commodity.id}`);
+      }
+
+      // Broadcast WebSocket update
+      if (typeof globalThis.broadcastEntityUpdate === 'function') {
+        globalThis.broadcastEntityUpdate(
+          commodity.ownerId,
+          'commodity',
+          commodity.id,
+          {
+            type: 'quality_results',
+            commodityId: commodity.id,
+            qualityScore,
+            grade,
+            newValuation,
+            receiptGenerated: !!receipt,
+            timestamp: timestamp || new Date().toISOString()
+          }
+        );
+
+        if (process) {
+          globalThis.broadcastEntityUpdate(
+            process.ownerId!,
+            'process',
+            process.id,
+            {
+              type: 'quality_complete',
+              processId: process.id,
+              qualityScore,
+              grade,
+              timestamp: timestamp || new Date().toISOString()
+            }
+          );
+        }
+      }
+
+      console.log(`Quality assessment completed for commodity ${commodity.id}: ${grade} (${qualityScore}/100)`);
+
+      res.json({
+        success: true,
+        commodityId: commodity.id,
+        processId: process?.id,
+        qualityScore,
+        grade,
+        newValuation,
+        receiptNumber: receipt?.receiptNumber,
+        message: 'Quality assessment results processed successfully',
+        timestamp: new Date().toISOString()
+      });
+
+    } catch (error) {
+      console.error('Webhook error - quality results:', error);
+      res.status(500).json({ message: 'Failed to process quality results' });
+    }
+  });
+
+  // ADMIN ENDPOINTS
+
+  // Admin: System Health Dashboard
+  apiRouter.get("/admin/system-health", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const health = monitoringService.getSystemHealth();
+      res.json(health);
+    } catch (error) {
+      console.error('Failed to get system health:', error);
+      res.status(500).json({ message: 'Failed to retrieve system health' });
+    }
+  });
+
+  // Admin: Error Logs
+  apiRouter.get("/admin/error-logs", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const limit = parseInt(req.query.limit as string) || 50;
+      const endpoint = req.query.endpoint as string;
+      
+      const errors = monitoringService.getRecentErrors(limit, endpoint);
+      res.json(errors);
+    } catch (error) {
+      console.error('Failed to get error logs:', error);
+      res.status(500).json({ message: 'Failed to retrieve error logs' });
+    }
+  });
+
+  // Admin: Integration Metrics Export
+  apiRouter.get("/admin/metrics/export", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const metrics = monitoringService.exportMetrics();
+      
+      res.setHeader('Content-Type', 'application/json');
+      res.setHeader('Content-Disposition', `attachment; filename="integration-metrics-${Date.now()}.json"`);
+      res.json(metrics);
+    } catch (error) {
+      console.error('Failed to export metrics:', error);
+      res.status(500).json({ message: 'Failed to export metrics' });
+    }
+  });
+
+  // Admin: Force Health Check
+  apiRouter.post("/admin/health-check/:module", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const module = req.params.module;
+      const isHealthy = await monitoringService.performHealthCheck(module);
+      
+      res.json({
+        module,
+        isHealthy,
+        timestamp: new Date().toISOString(),
+        message: isHealthy ? 'Health check passed' : 'Health check failed'
+      });
+    } catch (error) {
+      console.error(`Health check failed for ${req.params.module}:`, error);
+      res.status(500).json({ message: 'Health check failed' });
+    }
+  });
+
+  // API Documentation Endpoint (OpenAPI Specification)
+  apiRouter.get("/docs/openapi.json", (req: Request, res: Response) => {
+    const openApiSpec = {
+      openapi: "3.0.3",
+      info: {
+        title: "TradeWiser Webhook Integration API",
+        description: "Comprehensive webhook system for external warehouse and quality testing module integration",
+        version: "1.0.0",
+        contact: {
+          name: "TradeWiser Platform",
+          email: "integrations@tradewiser.com"
+        }
+      },
+      servers: [
+        {
+          url: `${req.protocol}://${req.get('host')}/api`,
+          description: "Production server"
+        }
+      ],
+      paths: {
+        "/webhooks/warehouse/status-update": {
+          post: {
+            summary: "Warehouse Status Update",
+            description: "Receive real-time status updates from warehouse management module",
+            tags: ["Webhooks"],
+            security: [{ ApiKeyAuth: [] }],
+            requestBody: {
+              required: true,
+              content: {
+                "application/json": {
+                  schema: {
+                    type: "object",
+                    required: ["processId", "status"],
+                    properties: {
+                      processId: { type: "integer", description: "Process ID being updated" },
+                      status: { type: "string", enum: ["pending", "in_progress", "completed", "failed"] },
+                      stage: { type: "string", description: "Current workflow stage" },
+                      metadata: { type: "object", description: "Additional status metadata" },
+                      timestamp: { type: "string", format: "date-time" }
+                    }
+                  }
+                }
+              }
+            },
+            responses: {
+              200: {
+                description: "Status updated successfully",
+                content: {
+                  "application/json": {
+                    schema: {
+                      type: "object",
+                      properties: {
+                        success: { type: "boolean" },
+                        processId: { type: "integer" },
+                        status: { type: "string" },
+                        stage: { type: "string" },
+                        message: { type: "string" },
+                        timestamp: { type: "string", format: "date-time" }
+                      }
+                    }
+                  }
+                }
+              },
+              401: { description: "Invalid or missing API key" },
+              404: { description: "Process not found" },
+              500: { description: "Internal server error" }
+            }
+          }
+        },
+        "/webhooks/warehouse/weight-update": {
+          post: {
+            summary: "IoT Weight & Quality Data",
+            description: "Receive IoT weighbridge data and quality assessment results",
+            tags: ["Webhooks"],
+            security: [{ ApiKeyAuth: [] }],
+            requestBody: {
+              required: true,
+              content: {
+                "application/json": {
+                  schema: {
+                    type: "object",
+                    properties: {
+                      processId: { type: "integer", description: "Process ID (optional if commodityId provided)" },
+                      commodityId: { type: "integer", description: "Commodity ID (optional if processId provided)" },
+                      actualWeight: { type: "string", description: "Actual weight measurement" },
+                      measurementUnit: { type: "string", enum: ["kg", "MT", "ton"] },
+                      qualityGrade: { type: "string", enum: ["Premium", "A", "Good", "B", "Fair", "C", "Poor"] },
+                      moistureContent: { type: "number", description: "Moisture percentage" },
+                      timestamp: { type: "string", format: "date-time" }
+                    }
+                  }
+                }
+              }
+            },
+            responses: {
+              200: {
+                description: "Weight and quality data updated successfully",
+                content: {
+                  "application/json": {
+                    schema: {
+                      type: "object",
+                      properties: {
+                        success: { type: "boolean" },
+                        commodityId: { type: "integer" },
+                        processId: { type: "integer" },
+                        actualWeight: { type: "string" },
+                        qualityGrade: { type: "string" },
+                        newValuation: { type: "string" },
+                        receiptGenerated: { type: "boolean" },
+                        message: { type: "string" },
+                        timestamp: { type: "string", format: "date-time" }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "/webhooks/quality/results": {
+          post: {
+            summary: "Quality Testing Results",
+            description: "Receive AI-powered quality assessment results",
+            tags: ["Webhooks"],
+            security: [{ ApiKeyAuth: [] }],
+            requestBody: {
+              required: true,
+              content: {
+                "application/json": {
+                  schema: {
+                    type: "object",
+                    properties: {
+                      commodityId: { type: "integer", description: "Commodity ID (optional if processId provided)" },
+                      processId: { type: "integer", description: "Process ID (optional if commodityId provided)" },
+                      qualityScore: { type: "integer", minimum: 0, maximum: 100 },
+                      grade: { type: "string", enum: ["Premium", "A", "B", "C"] },
+                      parameters: { type: "object", description: "Quality assessment parameters" },
+                      defects: { type: "array", items: { type: "string" } },
+                      recommendations: { type: "array", items: { type: "string" } },
+                      certificationUrl: { type: "string", format: "uri" },
+                      timestamp: { type: "string", format: "date-time" }
+                    }
+                  }
+                }
+              }
+            },
+            responses: {
+              200: {
+                description: "Quality assessment results processed successfully",
+                content: {
+                  "application/json": {
+                    schema: {
+                      type: "object",
+                      properties: {
+                        success: { type: "boolean" },
+                        commodityId: { type: "integer" },
+                        processId: { type: "integer" },
+                        qualityScore: { type: "integer" },
+                        grade: { type: "string" },
+                        newValuation: { type: "string" },
+                        receiptNumber: { type: "string" },
+                        message: { type: "string" },
+                        timestamp: { type: "string", format: "date-time" }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      components: {
+        securitySchemes: {
+          ApiKeyAuth: {
+            type: "apiKey",
+            in: "header",
+            name: "X-API-Key",
+            description: "API key for webhook authentication"
+          }
+        }
+      },
+      tags: [
+        {
+          name: "Webhooks",
+          description: "Webhook endpoints for external system integration"
+        }
+      ]
+    };
+
+    res.json(openApiSpec);
+  });
+
+  // NEW LOAN-RECEIPT CONNECTION ENDPOINTS
+
+  // Get eligible receipts for loan collateral
+  apiRouter.get("/loans/eligible-collateral", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const userId = req.session!.userId as number;
+      
+      // Get all active receipts for the user that aren't already collateralized
+      const userReceipts = await storage.listWarehouseReceiptsByOwner(userId);
+      const eligibleReceipts = userReceipts.filter(receipt => 
+        receipt.status === 'active' && 
+        !receipt.liens && // No existing liens
+        receipt.valuation && 
+        parseFloat(receipt.valuation) > 0
+      );
+      
+      // Calculate loan eligibility for each receipt
+      const eligibleCollateral = await Promise.all(eligibleReceipts.map(async (receipt) => {
+        const receiptValue = parseFloat(receipt.valuation || '0');
+        const maxLoanAmount = Math.floor(receiptValue * 0.8); // 80% collateral ratio
+        const warehouse = await storage.getWarehouse(receipt.warehouseId!);
+        const commodity = receipt.commodityId ? await storage.getCommodity(receipt.commodityId) : null;
+        
+        return {
+          id: receipt.id,
+          receiptNumber: receipt.receiptNumber,
+          commodityName: commodity?.name || receipt.commodityName || 'Unknown Commodity',
+          commodityType: commodity?.type || 'Unknown Type',
+          quantity: receipt.quantity,
+          measurementUnit: receipt.measurementUnit || commodity?.measurementUnit || 'MT',
+          warehouseName: warehouse?.name || receipt.warehouseName || 'Unknown Warehouse',
+          receiptValue: receiptValue,
+          maxLoanAmount: maxLoanAmount,
+          collateralRatio: 80,
+          issuedDate: receipt.issuedDate,
+          expiryDate: receipt.expiryDate,
+          status: receipt.status,
+          qualityGrade: receipt.qualityGrade || commodity?.gradeAssigned || 'Standard',
+          blockchainVerified: !!receipt.blockchainHash
+        };
+      }));
+      
+      // Sort by receipt value descending (most valuable first)
+      eligibleCollateral.sort((a, b) => b.receiptValue - a.receiptValue);
+      
+      res.json({
+        eligibleCollateral,
+        totalEligibleValue: eligibleCollateral.reduce((sum, item) => sum + item.receiptValue, 0),
+        totalMaxLoanAmount: eligibleCollateral.reduce((sum, item) => sum + item.maxLoanAmount, 0),
+        count: eligibleCollateral.length
+      });
+    } catch (error) {
+      console.error('Failed to fetch eligible collateral:', error);
+      res.status(500).json({ message: 'Failed to fetch eligible collateral' });
+    }
+  });
+
+  // Calculate loan offer for specific receipts
+  apiRouter.post("/loans/calculate-offer", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const userId = req.session!.userId as number;
+      const { receiptIds, requestedAmount } = req.body;
+      
+      if (!receiptIds || !Array.isArray(receiptIds) || receiptIds.length === 0) {
+        return res.status(400).json({ message: 'Receipt IDs are required' });
+      }
+      
+      // Fetch and validate receipts
+      const receipts = await Promise.all(
+        receiptIds.map(id => storage.getWarehouseReceipt(id))
+      );
+      
+      // Check all receipts exist and belong to user
+      const validReceipts = receipts.filter((receipt): receipt is NonNullable<typeof receipt> => 
+        receipt !== undefined &&
+        receipt !== null && 
+        receipt.ownerId === userId && 
+        receipt.status === 'active' && 
+        !receipt.liens
+      );
+      
+      if (validReceipts.length !== receiptIds.length) {
+        return res.status(400).json({ message: 'Some receipts are invalid or not eligible' });
+      }
+      
+      // Calculate total collateral value
+      const totalCollateralValue = validReceipts.reduce((sum, receipt) => {
+        return sum + parseFloat(receipt.valuation || '0');
+      }, 0);
+      
+      const maxLoanAmount = Math.floor(totalCollateralValue * 0.8); // 80% ratio
+      const finalLoanAmount = requestedAmount ? 
+        Math.min(requestedAmount, maxLoanAmount) : 
+        maxLoanAmount;
+      
+      // Calculate loan terms
+      const interestRate = 12; // 12% annual rate (can be dynamic based on risk)
+      const defaultTenureMonths = 12;
+      const monthlyPayment = Math.ceil((finalLoanAmount * (1 + (interestRate / 100))) / defaultTenureMonths);
+      const totalPayment = monthlyPayment * defaultTenureMonths;
+      const totalInterest = totalPayment - finalLoanAmount;
+      
+      res.json({
+        eligible: finalLoanAmount > 0,
+        collateralReceiptIds: receiptIds,
+        totalCollateralValue,
+        maxLoanAmount,
+        requestedAmount: requestedAmount || maxLoanAmount,
+        approvedAmount: finalLoanAmount,
+        collateralRatio: 80,
+        interestRate,
+        tenureMonths: defaultTenureMonths,
+        monthlyPayment,
+        totalPayment,
+        totalInterest,
+        receipts: validReceipts.map(receipt => ({
+          id: receipt.id,
+          receiptNumber: receipt.receiptNumber,
+          value: parseFloat(receipt.valuation || '0'),
+          commodityName: receipt.commodityName,
+          quantity: receipt.quantity
+        }))
+      });
+    } catch (error) {
+      console.error('Failed to calculate loan offer:', error);
+      res.status(500).json({ message: 'Failed to calculate loan offer' });
+    }
+  });
+
+  // Apply for loan using specific receipts
+  apiRouter.post("/loans/apply-with-collateral", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const userId = req.session!.userId as number;
+      const { 
+        receiptIds, 
+        requestedAmount, 
+        tenureMonths = 12, 
+        purpose = 'Working Capital',
+        lendingPartnerName = 'TradeWiser Direct Lending'
+      } = req.body;
+      
+      if (!receiptIds || !Array.isArray(receiptIds) || receiptIds.length === 0) {
+        return res.status(400).json({ message: 'Receipt IDs are required' });
+      }
+      
+      if (!requestedAmount || requestedAmount <= 0) {
+        return res.status(400).json({ message: 'Valid requested amount is required' });
+      }
+      
+      // Get loan calculation first
+      const offerResponse = await fetch(`http://localhost:5000/api/loans/calculate-offer`, {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Cookie': req.headers.cookie || ''
+        },
+        body: JSON.stringify({ receiptIds, requestedAmount })
+      });
+      
+      if (!offerResponse.ok) {
+        return res.status(400).json({ message: 'Unable to calculate loan offer' });
+      }
+      
+      const offer = await offerResponse.json();
+      
+      if (!offer.eligible || offer.approvedAmount <= 0) {
+        return res.status(400).json({ message: 'Loan not eligible based on collateral' });
+      }
+      
+      // Create the loan
+      const endDate = new Date();
+      endDate.setMonth(endDate.getMonth() + tenureMonths);
+      
+      const newLoan = await storage.createLoan({
+        userId,
+        lendingPartnerId: 1, // Default lending partner
+        lendingPartnerName,
+        amount: offer.approvedAmount.toString(),
+        interestRate: offer.interestRate.toString(),
+        endDate,
+        status: 'pending_approval',
+        collateralReceiptIds: JSON.stringify(receiptIds),
+        outstandingAmount: offer.approvedAmount.toString(),
+        purpose,
+        creditScore: 750 // Default credit score
+      });
+      
+      // Update receipts to mark them as collateralized
+      await Promise.all(receiptIds.map(async (receiptId: number) => {
+        await storage.updateWarehouseReceipt(receiptId, {
+          status: 'collateralized',
+          liens: JSON.stringify([{
+            type: 'loan_collateral',
+            loanId: newLoan.id,
+            amount: offer.approvedAmount,
+            date: new Date().toISOString()
+          }])
+        });
+      }));
+      
+      // Auto-approve for demo purposes (in production, this would go through underwriting)
+      const approvedLoan = await storage.updateLoan(newLoan.id, {
+        status: 'approved',
+        outstandingAmount: offer.approvedAmount.toString()
+      });
+      
+      res.json({
+        success: true,
+        loan: approvedLoan,
+        message: 'Loan application submitted successfully',
+        loanId: newLoan.id,
+        approvedAmount: offer.approvedAmount,
+        monthlyPayment: offer.monthlyPayment,
+        totalPayment: offer.totalPayment,
+        interestRate: offer.interestRate,
+        tenure: tenureMonths,
+        collateralReceipts: receiptIds.length
+      });
+      
+    } catch (error) {
+      console.error('Failed to apply for loan:', error);
+      res.status(500).json({ message: 'Failed to process loan application' });
+    }
+  });
+
+  // AUTO-START TRACKING ENDPOINT
+  apiRouter.post("/deposits/:id/start-tracking", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const userId = req.session!.userId as number;
+
+      // Get the process
+      const process = await storage.getProcess(parseInt(id));
+      if (!process || process.userId !== userId) {
+        return res.status(404).json({ message: "Process not found or access denied" });
+      }
+
+      // Generate realistic transport details
+      const vehicleNumber = `MH12-AB-${Math.floor(Math.random() * 9000) + 1000}`;
+      const driverName = 'Rajesh Kumar';
+      const driverPhone = '+91-98765-43210';
+      const transportCompany = 'Swift Logistics Pvt Ltd';
+      
+      // Update process to start tracking with estimated completion and transport details
+      const updatedProcess = await storage.updateProcess(parseInt(id), {
+        currentStage: "pickup_scheduled",
+        vehicleNumber,
+        driverName,
+        driverPhone,
+        transportCompany,
+        statusMessage: 'Pickup has been scheduled and vehicle assigned',
+        stageProgress: JSON.stringify({
+          startedAt: new Date(),
+          estimatedCompletion: new Date(Date.now() + 5.25 * 60 * 60 * 1000) // Total 5.25 hours for all stages
+        })
+      });
+
+      // Trigger automatic progression with realistic timing
+      setTimeout(() => progressToNextStage(parseInt(id)), 10 * 1000); // Start after 10 seconds for demo
+
+      res.json({ success: true, data: updatedProcess });
+    } catch (error) {
+      console.error('Error starting tracking:', error);
+      res.status(500).json({ message: "Failed to start tracking" });
+    }
+  });
+
+  // AUTO-PROGRESSION FUNCTIONS
+  async function progressToNextStage(processId: number) {
+    try {
+      const process = await storage.getProcess(processId);
+      if (!process) return;
+
+      const stageProgression: Record<string, string> = {
+        'pickup_scheduled': 'in_transit',
+        'in_transit': 'arrived_warehouse',
+        'arrived_warehouse': 'quality_assessment',
+        'quality_assessment': 'pricing_complete',
+        'pricing_complete': 'receipt_generated'
+      };
+
+      const stageMessages: Record<string, string> = {
+        'pickup_scheduled': 'Pickup has been scheduled and vehicle assigned',
+        'in_transit': 'Vehicle is en route to warehouse facility',
+        'arrived_warehouse': 'Commodity has arrived at warehouse for processing',
+        'quality_assessment': 'Quality inspection and grading in progress',
+        'pricing_complete': 'Valuation and pricing has been finalized',
+        'receipt_generated': 'Electronic warehouse receipt has been generated'
+      };
+
+      const nextStage = stageProgression[process.currentStage || 'pickup_scheduled'];
+
+      if (nextStage) {
+        // --- Integration Logic based on current stage ---
+        const commodity = await storage.getCommodity(process.commodityId!);
+        if (!commodity) return;
+
+        if (process.currentStage === 'pickup_scheduled') {
+          // --- Transporter Module Integration (Schedule Pickup) ---
+          try {
+            const warehouse = await storage.getWarehouse(process.warehouseId);
+            const pickupAddress = process.metadata.pickupAddress || 'User Default Address';
+            const destinationAddress = `${warehouse.address}, ${warehouse.city}`;
+
+            const logisticsResponse = await schedulePickup({
+              processId: process.id,
+              origin: pickupAddress,
+              destination: destinationAddress,
+              cargoType: commodity.name,
+              quantity: commodity.quantity,
+              userId: process.ownerId
+            });
+
+            console.log("Logistics response:", logisticsResponse);
+            await storage.updateProcess(process.id, { 
+              trackingNumber: logisticsResponse.trackingNumber
+            });
+          } catch (e) {
+            console.error("Error scheduling pickup:", e);
+            await monitoringService.logIntegrationError('Logistics', process.id, 'Error scheduling pickup', e.message);
+            await storage.updateProcess(process.id, { status: 'pickup_scheduling_failed' });
+            return; // Stop progression on failure
+          }
+        }
+        
+        if (process.currentStage === 'arrived_warehouse') {
+          // --- WMS Integration (Send Inward Goods Request) ---
+          try {
+            const wmsResponse = await sendInwardGoodsToWMS({
+              processId: process.id,
+              commodityName: commodity.name,
+              quantity: parseFloat(commodity.quantity),
+              warehouseId: commodity.warehouseId,
+              userId: commodity.ownerId
+            });
+            console.log("WMS response:", wmsResponse);
+            await storage.updateProcess(process.id, {
+              wmsInventoryId: wmsResponse.inventoryId
+            });
+          } catch (error) {
+            console.warn('Failed to send initial inward goods request to WMS:', error);
+            monitoringService.logIntegrationError('WMS', process.id, 'Error sending initial inward goods', error.message);
+            // Non-critical failure, continue progression
+          }
+        }
+
+        if (process.currentStage === 'quality_assessment') {
+          // --- QA Tool Integration (Request Quality Assessment) ---
+          try {
+            const qaResponse = await requestQualityAssessment({
+              processId: process.id,
+              commodityName: commodity.name,
+              quantity: parseFloat(commodity.quantity),
+              warehouseId: commodity.warehouseId,
+              userId: commodity.ownerId
+            });
+            console.log("QA response:", qaResponse);
+            await storage.updateProcess(process.id, {
+              qaAssessmentId: qaResponse.assessmentId
+            });
+          } catch (error) {
+            console.warn('Failed to request quality testing:', error);
+            monitoringService.logIntegrationError('QA', process.id, 'Error requesting assessment', error.message);
+            // Non-critical failure, continue progression
+          }
+        }
+        
+        // --- Stage Progression Update ---
+        const currentProgress = JSON.parse(process.stageProgress as string || '{}');
+        await storage.updateProcess(processId, {
+          currentStage: nextStage,
+          statusMessage: stageMessages[nextStage] || 'Processing your deposit',
+          stageProgress: JSON.stringify({
+            ...currentProgress,
+            [`${nextStage}_at`]: new Date()
+          })
+        });
+
+        // Broadcast WebSocket update to connected clients
+        try {
+          if (process.userId && global.broadcastEntityUpdate) {
+            global.broadcastEntityUpdate(process.userId.toString(), 'process', processId.toString(), {
+              type: 'process_update',
+              processId,
+              entityId: processId,
+              entityType: 'process',
+              currentStage: nextStage,
+              statusMessage: stageMessages[nextStage],
+              timestamp: new Date().toISOString()
+            });
+          }
+        } catch (error) {
+          console.error('Error broadcasting WebSocket update:', error);
+        }
+
+        console.log(`Process ${processId} progressed to ${nextStage}`);
+
+        // Continue progression if not final stage
+        if (nextStage !== 'receipt_generated') {
+          const delay = getStageDelay(nextStage);
+          setTimeout(() => progressToNextStage(processId), delay);
+        } else {
+          // --- Final Stage: Generate eWR and Push to Depository ---
+          try {
+            const receiptNumber = `WR${Date.now()}-${process.userId}`;
+            
+            const receiptData = {
+              receiptNumber,
+              commodityId: commodity.id,
+              warehouseId: commodity.warehouseId!,
+              ownerId: commodity.ownerId!,
+              quantity: commodity.quantity,
+              measurementUnit: commodity.measurementUnit || "MT",
+              status: "active" as const,
+              blockchainHash: `0x${Math.random().toString(16).substring(2, 18)}`,
+              valuation: commodity.valuation || (parseFloat(commodity.quantity) * 1000 * 50).toString(),
+              commodityName: commodity.name,
+              qualityGrade: commodity.gradeAssigned || "Standard",
+              issuedDate: new Date(),
+              expiryDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000), // 1 year
+              metadata: JSON.stringify({
+                type: 'auto_generated',
+                processCompleted: true,
+                autoGenerated: true,
+                timestamp: new Date().toISOString()
+              })
+            };
+
+            const receipt = await storage.createWarehouseReceipt(receiptData);
+            
+            // Push to Depository Application
+            const depositoryResponse = await issueElectronicWarehouseReceipt(receiptData);
+            
+            console.log("Depository response:", depositoryResponse);
+            await storage.updateProcess(process.id, { 
+              status: 'receipt_issued',
+              warehouseReceiptId: receipt.id,
+              depositoryId: depositoryResponse.depositoryId // Store the ID from the Depository
+            });
+            console.log(`Auto-generated and pushed eWR ${receiptNumber} to Depository for commodity ${commodity.id}`);
+          } catch (e) {
+            console.error("Error issuing eWR to Depository:", e);
+            await monitoringService.logIntegrationError('Depository', process.id, 'Error issuing eWR', e.message);
+            await storage.updateProcess(process.id, { status: 'ewr_issue_failed' });
+          }
+        }
+      }
+    } catch (error) {
+      console.error(`Error progressing process ${processId}:`, error);
+    }
+  }
+
+  function getStageDelay(stage: string): number {
+    // Realistic timing delays for client demo (shortened for demonstration)
+    const delays: Record<string, number> = {
+      'pickup_scheduled': 10 * 1000,       // 10 seconds for demo
+      'in_transit': 15 * 1000,             // 15 seconds for demo
+      'arrived_warehouse': 20 * 1000,      // 20 seconds for demo
+      'quality_assessment': 30 * 1000,     // 30 seconds for demo
+      'pricing_complete': 15 * 1000,       // 15 seconds for demo
+      'receipt_generated': 0                // Complete
+    };
+    return delays[stage] || 15 * 1000;
+  }
+
+  // Placeholder functions for external services
+  async function schedulePickup(data: any) {
+    console.log("MOCK: Scheduling pickup via Logistics module:", data);
+    return { trackingNumber: `TRK-${Date.now()}`, status: 'scheduled' };
+  }
+
+  async function sendInwardGoodsToWMS(data: any) {
+    console.log("MOCK: Sending inward goods request to WMS:", data);
+    return { inventoryId: `INV-${Date.now()}`, status: 'inward_request_received' };
+  }
+
+  async function requestQualityAssessment(data: any) {
+    console.log("MOCK: Requesting quality assessment from QA Tool:", data);
+    return { assessmentId: `QA-${Date.now()}`, status: 'request_sent' };
+  }
+
+  async function issueElectronicWarehouseReceipt(data: any) {
+    console.log("MOCK: Issuing eWR to Depository (Finance Management System):", data);
+    return { depositoryId: `DEP-${Date.now()}`, status: 'issued_to_depository' };
+  }
+
+  // Get deposit progress endpoint for tracking
+  apiRouter.get("/deposits/:id/progress", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const userId = req.session!.userId as number;
+
+      const process = await storage.getProcess(parseInt(id));
+      if (!process || process.userId !== userId) {
+        return res.status(404).json({ message: "Process not found or access denied" });
+      }
+
+      const stageMessages: Record<string, string> = {
+        'pickup_scheduled': 'Pickup has been scheduled and vehicle assigned',
+        'in_transit': 'Vehicle is en route to warehouse facility',
+        'arrived_warehouse': 'Commodity has arrived at warehouse for processing',
+        'quality_assessment': 'Quality inspection and grading in progress',
+        'pricing_complete': 'Valuation and pricing has been finalized',
+        'receipt_generated': 'Electronic warehouse receipt has been generated'
+      };
+
+      const estimatedCompletionTimes: Record<string, number> = {
+        'pickup_scheduled': 30 * 60 * 1000,  // 30 minutes
+        'in_transit': 90 * 60 * 1000,        // 90 minutes  
+        'arrived_warehouse': 45 * 60 * 1000, // 45 minutes
+        'quality_assessment': 120 * 60 * 1000, // 2 hours
+        'pricing_complete': 30 * 60 * 1000,  // 30 minutes
+        'receipt_generated': 0                // Complete
+      };
+
+      const currentStage = process.currentStage || 'pickup_scheduled';
+      const stageProgress = process.stageProgress ? JSON.parse(process.stageProgress as string) : {};
+      
+      // Calculate estimated completion time
+      let estimatedCompletion = new Date();
+      if (stageProgress.startedAt) {
+        const startTime = new Date(stageProgress.startedAt);
+        const remainingTime = estimatedCompletionTimes[currentStage] || 0;
+        estimatedCompletion = new Date(startTime.getTime() + remainingTime);
+      }
+
+      // Fetch related data for comprehensive tracking
+      let commodity = null;
+      let warehouse = null;
+      
+      try {
+        if (process.commodityId) {
+          commodity = await storage.getCommodity(process.commodityId);
+        }
+        if (process.warehouseId) {
+          warehouse = await storage.getWarehouse(process.warehouseId);
+        }
+      } catch (error) {
+        console.error('Error fetching related data:', error);
+      }
+
+      // Generate realistic transport details
+      const transportDetails = {
+        vehicleNumber: process.vehicleNumber || `MH12-AB-${Math.floor(Math.random() * 9000) + 1000}`,
+        driverName: process.driverName || 'Rajesh Kumar',
+        driverPhone: process.driverPhone || '+91-98765-43210',
+        transportCompany: process.transportCompany || 'Swift Logistics Pvt Ltd'
+      };
+
+      // Build comprehensive progress object with 6 stages
+      const progressData = {
+        pickup_scheduled: currentStage === 'pickup_scheduled' ? 'current' : 
+                         ['in_transit', 'arrived_warehouse', 'quality_assessment', 'pricing_complete', 'receipt_generated'].includes(currentStage) ? 'completed' : 'pending',
+        in_transit: currentStage === 'in_transit' ? 'current' : 
+                   ['arrived_warehouse', 'quality_assessment', 'pricing_complete', 'receipt_generated'].includes(currentStage) ? 'completed' : 'pending',
+        arrived_warehouse: currentStage === 'arrived_warehouse' ? 'current' : 
+                          ['quality_assessment', 'pricing_complete', 'receipt_generated'].includes(currentStage) ? 'completed' : 'pending',
+        quality_assessment: currentStage === 'quality_assessment' ? 'current' : 
+                           ['pricing_complete', 'receipt_generated'].includes(currentStage) ? 'completed' : 'pending',
+        pricing_complete: currentStage === 'pricing_complete' ? 'current' : 
+                         currentStage === 'receipt_generated' ? 'completed' : 'pending',
+        receipt_generated: currentStage === 'receipt_generated' ? 'completed' : 'pending'
+      };
+
+      // Build response with comprehensive tracking data
+      const responseData = {
+        id: process.id,
+        currentStage,
+        statusMessage: process.statusMessage || stageMessages[currentStage] || 'Processing your deposit',
+        estimatedCompletion: estimatedCompletion.toISOString(),
+        progress: progressData
+      };
+
+      // Add commodity details if available
+      if (commodity) {
+        responseData.commodity = {
+          name: commodity.name,
+          quantity: parseFloat(commodity.quantity),
+          measurementUnit: commodity.measurementUnit || 'MT',
+          estimatedValue: commodity.valuation ? parseFloat(commodity.valuation) : getCommodityBasePrice(commodity.name) * parseFloat(commodity.quantity)
+        };
+      }
+
+      // Add warehouse details if available
+      if (warehouse) {
+        responseData.warehouse = {
+          name: warehouse.name,
+          address: `${warehouse.address}, ${warehouse.city}, ${warehouse.state}`,
+          contact: warehouse.phoneNumber || '+91-12345-67890'
+        };
+      }
+
+      // Add transport details
+      responseData.transport = transportDetails;
+
+      res.json(responseData);
+    } catch (error) {
+      console.error('Error fetching deposit progress:', error);
+      res.status(500).json({ message: "Failed to fetch progress" });
+    }
+  });
+
+  // ===============================
+  // REBUILD: CORE WORKING APIS
+  // ===============================
+
+  // Helper function for commodity pricing
+  function getCommodityBasePrice(commodity: string): number {
+    const prices: Record<string, number> = {
+      'Wheat': 2500,
+      'Rice': 3000,
+      'Maize': 2000,
+      'Soybean': 4500,
+      'Cotton': 6000,
+      'Sugarcane': 300,
+      'Bajra': 2200,
+      'Jowar': 2100,
+      'Groundnut': 5500,
+      'Mustard': 4800,
+      'Barley': 2300,
+      'Gram': 4200,
+      'Tur': 6500,
+      'Moong': 7000,
+      'Urad': 6800
+    };
+    return prices[commodity] || 2500; // Default price per MT
+  }
+
+  // WORKING DEPOSIT API - IMMEDIATELY CREATES RECEIPT
+  apiRouter.post('/deposits', requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { commodityName, commodityType, quantity, unit, qualityParams, location } = req.body;
+      const userId = req.session!.userId as number;
+
+      if (!commodityName || !commodityType || !quantity) {
+        return res.status(400).json({
+          success: false,
+          error: "Missing required fields: commodityName, commodityType, quantity"
+        });
+      }
+
+      // Calculate market value (mock pricing for now)
+      const basePrice = getCommodityBasePrice(commodityName);
+      const marketValue = basePrice * parseFloat(quantity);
+
+      // Create commodity entry
+      const commodity = await storage.createCommodity({
+        name: commodityName,
+        type: commodityType,
+        quantity: quantity.toString(),
+        measurementUnit: unit || 'MT',
+        qualityParameters: qualityParams || {},
+        gradeAssigned: 'Pending Assessment',
+        warehouseId: 1, // Default warehouse
+        ownerId: userId,
+        status: 'active',
+        channelType: 'green',
+        valuation: marketValue.toString(),
+        marketValue: marketValue.toString()
+      });
+
+      console.log("Commodity created:", commodity.id);
+
+      // IMMEDIATELY create warehouse receipt (no complex tracking for now)
+      const receiptNumber = `TW${Date.now()}-${Math.random().toString(36).substr(2, 6)}`;
+      const receipt = await storage.createWarehouseReceipt({
+        receiptNumber,
+        commodityId: commodity.id,
+        ownerId: userId,
+        warehouseId: 1,
+        quantity: parseFloat(quantity).toString(),
+        valuation: marketValue.toString(),
+        status: 'active',
+        availableForCollateral: true,
+        collateralUsed: '0',
+        blockchainHash: `BC-${Date.now()}`,
+        qualityGrade: 'Grade A', // Mock quality for demo
+        commodityName: commodityName,
+        measurementUnit: unit || 'MT',
+        issuedDate: new Date(),
+        expiryDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000) // 1 year
+      });
+
+      res.json({
+        success: true,
+        data: {
+          commodity: commodity,
+          receipt: receipt,
+          message: `Commodity deposited and receipt ${receiptNumber} generated successfully!`
+        }
+      });
+    } catch (error: any) {
+      console.error('Deposit error:', error);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  // PORTFOLIO API - FIXED VERSION WITH PROPER ERROR HANDLING
+  apiRouter.get('/portfolio', requireAuth, async (req: Request, res: Response) => {
+    try {
+      const userId = req.session!.userId as number;
+
+      // Get receipts with commodity data
+      const receipts = await storage.listWarehouseReceiptsByOwner(userId);
+      const commodities = await storage.listCommoditiesByOwner(userId);
+
+      // Calculate portfolio metrics
+      const totalValue = receipts.reduce((sum, receipt) =>
+        sum + (parseFloat(receipt.valuation || '0')), 0);
+
+      const totalCollateralUsed = receipts.reduce((sum, receipt) =>
+        sum + (parseFloat(receipt.collateralUsed || '0')), 0);
+
+      const availableCredit = Math.max(0, (totalValue * 0.8) - totalCollateralUsed);
+
+      res.json({
+        success: true,
+        data: {
+          totalValue,
+          receiptsCount: receipts.length,
+          availableCredit,
+          receipts,
+          commodities: receipts
+        }
+      });
+    } catch (error: any) {
+      console.error('Portfolio API error:', error);
+      res.status(500).json({
+        success: false,
+        error: error.message,
+        data: {
+          totalValue: 0,
+          receiptsCount: 0,
+          availableCredit: 0,
+          receipts: [],
+          commodities: []
+        }
+      });
+    }
+  });
+
+  // ELIGIBLE RECEIPTS FOR LOANS - WORKING
+  apiRouter.get('/receipts/eligible-for-loans', requireAuth, async (req: Request, res: Response) => {
+    try {
+      const userId = req.session!.userId as number;
+      
+      const receipts = await storage.listWarehouseReceiptsByOwner(userId);
+
+      // Filter eligible receipts
+      const eligibleReceipts = receipts
+        .filter(receipt => 
+          receipt.status === 'active' &&
+          receipt.availableForCollateral !== false &&
+          parseFloat(receipt.valuation || '0') > 0
+        )
+        .map(receipt => {
+          const receiptValue = parseFloat(receipt.valuation || '0');
+          const collateralUsed = parseFloat(receipt.collateralUsed || '0');
+          const availableLoanAmount = (receiptValue - collateralUsed) * 0.8;
+          
+          return {
+            ...receipt,
+            availableLoanAmount: Math.max(0, availableLoanAmount)
+          };
+        })
+        .filter(receipt => receipt.availableLoanAmount > 0);
+
+      res.json({ success: true, data: eligibleReceipts });
+    } catch (error: any) {
+      console.error('Eligible receipts error:', error);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  // ENHANCED LOAN APPLICATION - Multi-step form support
+  apiRouter.post('/loans/apply', requireAuth, async (req: Request, res: Response) => {
+    try {
+      const userId = req.session!.userId as number;
+      const { 
+        receiptIds, 
+        requestedAmount, 
+        tenureMonths = 12, 
+        purpose = 'Working Capital',
+        bankDetails,
+        loanTerms
+      } = req.body;
+
+      // Validate required fields
+      if (!receiptIds || !Array.isArray(receiptIds) || receiptIds.length === 0) {
+        return res.status(400).json({
+          success: false,
+          message: 'At least one receipt ID is required'
+        });
+      }
+
+      if (!requestedAmount || requestedAmount < 10000) {
+        return res.status(400).json({
+          success: false,
+          message: 'Minimum loan amount is ₹10,000'
+        });
+      }
+
+      // Validate bank details
+      if (!bankDetails || !bankDetails.accountNumber || !bankDetails.ifscCode || !bankDetails.accountHolderName) {
+        return res.status(400).json({
+          success: false,
+          message: 'Complete bank details are required'
+        });
+      }
+
+      // Validate IFSC code format
+      if (bankDetails.ifscCode.length !== 11) {
+        return res.status(400).json({
+          success: false,
+          message: 'IFSC code must be 11 characters'
+        });
+      }
+
+      // Fetch and validate all receipts
+      const receipts = await Promise.all(
+        receiptIds.map(id => storage.getWarehouseReceipt(id))
+      );
+
+      const validReceipts = receipts.filter((receipt): receipt is NonNullable<typeof receipt> => 
+        receipt !== undefined &&
+        receipt !== null && 
+        receipt.ownerId === userId && 
+        receipt.status === 'active' && 
+        !receipt.liens
+      );
+
+      if (validReceipts.length !== receiptIds.length) {
+        return res.status(400).json({
+          success: false,
+          message: 'Some receipts are invalid, not owned by you, or already collateralized'
+        });
+      }
+
+      // Calculate total collateral value
+      const totalCollateralValue = validReceipts.reduce((sum, receipt) => {
+        return sum + parseFloat(receipt.valuation || '0');
+      }, 0);
+
+      const maxLoanAmount = Math.floor(totalCollateralValue * 0.8); // 80% LTV
+
+      if (requestedAmount > maxLoanAmount) {
+        return res.status(400).json({
+          success: false,
+          message: `Requested amount exceeds maximum available: ₹${maxLoanAmount.toLocaleString()}`
+        });
+      }
+
+      // Calculate EMI and terms
+      const interestRate = 12; // 12% annual
+      const monthlyRate = interestRate / 12 / 100;
+      const monthlyEMI = Math.round(
+        (requestedAmount * monthlyRate * Math.pow(1 + monthlyRate, tenureMonths)) /
+        (Math.pow(1 + monthlyRate, tenureMonths) - 1)
+      );
+      const totalAmount = monthlyEMI * tenureMonths;
+      const totalInterest = totalAmount - requestedAmount;
+      const processingFee = Math.round(requestedAmount * 0.005); // 0.5%
+
+      // Create loan record
+      const loan = await storage.createLoan({
+        userId: userId,
+        lendingPartnerId: 1,
+        lendingPartnerName: 'TradeWiser Direct Lending',
+        amount: requestedAmount.toString(),
+        interestRate: interestRate.toString(),
+        endDate: new Date(Date.now() + tenureMonths * 30 * 24 * 60 * 60 * 1000),
+        status: 'approved', // Auto-approve for demo
+        collateralReceiptIds: JSON.stringify(receiptIds),
+        outstandingAmount: requestedAmount.toString(),
+        purpose,
+        creditScore: 750,
+        repaymentSchedule: JSON.stringify({
+          monthlyEMI,
+          totalAmount,
+          totalInterest,
+          processingFee,
+          bankDetails,
+          startDate: new Date(),
+          nextPaymentDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+        })
+      });
+
+      // Update receipts to mark as collateralized
+      await Promise.all(receiptIds.map(async (receiptId: number) => {
+        await storage.updateWarehouseReceipt(receiptId, {
+          status: 'collateralized',
+          liens: JSON.stringify([{
+            type: 'loan_collateral',
+            loanId: loan.id,
+            amount: requestedAmount,
+            date: new Date().toISOString(),
+            bankDetails: {
+              accountNumber: bankDetails.accountNumber,
+              ifscCode: bankDetails.ifscCode,
+              accountHolderName: bankDetails.accountHolderName,
+              bankName: bankDetails.bankName
+            }
+          }])
+        });
+      }));
+
+      res.json({
+        success: true,
+        message: 'Loan approved successfully! Disbursement will be processed within 24 hours.',
+        loan: {
+          id: loan.id,
+          amount: requestedAmount,
+          status: 'approved',
+          interestRate,
+          tenureMonths,
+          monthlyEMI,
+          totalAmount,
+          totalInterest,
+          processingFee,
+          disbursementDetails: {
+            accountNumber: bankDetails.accountNumber,
+            ifscCode: bankDetails.ifscCode,
+            accountHolderName: bankDetails.accountHolderName,
+            bankName: bankDetails.bankName
+          },
+          collateralReceipts: validReceipts.map(receipt => ({
+            id: receipt.id,
+            receiptNumber: receipt.receiptNumber,
+            value: parseFloat(receipt.valuation || '0')
+          }))
+        }
+      });
+
+    } catch (error) {
+      console.error('Loan application error:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to process loan application. Please try again.'
+      });
+    }
+  });
+
+  // Legacy single receipt loan application (keeping for backward compatibility)
+  apiRouter.post('/loans/apply-legacy', requireAuth, async (req: Request, res: Response) => {
+    try {
+      const userId = req.session!.userId as number;
+      const { receiptId, amount, durationMonths } = req.body;
+
+      if (!receiptId || !amount || !durationMonths) {
+        return res.status(400).json({
+          success: false,
+          error: 'Receipt ID, amount, and duration are required'
+        });
+      }
+
+      const receipt = await storage.getWarehouseReceipt(receiptId);
+
+      if (!receipt || receipt.ownerId !== userId) {
+        return res.status(400).json({ success: false, error: 'Receipt not found or not owned by user' });
+      }
+
+      const receiptValue = parseFloat(receipt.valuation || '0');
+      const collateralUsed = parseFloat(receipt.collateralUsed || '0');
+      const maxLoanAmount = (receiptValue - collateralUsed) * 0.8;
+
+      if (parseFloat(amount) > maxLoanAmount) {
+        return res.status(400).json({
+          success: false,
+          error: `Maximum available: ₹${maxLoanAmount.toLocaleString()}`
+        });
+      }
+
+      // Calculate EMI
+      const monthlyRate = 0.12 / 12; // 12% annual
+      const emi = (parseFloat(amount) * monthlyRate * Math.pow(1 + monthlyRate, durationMonths)) /
+                  (Math.pow(1 + monthlyRate, durationMonths) - 1);
+
+      const loan = await storage.createLoan({
+        userId: userId,
+        lendingPartnerId: 1, // Default lending partner
+        lendingPartnerName: 'TradeWiser Direct Lending',
+        amount: amount,
+        interestRate: '12.0',
+        endDate: new Date(Date.now() + durationMonths * 30 * 24 * 60 * 60 * 1000),
+        status: 'active',
+        collateralReceiptIds: JSON.stringify([receiptId]),
+        outstandingAmount: amount,
+        purpose: 'Working Capital',
+        creditScore: 750
+      });
+
+      // Update collateral usage
+      const newCollateralUsed = collateralUsed + parseFloat(amount);
+      await storage.updateWarehouseReceipt(receiptId, {
+        collateralUsed: newCollateralUsed.toString(),
+        status: newCollateralUsed >= receiptValue ? 'collateralized' : 'active'
+      });
+
+      res.json({ 
+        success: true, 
+        data: {
+          loan: loan,
+          monthlyEmi: Math.round(emi),
+          message: `Loan of ₹${parseFloat(amount).toLocaleString()} approved successfully!`
+        }
+      });
+    } catch (error: any) {
+      console.error('Loan application error:', error);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  // ===============================
+  // CREDIT LINE SYSTEM - FULL IMPLEMENTATION
+  // ===============================
+
+  // Get Available Credit
+  apiRouter.get('/credit/available', requireAuth, async (req: Request, res: Response) => {
+    try {
+      const userId = req.session!.userId as number;
+      console.log('=== CREDIT AVAILABLE DEBUG ===');
+      console.log('User ID:', userId);
+      
+      const creditInfo = await storage.getAvailableCredit(userId);
+      console.log('Credit info calculated:', JSON.stringify(creditInfo, null, 2));
+
+      const responseData = {
+        success: true,
+        data: {
+          totalCollateralValue: creditInfo.totalCollateralValue,
+          maxEligibleCredit: creditInfo.maxEligibleCredit,
+          outstandingBalance: creditInfo.outstandingBalance,
+          availableCredit: creditInfo.availableCredit,
+          utilizationPercentage: creditInfo.utilizationPercentage,
+          interestRate: 12.0, // Fixed rate for demo
+          processingTime: '2-4 business hours',
+          minimumWithdrawal: 1000,
+          maximumWithdrawal: creditInfo.availableCredit
+        }
+      };
+      console.log('Sending response:', JSON.stringify(responseData, null, 2));
+
+      res.json(responseData);
+    } catch (error: any) {
+      console.error('Error fetching available credit:', error);
+      res.status(500).json({ success: false, error: 'Failed to fetch available credit' });
+    }
+  });
+
+  // Credit Line Details (Legacy endpoint)
+  apiRouter.get('/credit-line/details', requireAuth, async (req: Request, res: Response) => {
+    try {
+      const userId = req.session!.userId as number;
+      const creditInfo = await storage.getAvailableCredit(userId);
+
+      res.json({
+        success: true,
+        data: {
+          totalLimit: creditInfo.maxEligibleCredit,
+          availableBalance: creditInfo.availableCredit,
+          outstandingAmount: creditInfo.outstandingBalance,
+          interestRate: 12.0,
+          dailyInterest: Math.round((creditInfo.outstandingBalance * 12 / 100 / 365) * 100) / 100,
+          monthlyInterest: Math.round((creditInfo.outstandingBalance * 12 / 100 / 12) * 100) / 100,
+          lastPaymentDate: '2025-09-01'
+        }
+      });
+    } catch (error: any) {
+      console.error('Credit line details error:', error);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  // Bank Account Management
+  apiRouter.get('/credit/bank-accounts', requireAuth, async (req: Request, res: Response) => {
+    try {
+      const userId = req.session!.userId as number;
+      console.log('=== BANK ACCOUNTS DEBUG ===');
+      console.log('User ID:', userId);
+      
+      // Ensure demo bank accounts are seeded if none exist
+      const bankAccounts = await storage.seedDemoBankAccounts(userId);
+      
+      // Return bank accounts with proper verification status
+      const accountsWithStatus = bankAccounts.map(account => ({
+        id: account.id,
+        accountNumber: account.accountNumber,
+        ifscCode: account.ifscCode,
+        accountHolderName: account.accountHolderName,
+        bankName: account.bankName,
+        branchName: account.branchName,
+        accountType: account.accountType,
+        isDefault: account.isDefault,
+        isVerified: account.isVerified,
+        createdAt: account.createdAt,
+        updatedAt: account.updatedAt
+      }));
+      
+      res.json({
+        success: true,
+        data: accountsWithStatus,
+        meta: {
+          total: accountsWithStatus.length,
+          verified: accountsWithStatus.filter(acc => acc.isVerified).length,
+          default: accountsWithStatus.find(acc => acc.isDefault)?.id || null
+        }
+      });
+    } catch (error: any) {
+      console.error('Error fetching bank accounts:', error);
+      res.status(500).json({ success: false, error: 'Failed to fetch bank accounts' });
+    }
+  });
+
+  apiRouter.post('/credit/bank-accounts', requireAuth, async (req: Request, res: Response) => {
+    try {
+      const userId = req.session!.userId as number;
+      const { accountNumber, ifscCode, accountHolderName, bankName, branchName, accountType } = req.body;
+
+      // Validate required fields
+      if (!accountNumber || !ifscCode || !accountHolderName || !bankName) {
+        return res.status(400).json({ 
+          success: false, 
+          error: 'Missing required fields: accountNumber, ifscCode, accountHolderName, bankName' 
+        });
+      }
+
+      // Validate IFSC format
+      const ifscRegex = /^[A-Z]{4}0[A-Z0-9]{6}$/;
+      if (!ifscRegex.test(ifscCode)) {
+        return res.status(400).json({
+          success: false,
+          error: 'Invalid IFSC code format'
+        });
+      }
+
+      // Validate account number (basic validation)
+      if (accountNumber.length < 8 || accountNumber.length > 18) {
+        return res.status(400).json({
+          success: false,
+          error: 'Account number must be between 8 and 18 characters'
+        });
+      }
+
+      const bankAccount = await storage.createUserBankAccount({
+        userId,
+        accountNumber,
+        ifscCode: ifscCode.toUpperCase(),
+        accountHolderName,
+        bankName,
+        branchName: branchName || '',
+        accountType: accountType || 'savings',
+        isDefault: false,
+        isVerified: true // Auto-verify for demo
+      });
+
+      // Return bank account with proper verification status
+      const accountWithStatus = {
+        id: bankAccount.id,
+        accountNumber: bankAccount.accountNumber,
+        ifscCode: bankAccount.ifscCode,
+        accountHolderName: bankAccount.accountHolderName,
+        bankName: bankAccount.bankName,
+        branchName: bankAccount.branchName,
+        accountType: bankAccount.accountType,
+        isDefault: bankAccount.isDefault,
+        isVerified: bankAccount.isVerified,
+        createdAt: bankAccount.createdAt,
+        updatedAt: bankAccount.updatedAt
+      };
+
+      res.json({
+        success: true,
+        data: accountWithStatus,
+        message: 'Bank account added and verified successfully for demo purposes'
+      });
+    } catch (error: any) {
+      console.error('Error creating bank account:', error);
+      res.status(500).json({ success: false, error: 'Failed to create bank account' });
+    }
+  });
+
+  // Credit Withdrawal
+  apiRouter.post('/credit/withdraw', requireAuth, async (req: Request, res: Response) => {
+    try {
+      const userId = req.session!.userId as number;
+      console.log('=== CREDIT WITHDRAWAL DEBUG ===');
+      console.log('Request body:', JSON.stringify(req.body, null, 2));
+      console.log('User ID:', userId);
+      
+      const { amount, bankAccountId, purpose } = req.body;
+      console.log('Extracted values:', { amount, bankAccountId, purpose, types: { amount: typeof amount, bankAccountId: typeof bankAccountId } });
+
+      // Enhanced amount validation
+      if (amount === null || amount === undefined || amount === '') {
+        console.log('VALIDATION FAILED: Amount is required');
+        return res.status(400).json({ success: false, error: 'Withdrawal amount is required' });
+      }
+
+      const parsedAmount = parseFloat(amount);
+      if (isNaN(parsedAmount) || !isFinite(parsedAmount)) {
+        return res.status(400).json({ success: false, error: 'Invalid withdrawal amount - must be a valid number' });
+      }
+
+      if (parsedAmount <= 0) {
+        return res.status(400).json({ success: false, error: 'Withdrawal amount must be greater than zero' });
+      }
+
+      const MINIMUM_WITHDRAWAL = 1000;
+      if (parsedAmount < MINIMUM_WITHDRAWAL) {
+        return res.status(400).json({ 
+          success: false, 
+          error: `Minimum withdrawal amount is ₹${MINIMUM_WITHDRAWAL.toLocaleString()}` 
+        });
+      }
+
+      // Check available credit with explicit maximum validation
+      const creditInfo = await storage.getAvailableCredit(userId);
+      const maxWithdrawal = Math.floor(creditInfo.availableCredit);
+      
+      if (parsedAmount > maxWithdrawal) {
+        return res.status(400).json({ 
+          success: false, 
+          error: `Withdrawal amount exceeds available credit. Maximum allowed: ₹${maxWithdrawal.toLocaleString()}, Available: ₹${creditInfo.availableCredit.toLocaleString()}` 
+        });
+      }
+
+      // Enhanced bank account validation
+      if (bankAccountId === null || bankAccountId === undefined || bankAccountId === '') {
+        return res.status(400).json({ success: false, error: 'Bank account selection is required' });
+      }
+
+      const parsedBankAccountId = parseInt(bankAccountId);
+      if (isNaN(parsedBankAccountId) || !isFinite(parsedBankAccountId)) {
+        return res.status(400).json({ success: false, error: 'Invalid bank account selection' });
+      }
+
+      const bankAccount = await storage.getUserBankAccount(parsedBankAccountId);
+      if (!bankAccount) {
+        return res.status(400).json({ success: false, error: 'Selected bank account does not exist' });
+      }
+
+      if (bankAccount.userId !== userId) {
+        return res.status(400).json({ success: false, error: 'Bank account does not belong to current user' });
+      }
+
+      if (!bankAccount.isVerified) {
+        return res.status(400).json({ 
+          success: false, 
+          error: 'Selected bank account is not verified. Please verify your bank account before withdrawing funds.' 
+        });
+      }
+
+      // Create withdrawal request with validated data
+      const withdrawal = await storage.createCreditWithdrawal({
+        userId,
+        bankAccountId: parsedBankAccountId,
+        amount: parsedAmount.toString(),
+        availableCreditAtTime: creditInfo.availableCredit.toString(),
+        status: 'approved', // Auto-approve for demo
+        withdrawalMethod: 'bank_transfer',
+        processingFee: '0',
+        actualAmount: parsedAmount.toString(),
+        metadata: {
+          purpose: purpose || 'Working Capital',
+          ipAddress: req.ip,
+          userAgent: req.get('User-Agent'),
+          validationChecks: {
+            amountValidated: true,
+            bankAccountValidated: true,
+            creditLimitValidated: true,
+            timestamp: new Date().toISOString()
+          }
+        }
+      });
+
+      // For demo purposes, immediately complete the withdrawal
+      await storage.updateCreditWithdrawal(withdrawal.id, {
+        status: 'completed',
+        externalTransactionId: `TXN${Date.now()}`,
+        transactionReference: `REF${withdrawal.id}${Date.now()}`
+      });
+
+      res.json({
+        success: true,
+        data: {
+          withdrawalId: withdrawal.id,
+          transactionId: `TXN${Date.now()}`,
+          amount: parsedAmount,
+          bankAccount: {
+            accountNumber: `****${bankAccount.accountNumber.slice(-4)}`,
+            bankName: bankAccount.bankName,
+            accountHolderName: bankAccount.accountHolderName,
+            isVerified: bankAccount.isVerified
+          },
+          status: 'completed',
+          processingTime: '2-4 business hours',
+          estimatedCreditTime: 'Within 1 business day',
+          remainingCredit: creditInfo.availableCredit - parsedAmount,
+          message: `Withdrawal of ₹${parsedAmount.toLocaleString()} has been processed successfully to ${bankAccount.bankName} account ending in ${bankAccount.accountNumber.slice(-4)}!`
+        }
+      });
+    } catch (error: any) {
+      console.error('Credit withdrawal error:', error);
+      res.status(500).json({ success: false, error: 'Failed to process withdrawal' });
+    }
+  });
+
+  // Legacy withdraw endpoint
+  apiRouter.post('/credit-line/withdraw', requireAuth, async (req: Request, res: Response) => {
+    // Redirect to new endpoint
+    return res.redirect(307, '/api/credit/withdraw');
+  });
+
+  // Test endpoint
+  apiRouter.get("/test", (req: Request, res: Response) => {
+    res.json({ message: "API is working", timestamp: new Date().toISOString() });
+  });
+
+  // Enhanced Authentication System - Phone/OTP, Username/Password, Social Login
+  app.use("/api/auth", authRouter);
+  
+  // Revolving Credit/Overdraft System - mount directly on app (like auth router)
+  console.log('🔍 Mounting revolving credit router directly on app');
+  app.use("/api/revolving-credit", revolvingCreditRouter);
+  console.log('✅ Revolving credit router mounted on app');
+  
+  // Add logging middleware to apiRouter
+  apiRouter.use((req, res, next) => {
+    console.log(`📡 apiRouter received request: ${req.method} ${req.path}`);
+    next();
+  });
+  
+  // Add 404 handler for apiRouter - this catches unmatched routes within /api/*
+  apiRouter.use((req, res) => {
+    res.status(404).json({ message: "API endpoint not found" });
+  });
+
+  // Mount API router on /api path
+  app.use("/api", apiRouter);
+  
+  // Handle 404 for unknown API routes - this must be last
+  // TEMPORARILY DISABLED FOR DEBUGGING
+  // app.use('/api/*', (req, res) => {
+  //   res.status(404).json({ message: "API endpoint not found" });
+  // });
+
+  console.log("API routes registered successfully");
+  
+  const httpServer = createServer(app);
+
+  // Server-Sent Events (SSE) for real-time updates - More reliable than WebSockets
+  apiRouter.get("/events", requireAuth, (req: Request, res: Response) => {
+    // Set SSE headers
+    res.writeHead(200, {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache',
+      'Connection': 'keep-alive',
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Headers': 'Cache-Control'
+    });
+
+    const userId = req.session.userId;
+    const clientId = Math.random().toString(36).substring(7);
+    
+    console.log(`SSE: Client ${clientId} connected for user ${userId}`);
+    
+    // Initialize SSE client storage
+    if (!globalThis.sseClients) {
+      globalThis.sseClients = new Map();
+    }
+    
+    if (!globalThis.sseClients.has(userId)) {
+      globalThis.sseClients.set(userId, new Set());
+    }
+    globalThis.sseClients.get(userId).add(res);
+
+    // Send initial connection event
+    try {
+      res.write(`data: ${JSON.stringify({
+        type: 'connected',
+        clientId,
+        timestamp: new Date().toISOString()
+      })}\n\n`);
+    } catch (error) {
+      console.error('Error sending SSE connection event:', error);
+    }
+
+    // Keep connection alive with heartbeat every 30 seconds
+    const heartbeat = setInterval(() => {
+      try {
+        res.write(`data: ${JSON.stringify({ 
+          type: 'heartbeat', 
+          timestamp: new Date().toISOString() 
+        })}\n\n`);
+      } catch (error) {
+        console.error('SSE heartbeat error:', error);
+        clearInterval(heartbeat);
+      }
+    }, 30000);
+
+    // Handle client disconnect
+    const cleanup = () => {
+      console.log(`SSE: Client ${clientId} disconnected`);
+      clearInterval(heartbeat);
+      if (globalThis.sseClients && globalThis.sseClients.has(userId)) {
+        globalThis.sseClients.get(userId).delete(res);
+        if (globalThis.sseClients.get(userId).size === 0) {
+          globalThis.sseClients.delete(userId);
+        }
+      }
+    };
+
+    req.on('close', cleanup);
+    req.on('aborted', cleanup);
+    res.on('close', cleanup);
+  });
+
+  // Map to store active connections - replaced WebSocket with SSE
+  const connections = new Map<string, any[]>();
+
+  // SSE-based real-time updates - No connection handling needed (HTTP-based)
+
+  // SSE broadcast function for real-time updates (replacing WebSocket)
+  globalThis.broadcastEntityUpdate = function(userId: number, entityType: string, entityId: number, updateData: any) {
+    console.log(`SSE: Broadcasting ${entityType} update to user ${userId}`);
+    
+    if (!globalThis.sseClients || !globalThis.sseClients.has(userId)) {
+      console.log(`SSE: No clients connected for user ${userId}`);
+      return;
+    }
+
+    const clients = globalThis.sseClients.get(userId);
+    
+    const message = JSON.stringify({
+      type: 'entity_update',
+      entityType,
+      entityId,
+      userId,
+      data: updateData,
+      timestamp: new Date().toISOString()
+    });
+
+    const sseData = `data: ${message}\n\n`;
+    let sentCount = 0;
+
+    clients.forEach(client => {
+      try {
+        client.write(sseData);
+        sentCount++;
+      } catch (error) {
+        console.error(`SSE: Error sending to client:`, error);
+        // Remove failed client
+        clients.delete(client);
+      }
+    });
+
+    console.log(`SSE: Sent ${entityType} update to ${sentCount} clients for user ${userId}`);
+  };
+
+  // Process-specific broadcast function for manual progression controls
+  globalThis.broadcastProcessUpdate = function(userId: number, processId: number, updateData: any) {
+    console.log(`SSE: Broadcasting process update to user ${userId}, process ${processId}`);
+    
+    if (!globalThis.sseClients || !globalThis.sseClients.has(userId)) {
+      console.log(`SSE: No clients connected for user ${userId}`);
+      return;
+    }
+
+    const clients = globalThis.sseClients.get(userId);
+    
+    const message = JSON.stringify({
+      type: 'process_update',
+      processId,
+      userId,
+      update: updateData,
+      timestamp: new Date().toISOString()
+    });
+
+    const sseData = `data: ${message}\n\n`;
+    let sentCount = 0;
+
+    clients.forEach(client => {
+      try {
+        client.write(sseData);
+        sentCount++;
+      } catch (error) {
+        console.error(`SSE: Error sending process update:`, error);
+        // Remove failed client
+        clients.delete(client);
+      }
+    });
+
+    console.log(`SSE: Sent process update to ${sentCount} clients for user ${userId}`);
+  };
+
+  // Make outbound API functions globally available
+  globalThis.sendToWarehouseModule = sendToWarehouseModule;
+  globalThis.requestQualityTesting = requestQualityTesting;
+
+  // =============================================
+  // DEMO DATA GENERATION - FOR DEMONSTRATION PURPOSES
+  // =============================================
+
+  // Generate diverse warehouse receipts for demo
+  apiRouter.post("/demo/generate-receipts", requireAuth, async (req: Request, res: Response) => {
+    try {
+      console.log("Generating diverse warehouse receipts for demo...");
+      
+      const demoReceiptsData = [
+        {
+          receiptNumber: `WR${Date.now()}-001`,
+          commodityName: 'Wheat (गेहूं)',
+          quantity: '250',
+          measurementUnit: 'MT',
+          status: 'active' as const,
+          warehouseName: 'Karnal Premium Storage',
+          warehouseAddress: 'Grain Market Road, Karnal, Haryana',
+          qualityGrade: 'Grade A',
+          valuation: (250 * 1000 * 50).toString(),
+          blockchainHash: `0x${Math.random().toString(16).substring(2, 18)}`,
+          issuedDate: new Date(),
+          expiryDate: new Date(Date.now() + 6 * 30 * 24 * 60 * 60 * 1000),
+          liens: JSON.stringify({
+            collateralized: true,
+            loanAmount: 6250000, // 25% of value
+            lenderName: 'Punjab National Bank',
+            collateralPercentage: 80,
+            verificationCode: `WR-${req.session.userId}-${Math.random().toString(16).substring(2, 11).toUpperCase()}`
+          })
+        },
+        {
+          receiptNumber: `WR${Date.now()}-002`,
+          commodityName: 'Basmati Rice (बासमती चावल)',
+          quantity: '100',
+          measurementUnit: 'MT',
+          status: 'active' as const,
+          warehouseName: 'Delhi Central Warehouse',
+          warehouseAddress: 'Azadpur Mandi, Delhi',
+          qualityGrade: 'Super Grade',
+          valuation: (100 * 1000 * 75).toString(), // Premium pricing for Basmati
+          blockchainHash: `0x${Math.random().toString(16).substring(2, 18)}`,
+          issuedDate: new Date(Date.now() - 15 * 24 * 60 * 60 * 1000), // 15 days ago
+          expiryDate: new Date(Date.now() + 5 * 30 * 24 * 60 * 60 * 1000),
+          liens: JSON.stringify({
+            collateralized: false,
+            verificationCode: `WR-${req.session.userId}-${Math.random().toString(16).substring(2, 11).toUpperCase()}`
+          })
+        },
+        {
+          receiptNumber: `WR${Date.now()}-003`,
+          commodityName: 'Soybean (सोयाबीन)',
+          quantity: '500',
+          measurementUnit: 'MT',
+          status: 'active' as const,
+          warehouseName: 'Indore Commodity Hub',
+          warehouseAddress: 'Krishi Upaj Mandi, Indore, MP',
+          qualityGrade: 'Grade A',
+          valuation: (500 * 1000 * 45).toString(),
+          blockchainHash: `0x${Math.random().toString(16).substring(2, 18)}`,
+          issuedDate: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000), // 1 month ago
+          expiryDate: new Date(Date.now() + 4 * 30 * 24 * 60 * 60 * 1000),
+          liens: JSON.stringify({
+            collateralized: true,
+            loanAmount: 18000000, // 80% of value
+            lenderName: 'State Bank of India',
+            collateralPercentage: 80,
+            verificationCode: `WR-${req.session.userId}-${Math.random().toString(16).substring(2, 11).toUpperCase()}`
+          })
+        },
+        {
+          receiptNumber: `WR${Date.now()}-004`,
+          commodityName: 'Maize (मक्का)',
+          quantity: '150',
+          measurementUnit: 'MT',
+          status: 'active' as const,
+          warehouseName: 'Bihar Grain Storage',
+          warehouseAddress: 'Hajipur Industrial Area, Bihar',
+          qualityGrade: 'Grade B',
+          valuation: (150 * 1000 * 35).toString(),
+          blockchainHash: `0x${Math.random().toString(16).substring(2, 18)}`,
+          issuedDate: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000), // 1 week ago
+          expiryDate: new Date(Date.now() + 5 * 30 * 24 * 60 * 60 * 1000),
+          liens: JSON.stringify({
+            collateralized: false,
+            verificationCode: `WR-${req.session.userId}-${Math.random().toString(16).substring(2, 11).toUpperCase()}`
+          })
+        },
+        {
+          receiptNumber: `WR${Date.now()}-005`,
+          commodityName: 'Cotton (कपास)',
+          quantity: '75',
+          measurementUnit: 'MT',
+          status: 'active' as const,
+          warehouseName: 'Gujarat Cotton Warehouse',
+          warehouseAddress: 'Cotton Market, Rajkot, Gujarat',
+          qualityGrade: 'Premium',
+          valuation: (75 * 1000 * 85).toString(), // Premium cotton pricing
+          blockchainHash: `0x${Math.random().toString(16).substring(2, 18)}`,
+          issuedDate: new Date(Date.now() - 45 * 24 * 60 * 60 * 1000), // 45 days ago
+          expiryDate: new Date(Date.now() + 3 * 30 * 24 * 60 * 60 * 1000),
+          liens: JSON.stringify({
+            collateralized: true,
+            loanAmount: 4250000, // 66% of value
+            lenderName: 'HDFC Bank',
+            collateralPercentage: 70,
+            verificationCode: `WR-${req.session.userId}-${Math.random().toString(16).substring(2, 11).toUpperCase()}`
+          })
+        },
+        {
+          receiptNumber: `WR${Date.now()}-006`,
+          commodityName: 'Turmeric (हल्दी)',
+          quantity: '25',
+          measurementUnit: 'MT',
+          status: 'active' as const,
+          warehouseName: 'Erode Spice Warehouse',
+          warehouseAddress: 'Spice Market, Erode, Tamil Nadu',
+          qualityGrade: 'Export Quality',
+          valuation: (25 * 1000 * 120).toString(), // High value spice
+          blockchainHash: `0x${Math.random().toString(16).substring(2, 18)}`,
+          issuedDate: new Date(Date.now() - 20 * 24 * 60 * 60 * 1000),
+          expiryDate: new Date(Date.now() + 8 * 30 * 24 * 60 * 60 * 1000),
+          liens: JSON.stringify({
+            collateralized: false,
+            verificationCode: `WR-${req.session.userId}-${Math.random().toString(16).substring(2, 11).toUpperCase()}`
+          })
+        },
+        {
+          receiptNumber: `WR${Date.now()}-007`,
+          commodityName: 'Mustard Seed (सरसों)',
+          quantity: '200',
+          measurementUnit: 'MT',
+          status: 'active' as const,
+          warehouseName: 'Rajasthan Oilseed Storage',
+          warehouseAddress: 'Kota Mandi, Rajasthan',
+          qualityGrade: 'Grade A',
+          valuation: (200 * 1000 * 55).toString(),
+          blockchainHash: `0x${Math.random().toString(16).substring(2, 18)}`,
+          issuedDate: new Date(Date.now() - 60 * 24 * 60 * 60 * 1000), // 2 months ago
+          expiryDate: new Date(Date.now() + 2 * 30 * 24 * 60 * 60 * 1000),
+          liens: JSON.stringify({
+            collateralized: true,
+            loanAmount: 8800000, // 80% of value
+            lenderName: 'ICICI Bank',
+            collateralPercentage: 80,
+            verificationCode: `WR-${req.session.userId}-${Math.random().toString(16).substring(2, 11).toUpperCase()}`
+          })
+        },
+        {
+          receiptNumber: `WR${Date.now()}-008`,
+          commodityName: 'Chickpea (चना)',
+          quantity: '300',
+          measurementUnit: 'MT',
+          status: 'active' as const,
+          warehouseName: 'Maharashtra Pulse Center',
+          warehouseAddress: 'Latur Agricultural Market, Maharashtra',
+          qualityGrade: 'Grade A',
+          valuation: (300 * 1000 * 60).toString(),
+          blockchainHash: `0x${Math.random().toString(16).substring(2, 18)}`,
+          issuedDate: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000),
+          expiryDate: new Date(Date.now() + 6 * 30 * 24 * 60 * 60 * 1000),
+          liens: JSON.stringify({
+            collateralized: false,
+            verificationCode: `WR-${req.session.userId}-${Math.random().toString(16).substring(2, 11).toUpperCase()}`
+          })
+        },
+        {
+          receiptNumber: `WR${Date.now()}-009`,
+          commodityName: 'Groundnut (मूंगफली)',
+          quantity: '180',
+          measurementUnit: 'MT',
+          status: 'active' as const,
+          warehouseName: 'Andhra Pradesh Oilseed Hub',
+          warehouseAddress: 'Kurnool District Storage, AP',
+          qualityGrade: 'Premium',
+          valuation: (180 * 1000 * 70).toString(),
+          blockchainHash: `0x${Math.random().toString(16).substring(2, 18)}`,
+          issuedDate: new Date(Date.now() - 25 * 24 * 60 * 60 * 1000),
+          expiryDate: new Date(Date.now() + 4 * 30 * 24 * 60 * 60 * 1000),
+          liens: JSON.stringify({
+            collateralized: true,
+            loanAmount: 10080000, // 80% of value
+            lenderName: 'Axis Bank',
+            collateralPercentage: 80,
+            verificationCode: `WR-${req.session.userId}-${Math.random().toString(16).substring(2, 11).toUpperCase()}`
+          })
+        },
+        {
+          receiptNumber: `WR${Date.now()}-010`,
+          commodityName: 'Cumin (जीरा)',
+          quantity: '15',
+          measurementUnit: 'MT',
+          status: 'active' as const,
+          warehouseName: 'Unjha Spice Storage',
+          warehouseAddress: 'Unjha Spice Market, Gujarat',
+          qualityGrade: 'Export Grade',
+          valuation: (15 * 1000 * 200).toString(), // High value spice
+          blockchainHash: `0x${Math.random().toString(16).substring(2, 18)}`,
+          issuedDate: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000),
+          expiryDate: new Date(Date.now() + 12 * 30 * 24 * 60 * 60 * 1000), // Longer expiry for spices
+          liens: JSON.stringify({
+            collateralized: false,
+            verificationCode: `WR-${req.session.userId}-${Math.random().toString(16).substring(2, 11).toUpperCase()}`
+          })
+        },
+        {
+          receiptNumber: `WR${Date.now()}-011`,
+          commodityName: 'Jute (जूट)',
+          quantity: '120',
+          measurementUnit: 'MT',
+          status: 'active' as const,
+          warehouseName: 'West Bengal Fiber Storage',
+          warehouseAddress: 'Barrackpore Jute Mill Area, WB',
+          qualityGrade: 'Grade A',
+          valuation: (120 * 1000 * 40).toString(),
+          blockchainHash: `0x${Math.random().toString(16).substring(2, 18)}`,
+          issuedDate: new Date(Date.now() - 35 * 24 * 60 * 60 * 1000),
+          expiryDate: new Date(Date.now() + 3 * 30 * 24 * 60 * 60 * 1000),
+          liens: JSON.stringify({
+            collateralized: true,
+            loanAmount: 3360000, // 70% of value
+            lenderName: 'Bank of Baroda',
+            collateralPercentage: 70,
+            verificationCode: `WR-${req.session.userId}-${Math.random().toString(16).substring(2, 11).toUpperCase()}`
+          })
+        },
+        {
+          receiptNumber: `WR${Date.now()}-012`,
+          commodityName: 'Sesame Seeds (तिल)',
+          quantity: '50',
+          measurementUnit: 'MT',
+          status: 'active' as const,
+          warehouseName: 'Odisha Oilseed Storage',
+          warehouseAddress: 'Bhubaneswar Agricultural Hub, Odisha',
+          qualityGrade: 'Premium',
+          valuation: (50 * 1000 * 90).toString(),
+          blockchainHash: `0x${Math.random().toString(16).substring(2, 18)}`,
+          issuedDate: new Date(Date.now() - 18 * 24 * 60 * 60 * 1000),
+          expiryDate: new Date(Date.now() + 7 * 30 * 24 * 60 * 60 * 1000),
+          liens: JSON.stringify({
+            collateralized: false,
+            verificationCode: `WR-${req.session.userId}-${Math.random().toString(16).substring(2, 11).toUpperCase()}`
+          })
+        }
+      ];
+
+      const createdReceipts = [];
+      
+      for (const receiptData of demoReceiptsData) {
+        try {
+          const receipt = await storage.createWarehouseReceipt({
+            ...receiptData,
+            ownerId: req.session.userId
+          });
+          createdReceipts.push(receipt);
+          console.log(`Created demo receipt: ${receiptData.receiptNumber} - ${receiptData.commodityName}`);
+        } catch (error) {
+          console.warn(`Failed to create receipt ${receiptData.receiptNumber}:`, error);
+        }
+      }
+
+      console.log(`Successfully created ${createdReceipts.length} demo warehouse receipts`);
+
+      res.setHeader('Content-Type', 'application/json');
+      res.json({ 
+        success: true, 
+        message: `Created ${createdReceipts.length} diverse warehouse receipts`,
+        receipts: createdReceipts 
+      });
+    } catch (error) {
+      console.error("Error generating demo receipts:", error);
+      res.setHeader('Content-Type', 'application/json');
+      res.status(500).json({ message: "Failed to generate demo receipts" });
+    }
+  });
+
+  // =============================================
+  // DEMO PROGRESSION CONTROLS - FOR DEMONSTRATION PURPOSES
+  // =============================================
+
+  // Advance process to next stage manually (demo mode)
+  apiRouter.post("/processes/:processId/advance-stage", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const processId = parseInt(req.params.processId);
+      const { nextStage, demoMode } = req.body;
+
+      if (!demoMode) {
+        return res.status(400).json({ message: "This endpoint is only available in demo mode" });
+      }
+
+      // Get current process
+      const process = await storage.getProcess(processId);
+      if (!process) {
+        return res.status(404).json({ message: "Process not found" });
+      }
+
+      // Verify ownership
+      if (process.userId !== req.session.userId) {
+        return res.status(403).json({ message: "Unauthorized" });
+      }
+
+      // Update process stage
+      await storage.updateProcess(processId, {
+        currentStage: nextStage,
+        lastUpdated: new Date()
+      });
+
+      // Broadcast update to connected clients
+      if (typeof globalThis.broadcastProcessUpdate === 'function') {
+        globalThis.broadcastProcessUpdate(req.session.userId, processId, {
+          currentStage: nextStage,
+          message: `Stage advanced to: ${nextStage.replace('_', ' ').toUpperCase()}`,
+          timestamp: new Date().toISOString()
+        });
+      }
+
+      console.log(`Demo: Advanced process ${processId} to stage: ${nextStage}`);
+
+      res.setHeader('Content-Type', 'application/json');
+      res.json({ 
+        success: true, 
+        currentStage: nextStage,
+        message: `Advanced to ${nextStage}` 
+      });
+    } catch (error) {
+      console.error("Error advancing process stage:", error);
+      res.setHeader('Content-Type', 'application/json');
+      res.status(500).json({ message: "Failed to advance stage" });
+    }
+  });
+
+  // Jump to specific stage (demo mode)
+  apiRouter.post("/processes/:processId/jump-to-stage", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const processId = parseInt(req.params.processId);
+      const { targetStage, demoMode } = req.body;
+
+      if (!demoMode) {
+        return res.status(400).json({ message: "This endpoint is only available in demo mode" });
+      }
+
+      // Get current process
+      const process = await storage.getProcess(processId);
+      if (!process) {
+        return res.status(404).json({ message: "Process not found" });
+      }
+
+      // Verify ownership
+      if (process.userId !== req.session.userId) {
+        return res.status(403).json({ message: "Unauthorized" });
+      }
+
+      // Update process stage
+      await storage.updateProcess(processId, {
+        currentStage: targetStage,
+        lastUpdated: new Date()
+      });
+
+      // Broadcast update to connected clients
+      if (typeof globalThis.broadcastProcessUpdate === 'function') {
+        globalThis.broadcastProcessUpdate(req.session.userId, processId, {
+          currentStage: targetStage,
+          message: `Jumped to stage: ${targetStage.replace('_', ' ').toUpperCase()}`,
+          timestamp: new Date().toISOString()
+        });
+      }
+
+      console.log(`Demo: Jumped process ${processId} to stage: ${targetStage}`);
+
+      res.setHeader('Content-Type', 'application/json');
+      res.json({ 
+        success: true, 
+        currentStage: targetStage,
+        message: `Jumped to ${targetStage}` 
+      });
+    } catch (error) {
+      console.error("Error jumping to process stage:", error);
+      res.setHeader('Content-Type', 'application/json');
+      res.status(500).json({ message: "Failed to jump to stage" });
+    }
+  });
+
+  // Reset process to beginning (demo mode)
+  apiRouter.post("/processes/:processId/reset-stages", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const processId = parseInt(req.params.processId);
+      const { demoMode } = req.body;
+
+      if (!demoMode) {
+        return res.status(400).json({ message: "This endpoint is only available in demo mode" });
+      }
+
+      // Get current process
+      const process = await storage.getProcess(processId);
+      if (!process) {
+        return res.status(404).json({ message: "Process not found" });
+      }
+
+      // Verify ownership
+      if (process.userId !== req.session.userId) {
+        return res.status(403).json({ message: "Unauthorized" });
+      }
+
+      // Reset to initial stage
+      await storage.updateProcess(processId, {
+        currentStage: 'pickup_scheduled',
+        progress: 10,
+        lastUpdated: new Date()
+      });
+
+      // Broadcast update to connected clients
+      if (typeof globalThis.broadcastProcessUpdate === 'function') {
+        globalThis.broadcastProcessUpdate(req.session.userId, processId, {
+          currentStage: 'pickup_scheduled',
+          message: 'Process reset to beginning',
+          timestamp: new Date().toISOString()
+        });
+      }
+
+      console.log(`Demo: Reset process ${processId} to beginning`);
+
+      res.setHeader('Content-Type', 'application/json');
+      res.json({ 
+        success: true, 
+        currentStage: 'pickup_scheduled',
+        message: 'Process reset to beginning' 
+      });
+    } catch (error) {
+      console.error("Error resetting process:", error);
+      res.setHeader('Content-Type', 'application/json');
+      res.status(500).json({ message: "Failed to reset process" });
+    }
+  });
+
+  return httpServer;
+}

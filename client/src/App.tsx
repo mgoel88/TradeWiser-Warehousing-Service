@@ -35,6 +35,7 @@ import NotFound from "@/pages/not-found";
 import ProductDemoPage from "@/pages/ProductDemoPage";
 import TrackDepositPage from "@/pages/TrackDepositPage";
 import CreditWithdrawalPage from "@/pages/CreditWithdrawalPage";
+import RevolvingCreditPage from "@/pages/RevolvingCreditPage";
 
 function Router() {
   return (
@@ -43,8 +44,7 @@ function Router() {
       <Route path="/login" component={LandingPage} />
       <Route path="/dashboard" component={StreamlinedDashboard} />
       <Route path="/portfolio" component={NewDashboardPage} />
-      <Route path="/deposits/new" component={NewDepositPage} />
-      <Route path="/warehouses" component={WarehousePage} />
+   <Route path="/deposits/new" component={DepositPage} />    <Route path="/warehouses" component={WarehousePage} />
       <Route path="/receipts" component={ReceiptsPage} />
       <Route path="/loans" component={LoansPage} />
       <Route path="/loans/streamlined" component={StreamlinedLoansPage} />
@@ -68,6 +68,7 @@ function Router() {
       <Route path="/admin/integration-health" component={AdminDashboard} />
       <Route path="/docs/api" component={SwaggerDocsPage} />
       <Route path="/demo" component={ProductDemoPage} />
+      <Route path="/credit" component={RevolvingCreditPage} />
       <Route path="/credit/withdraw" component={CreditWithdrawalPage} />
       <Route component={NotFound} />
     </Switch>

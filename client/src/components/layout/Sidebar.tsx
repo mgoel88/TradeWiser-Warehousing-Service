@@ -51,8 +51,7 @@ export default function Sidebar() {
                 Storage Services
               </h3>
             </div>
-            <Link href="/deposit" className={cn(
-              "flex items-center p-2 pl-7 rounded-md text-sm",
+          <Link href="/deposit" className={cn(       "flex items-center p-2 pl-7 rounded-md text-sm",
               location === "/deposit" 
                 ? "bg-emerald-50 text-emerald-600 font-medium" 
                 : "text-gray-700 hover:bg-gray-100"

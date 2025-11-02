@@ -1,0 +1,15 @@
+nohup: ignoring input
+Error loading warehouses: ReferenceError: __dirname is not defined
+    at WarehouseService.loadWarehouses (file:///home/ubuntu/TradeWiser-Warehousing-Service/dist/index.js:2156:40)
+    at new WarehouseService (file:///home/ubuntu/TradeWiser-Warehousing-Service/dist/index.js:2152:10)
+    at file:///home/ubuntu/TradeWiser-Warehousing-Service/dist/index.js:2264:24
+    at ModuleJob.run (node:internal/modules/esm/module_job:271:25)
+    at async onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:547:26)
+    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:116:5)
+Registering API routes...
+API routes registered successfully
+12:44:25 PM [express] serving on port 5000
+Test user created at startup: testuser/password123 (hashed)
+Created sample commodities for test user
+Created 3 sample warehouses
+Error: ENOENT: no such file or directory, stat '/home/ubuntu/TradeWiser-Warehousing-Service/dist/public/index.html'

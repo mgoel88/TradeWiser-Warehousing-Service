@@ -111,9 +111,9 @@ const LocationPicker: React.FC<LocationPickerProps> = ({
     setMarker(newMarker);
     setCoordinates(latlng);
     
-    // Auto-select location after placing a marker
+    // Auto-select location immediately after placing a marker
+    setIsLocationSelected(true);
     if (address) {
-      setIsLocationSelected(true);
       onLocationSelect(address, latlng);
     }
   };
@@ -408,28 +408,7 @@ const LocationPicker: React.FC<LocationPickerProps> = ({
             </p>
           </div>
         )}
-        
-        {/* Confirm button */}
-        {coordinates && !isLocationSelected && (
-          <div className="absolute bottom-3 right-3">
-            <Button
-              onClick={() => {
-                if (coordinates && address) {
-                  setIsLocationSelected(true);
-                  onLocationSelect(address, coordinates);
-                  toast({
-                    title: "Location Selected",
-                    description: "Pickup location has been set",
-                  });
-                }
-              }}
-              disabled={!coordinates || !address}
-              className="shadow-lg"
-            >
-              Confirm Location
-            </Button>
-          </div>
-        )}
+        {/* Location is auto-confirmed when marker is placed - no manual confirmation needed */}
       </div>
       
       {/* Selected location display */}
