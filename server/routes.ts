@@ -15,7 +15,7 @@ import { webhookRateLimiter, adminRateLimiter, generalRateLimiter } from "./midd
 import authRouter from "./routes/auth";
 import revolvingCreditRouter from "./routes/revolvingCreditJWT";
 import { verifyPassword } from './auth';
-import { authenticateJWT } from "./middleware/auth";
+import { authenticateJWT } from "./middleware/jwtAuth";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   const apiRouter = express.Router();

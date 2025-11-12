@@ -6,6 +6,8 @@
  * services that need to send updates to clients.
  */
 
+import { broadcastToUser } from '../routes/sse';
+
 // Define type for the global broadcast functions
 type BroadcastEntityFn = (userId: number, entityType: string, entityId: number, data: any) => void;
 type BroadcastProcessFn = (userId: number, processId: number, data: any) => void;
@@ -23,9 +25,13 @@ class BroadcastService {
    */
   broadcastReceiptUpdate(userId: number, receiptId: number, data: any) {
     const broadcastFn = (global as any).broadcastEntityUpdate as BroadcastEntityFn | undefined;
-    if (typeof broadcastFn === 'function') {
-      broadcastFn(userId, 'receipt', receiptId, data);
-    }
+    broadcastToUser(userId.toString(), {
+      type: 'receipt_update',
+      entityType: 'receipt',
+      entityId: receiptId,
+      data,
+      timestamp: new Date().toISOString(),
+    });
   }
   
   /**
@@ -37,9 +43,13 @@ class BroadcastService {
    */
   broadcastLoanUpdate(userId: number, loanId: number, data: any) {
     const broadcastFn = (global as any).broadcastEntityUpdate as BroadcastEntityFn | undefined;
-    if (typeof broadcastFn === 'function') {
-      broadcastFn(userId, 'loan', loanId, data);
-    }
+    broadcastToUser(userId.toString(), {
+      type: 'loan_update',
+      entityType: 'loan',
+      entityId: loanId,
+      data,
+      timestamp: new Date().toISOString(),
+    });
   }
   
   /**
@@ -51,9 +61,13 @@ class BroadcastService {
    */
   broadcastCommodityUpdate(userId: number, commodityId: number, data: any) {
     const broadcastFn = (global as any).broadcastEntityUpdate as BroadcastEntityFn | undefined;
-    if (typeof broadcastFn === 'function') {
-      broadcastFn(userId, 'commodity', commodityId, data);
-    }
+    broadcastToUser(userId.toString(), {
+      type: 'commodity_update',
+      entityType: 'commodity',
+      entityId: commodityId,
+      data,
+      timestamp: new Date().toISOString(),
+    });
   }
   
   /**
@@ -65,9 +79,13 @@ class BroadcastService {
    */
   broadcastWarehouseUpdate(userId: number, warehouseId: number, data: any) {
     const broadcastFn = (global as any).broadcastEntityUpdate as BroadcastEntityFn | undefined;
-    if (typeof broadcastFn === 'function') {
-      broadcastFn(userId, 'warehouse', warehouseId, data);
-    }
+    broadcastToUser(userId.toString(), {
+      type: 'warehouse_update',
+      entityType: 'warehouse',
+      entityId: warehouseId,
+      data,
+      timestamp: new Date().toISOString(),
+    });
   }
   
   /**
@@ -78,10 +96,13 @@ class BroadcastService {
    * @param data - The data to include in the update
    */
   broadcastProcessUpdate(userId: number, processId: number, data: any) {
-    const broadcastFn = (global as any).broadcastProcessUpdate as BroadcastProcessFn | undefined;
-    if (typeof broadcastFn === 'function') {
-      broadcastFn(userId, processId, data);
-    }
+    broadcastToUser(userId.toString(), {
+      type: 'process_update',
+      entityType: 'process',
+      entityId: processId,
+      data,
+      timestamp: new Date().toISOString(),
+    });
   }
 }
 

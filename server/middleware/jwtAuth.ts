@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
-import { verifyToken, extractTokenFromHeader, JWTPayload } from '../utils/jwt';
+import { verifyAccessToken, TokenPayload } from '../utils/jwt';
 
 // Extend Express Request type to include user info
 declare global {
@@ -21,7 +21,7 @@ declare global {
 export function authenticateJWT(req: Request, res: Response, next: NextFunction) {
   try {
     // Extract token from Authorization header
-    const token = extractTokenFromHeader(req.headers.authorization);
+    const token = req.headers.authorization?.split(' ')[1];
 
     if (!token) {
       return res.status(401).json({
@@ -31,10 +31,10 @@ export function authenticateJWT(req: Request, res: Response, next: NextFunction)
     }
 
     // Verify token
-    const payload: JWTPayload = verifyToken(token);
+    const payload = verifyAccessToken(token);
 
     // Check if it's an access token (not a refresh token)
-    if (payload.type !== 'access') {
+    if (!payload) {
       return res.status(401).json({
         success: false,
         message: 'Invalid token type'
@@ -65,12 +65,12 @@ export function authenticateJWT(req: Request, res: Response, next: NextFunction)
  */
 export function optionalAuthenticateJWT(req: Request, res: Response, next: NextFunction) {
   try {
-    const token = extractTokenFromHeader(req.headers.authorization);
+    const token = req.headers.authorization?.split(' ')[1];
 
     if (token) {
-      const payload: JWTPayload = verifyToken(token);
+      const payload = verifyAccessToken(token);
       
-      if (payload.type === 'access') {
+      if (payload) {
         req.user = {
           userId: payload.userId,
           email: payload.email,

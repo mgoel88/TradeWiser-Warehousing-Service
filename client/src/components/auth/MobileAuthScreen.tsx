@@ -9,7 +9,7 @@ import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
 import { useMutation } from '@tanstack/react-query';
 import { apiRequest } from '@/lib/queryClient';
-import { useAuth } from '@/hooks/useAuth';
+import { useAuth } from '@/context/AuthContext';
 import { useLocation } from 'wouter';
 import { Smartphone, User, Mail, Eye, EyeOff, Check, RefreshCw } from 'lucide-react';
 import { SiGoogle, SiFacebook } from 'react-icons/si';

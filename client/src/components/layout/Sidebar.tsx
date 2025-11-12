@@ -1,6 +1,6 @@
 import { Link, useLocation } from 'wouter';
 import { cn } from '@/lib/utils';
-import { useAuth } from '@/hooks/useAuth';
+import { useAuth } from '@/context/AuthContext';
 import { Warehouse, FileText, Package, BadgeDollarSign, CreditCard, FileCheck, ExternalLink, User, Settings, LogOut, Wallet } from 'lucide-react';
 import tradewiserLogo from '@assets/TradeWiser Logo_1753185456298.png';
 

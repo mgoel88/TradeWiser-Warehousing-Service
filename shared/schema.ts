@@ -772,7 +772,9 @@ export const kycRecords = pgTable('kyc_records', {
   rejectionReason: text('rejection_reason'),
   
   createdAt: timestamp('created_at').defaultNow(),
-  updatedAt: timestamp('updated_at').defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+  tenantId: text("tenant_id").notNull().default("tw-warehouse-tenant-id"), // New field for multi-tenancy simulation
+  appPermissions: json("app_permissions").notNull().default({ pricing_tool: false, logistics: false, warehousing: true }), // New field for app access control
 });
 
 // Demat account integration table

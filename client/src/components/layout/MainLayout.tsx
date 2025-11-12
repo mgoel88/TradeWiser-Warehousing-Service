@@ -1,5 +1,5 @@
 import { ReactNode, useState } from "react";
-import { useAuth } from "@/hooks/useAuth";
+import { useAuth } from "@/context/AuthContext";
 import { useIsMobile } from "@/hooks/use-mobile";
 import Header from "./Header";
 import Sidebar from "./Sidebar";

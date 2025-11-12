@@ -4,7 +4,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 // WebSocket removed - using SSE instead
 const useWebSocket = () => ({ isConnected: false });
-import { useAuth } from "@/hooks/useAuth";
+import { useAuth } from "@/context/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { useRealTimeEntity } from "@/hooks/use-real-time-entity";
 import MainLayout from '@/components/layout/MainLayout';

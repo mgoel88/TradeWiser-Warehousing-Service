@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useLocation } from 'wouter';
-import { useContext } from 'react';
-import { AuthContext } from '@/context/AuthContext';
+import { useAuth } from '@/context/AuthContext';
+
 import MobileAuthScreen from '@/components/auth/MobileAuthScreen';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -31,7 +31,7 @@ import tradewiserLogo from '@assets/TradeWiser Logo_1753185456298.png';
 
 export default function LandingPage() {
   const [, setLocation] = useLocation();
-  const { user, setAuthenticatedUser, isLoading } = useContext(AuthContext);
+  const { user, isAuthenticated, isLoading, login } = useAuth();
   const [showAuth, setShowAuth] = useState(false);
   const [loginData, setLoginData] = useState({ username: '', password: '' });
   const [loginError, setLoginError] = useState('');
@@ -45,7 +45,7 @@ export default function LandingPage() {
 
   // Handle successful authentication from any method
   const handleAuthSuccess = (userData: any) => {
-    setAuthenticatedUser(userData);
+    // The new AuthContext handles state update internally after login
     setLocation('/dashboard');
   };
 

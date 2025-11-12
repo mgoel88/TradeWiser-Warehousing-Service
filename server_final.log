@@ -8391,3 +8391,155 @@ Session ID: oOwU1Ka8TBGSWa9MmgwSF82RCRtyr2mU, Session data: Session {
   }
 }
 3:26:43 PM [express] GET /api/portfolio 401 in 1ms :: {"message":"Not authenticated"}
+🧹 Rate limiter cleanup: removed 0 expired entries
+🧹 Rate limiter cleanup: removed 0 expired entries
+🧹 Rate limiter cleanup: removed 0 expired entries
+🧹 Rate limiter cleanup: removed 0 expired entries
+🧹 Rate limiter cleanup: removed 0 expired entries
+🧹 Rate limiter cleanup: removed 0 expired entries
+🧹 Rate limiter cleanup: removed 0 expired entries
+🧹 Rate limiter cleanup: removed 0 expired entries
+🧹 Rate limiter cleanup: removed 0 expired entries
+🧹 Rate limiter cleanup: removed 0 expired entries
+🧹 Rate limiter cleanup: removed 0 expired entries
+🧹 Rate limiter cleanup: removed 0 expired entries
+🧹 Performed periodic cleanup of monitoring data
+🧹 Rate limiter cleanup: removed 0 expired entries
+🧹 Rate limiter cleanup: removed 0 expired entries
+🧹 Rate limiter cleanup: removed 0 expired entries
+🧹 Rate limiter cleanup: removed 0 expired entries
+🧹 Rate limiter cleanup: removed 0 expired entries
+🧹 Rate limiter cleanup: removed 0 expired entries
+🧹 Rate limiter cleanup: removed 0 expired entries
+🧹 Rate limiter cleanup: removed 0 expired entries
+🧹 Rate limiter cleanup: removed 0 expired entries
+🧹 Rate limiter cleanup: removed 0 expired entries
+🧹 Rate limiter cleanup: removed 0 expired entries
+🧹 Rate limiter cleanup: removed 0 expired entries
+🧹 Rate limiter cleanup: removed 0 expired entries
+🧹 Rate limiter cleanup: removed 0 expired entries
+🧹 Rate limiter cleanup: removed 0 expired entries
+🧹 Rate limiter cleanup: removed 0 expired entries
+🧹 Rate limiter cleanup: removed 0 expired entries
+🧹 Rate limiter cleanup: removed 0 expired entries
+🧹 Rate limiter cleanup: removed 0 expired entries
+🧹 Rate limiter cleanup: removed 0 expired entries
+🧹 Rate limiter cleanup: removed 0 expired entries
+🧹 Rate limiter cleanup: removed 0 expired entries
+🧹 Rate limiter cleanup: removed 0 expired entries
+🧹 Rate limiter cleanup: removed 0 expired entries
+🧹 Performed periodic cleanup of monitoring data
+🧹 Rate limiter cleanup: removed 0 expired entries
+🧹 Rate limiter cleanup: removed 0 expired entries
+🧹 Rate limiter cleanup: removed 0 expired entries
+Session ID: 84GLyMyVjnKB11D1ZPh1aMFFGKVF4Bo8, Session data: Session {
+  cookie: {
+    path: '/',
+    _expires: 2025-11-13T08:13:41.900Z,
+    originalMaxAge: 86400000,
+    httpOnly: true,
+    secure: false,
+    sameSite: 'lax'
+  }
+}
+4:16:52 AM [express] GET /api/portfolio 401 in 0ms :: {"message":"Not authenticated"}
+🧹 Rate limiter cleanup: removed 0 expired entries
+🧹 Rate limiter cleanup: removed 0 expired entries
+🧹 Rate limiter cleanup: removed 0 expired entries
+🧹 Rate limiter cleanup: removed 0 expired entries
+🧹 Rate limiter cleanup: removed 0 expired entries
+🧹 Rate limiter cleanup: removed 0 expired entries
+🧹 Rate limiter cleanup: removed 0 expired entries
+🧹 Rate limiter cleanup: removed 0 expired entries
+🧹 Rate limiter cleanup: removed 0 expired entries
+Session ID: 84GLyMyVjnKB11D1ZPh1aMFFGKVF4Bo8, Session data: Session {
+  cookie: {
+    path: '/',
+    _expires: 2025-11-13T09:17:14.180Z,
+    originalMaxAge: 86400000,
+    httpOnly: true,
+    secure: false,
+    sameSite: 'lax'
+  }
+}
+4:31:01 AM [express] GET /api/deposits/1/progress 401 in 1ms :: {"message":"Not authenticated"}
+Session ID: 84GLyMyVjnKB11D1ZPh1aMFFGKVF4Bo8, Session data: Session {
+  cookie: {
+    path: '/',
+    _expires: 2025-11-13T09:31:01.427Z,
+    originalMaxAge: 86400000,
+    httpOnly: true,
+    secure: false,
+    sameSite: 'lax'
+  }
+}
+4:31:17 AM [express] GET /api/deposits/1/progress 401 in 1ms :: {"message":"Not authenticated"}
+Session ID: 84GLyMyVjnKB11D1ZPh1aMFFGKVF4Bo8, Session data: Session {
+  cookie: {
+    path: '/',
+    _expires: 2025-11-13T09:31:17.490Z,
+    originalMaxAge: 86400000,
+    httpOnly: true,
+    secure: false,
+    sameSite: 'lax'
+  }
+}
+4:31:24 AM [express] GET /api/deposits/1/progress 401 in 1ms :: {"message":"Not authenticated"}
+Session ID: 84GLyMyVjnKB11D1ZPh1aMFFGKVF4Bo8, Session data: Session {
+  cookie: {
+    path: '/',
+    _expires: 2025-11-13T09:31:24.539Z,
+    originalMaxAge: 86400000,
+    httpOnly: true,
+    secure: false,
+    sameSite: 'lax'
+  }
+}
+4:32:42 AM [express] GET /api/deposits/1/progress 401 in 1ms :: {"message":"Not authenticated"}
+🧹 Rate limiter cleanup: removed 0 expired entries
+🧹 Rate limiter cleanup: removed 0 expired entries
+🧹 Rate limiter cleanup: removed 0 expired entries
+Session ID: 84GLyMyVjnKB11D1ZPh1aMFFGKVF4Bo8, Session data: Session {
+  cookie: {
+    path: '/',
+    _expires: 2025-11-13T09:32:42.819Z,
+    originalMaxAge: 86400000,
+    httpOnly: true,
+    secure: false,
+    sameSite: 'lax'
+  }
+}
+4:33:24 AM [express] GET /api/deposits/1/progress 401 in 1ms :: {"message":"Not authenticated"}
+Session ID: 84GLyMyVjnKB11D1ZPh1aMFFGKVF4Bo8, Session data: Session {
+  cookie: {
+    path: '/',
+    _expires: 2025-11-13T09:33:24.017Z,
+    originalMaxAge: 86400000,
+    httpOnly: true,
+    secure: false,
+    sameSite: 'lax'
+  }
+}
+4:33:35 AM [express] GET /api/deposits/1/progress 401 in 2ms :: {"message":"Not authenticated"}
+Session ID: 84GLyMyVjnKB11D1ZPh1aMFFGKVF4Bo8, Session data: Session {
+  cookie: {
+    path: '/',
+    _expires: 2025-11-13T09:33:35.050Z,
+    originalMaxAge: 86400000,
+    httpOnly: true,
+    secure: false,
+    sameSite: 'lax'
+  }
+}
+4:33:53 AM [express] GET /api/deposits/1/progress 401 in 497ms :: {"message":"Not authenticated"}
+Session ID: 84GLyMyVjnKB11D1ZPh1aMFFGKVF4Bo8, Session data: Session {
+  cookie: {
+    path: '/',
+    _expires: 2025-11-13T09:33:52.644Z,
+    originalMaxAge: 86400000,
+    httpOnly: true,
+    secure: false,
+    sameSite: 'lax'
+  }
+}
+4:34:07 AM [express] GET /api/deposits/1/progress 401 in 967ms :: {"message":"Not authenticated"}

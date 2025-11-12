@@ -1,135 +1,175 @@
-/**
- * Authentication Context
- * Clean JWT-based authentication for the frontend
- */
+import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { useToast } from '@/hooks/use-toast'; // Assuming this hook exists or needs to be created
 
-import React, { createContext, useContext, useState, useEffect } from 'react';
-import { apiClient } from '@/lib/api-client';
+interface AppPermissions {
+  pricing_tool: boolean;
+  logistics: boolean;
+  warehousing: boolean;
+}
 
 interface User {
-  id: number;
-  username: string;
-  fullName: string;
+  id: string; // Changed from number to string to match Supabase/JWT ID format
   email: string;
-  phone: string;
+  fullName: string;
+  tenantId: string;
   role: string;
-  kycVerified: boolean;
+  appPermissions: AppPermissions;
 }
 
 interface AuthContextType {
   user: User | null;
-  isLoading: boolean;
-  isAuthenticated: boolean;
-  login: (username: string, password: string) => Promise<boolean>;
-  register: (data: RegisterData) => Promise<boolean>;
+  loading: boolean;
+  login: (email: string, password: string) => Promise<void>;
+  register: (data: RegisterData) => Promise<void>;
   logout: () => Promise<void>;
-  refreshUser: () => Promise<void>;
+  refreshToken: () => Promise<void>;
 }
 
 interface RegisterData {
-  username: string;
+  email: string;
   password: string;
   fullName: string;
-  email: string;
-  phone: string;
-  role?: string;
+  companyName?: string;
+  phone?: string;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-export function AuthProvider({ children }: { children: React.ReactNode }) {
+export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [loading, setLoading] = useState(true);
+  const { toast } = useToast();
 
-  // Load user on mount if token exists
   useEffect(() => {
-    if (apiClient.isAuthenticated()) {
-      refreshUser();
-    } else {
-      setIsLoading(false);
-    }
+    checkAuth();
+    
+    // Set up token refresh interval (every 14 minutes)
+    const interval = setInterval(() => {
+      refreshToken();
+    }, 14 * 60 * 1000);
+
+    return () => clearInterval(interval);
   }, []);
 
-  const refreshUser = async () => {
+  const checkAuth = async () => {
     try {
-      if (!apiClient.isAuthenticated()) {
-        setUser(null);
-        setIsLoading(false);
-        return;
-      }
+      const response = await fetch('/api/auth/me', {
+        credentials: 'include'
+      });
 
-      const data = await apiClient.get('/api/auth/me');
-      
-      if (data.success && data.data) {
-        setUser(data.data);
+      if (response.ok) {
+        const data = await response.json();
+        setUser(data.user);
       } else {
-        apiClient.clearTokens();
         setUser(null);
       }
     } catch (error) {
-      console.error('Failed to fetch user:', error);
-      apiClient.clearTokens();
+      console.error('Auth check failed:', error);
       setUser(null);
     } finally {
-      setIsLoading(false);
+      setLoading(false);
     }
   };
 
-  const login = async (username: string, password: string): Promise<boolean> => {
+  const login = async (email: string, password: string) => {
     try {
-      const data = await apiClient.login(username, password);
-      
-      if (data.success && data.data) {
-        setUser(data.data.user);
-        return true;
-      } else {
-        throw new Error(data.message || 'Login failed');
+      const response = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ email, password })
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Login failed');
       }
-    } catch (error) {
-      console.error('Login error:', error);
-      return false;
+
+      setUser(data.user);
+      toast.toast({
+        title: 'Welcome back!',
+        description: `Logged in as ${data.user.email}`
+      });
+    } catch (error: any) {
+      toast.toast({
+        title: 'Login failed',
+        description: error.message,
+        variant: 'destructive'
+      });
+      throw error;
     }
   };
 
-  const register = async (registerData: RegisterData): Promise<boolean> => {
+  const register = async (data: RegisterData) => {
     try {
-      const data = await apiClient.register(registerData);
-      
-      if (data.success && data.data) {
-        setUser(data.data.user);
-        return true;
-      } else {
-        throw new Error(data.message || 'Registration failed');
+      const response = await fetch('/api/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(data)
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Registration failed');
       }
-    } catch (error) {
-      console.error('Registration error:', error);
-      return false;
+
+      setUser(result.user);
+      toast.toast({
+        title: 'Account created!',
+        description: 'Welcome to TradeWiser'
+      });
+    } catch (error: any) {
+      toast.toast({
+        title: 'Registration failed',
+        description: error.message,
+        variant: 'destructive'
+      });
+      throw error;
     }
   };
 
   const logout = async () => {
-    await apiClient.logout();
-    setUser(null);
+    try {
+      await fetch('/api/auth/logout', {
+        method: 'POST',
+        credentials: 'include'
+      });
+
+      setUser(null);
+      toast.toast({
+        title: 'Logged out',
+        description: 'You have been logged out successfully'
+      });
+    } catch (error) {
+      console.error('Logout failed:', error);
+    }
+  };
+
+  const refreshToken = async () => {
+    try {
+      const response = await fetch('/api/auth/refresh', {
+        method: 'POST',
+        credentials: 'include'
+      });
+
+      if (!response.ok) {
+        setUser(null);
+      }
+    } catch (error) {
+      console.error('Token refresh failed:', error);
+      setUser(null);
+    }
   };
 
   return (
-    <AuthContext.Provider
-      value={{
-        user,
-        isLoading,
-        isAuthenticated: !!user,
-        login,
-        register,
-        logout,
-        refreshUser
-      }}
-    >
+    <AuthContext.Provider value={{ user, loading, login, register, logout, refreshToken }}>
       {children}
     </AuthContext.Provider>
   );
 }
-
-export { AuthContext };
 
 export function useAuth() {
   const context = useContext(AuthContext);

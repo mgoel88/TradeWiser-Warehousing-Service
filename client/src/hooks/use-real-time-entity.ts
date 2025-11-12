@@ -6,14 +6,10 @@
  */
 import { useState, useEffect, useCallback } from 'react';
 // WebSocket removed - using SSE instead
-const useWebSocket = () => ({ 
-  subscribe: () => {}, 
-  unsubscribe: () => {}, 
-  isConnected: false 
-});
+import { useSSE } from './use-sse';
 import { useQueryClient } from '@tanstack/react-query';
-import { useContext } from 'react';
-import { AuthContext } from '@/context/AuthContext';
+import { useAuth } from '@/context/AuthContext';
+
 
 type EntityType = 'receipt' | 'process' | 'loan' | 'commodity' | 'warehouse';
 
@@ -42,8 +38,8 @@ export function useRealTimeEntity(
   options: RealTimeEntityOptions = {}
 ) {
   const { autoRefresh = true, onUpdate } = options;
-  const { isAuthenticated, user } = useContext(AuthContext);
-  const { subscribe, unsubscribe, isConnected } = useWebSocket();
+  const { isAuthenticated, user } = useAuth();
+  const { subscribe, unsubscribe, isConnected } = useSSE();
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
   const [isActive, setIsActive] = useState<boolean>(false);
   const queryClient = useQueryClient();
@@ -85,12 +81,12 @@ export function useRealTimeEntity(
   
   // Setup listener for entity updates
   useEffect(() => {
-    const handleWebSocketMessage = (event: CustomEvent) => {
+    const handleSSEMessage = (event: CustomEvent) => {
       try {
         const data = event.detail;
         
-        // Debug log for WebSocket messages
-        console.log('🔄 WebSocket message received:', data);
+        // Debug log for SSE messages
+        console.log('🔄 SSE message received:', data);
         
         // Only process messages for this specific entity
         if (
@@ -120,11 +116,11 @@ export function useRealTimeEntity(
       }
     };
     
-    // Listen to WebSocket messages dispatched by WebSocketContext
-    window.addEventListener('tradewiser:ws:message', handleWebSocketMessage as EventListener);
+    // Listen to SSE messages dispatched by useSSE hook
+    window.addEventListener('tradewiser:sse:message', handleSSEMessage as EventListener);
     
     return () => {
-      window.removeEventListener('tradewiser:ws:message', handleWebSocketMessage as EventListener);
+      window.removeEventListener('tradewiser:sse:message', handleSSEMessage as EventListener);
     };
   }, [entityType, entityId, autoRefresh, onUpdate, queryClient, getQueryKey]);
   

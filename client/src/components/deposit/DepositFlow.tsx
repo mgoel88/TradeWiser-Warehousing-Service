@@ -4,9 +4,9 @@ import { TimeSlotPicker } from "@/components/time-slot-picker";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useLocation } from "wouter";
-import { apiClient } from "@/lib/api-client";
+
 import { useToast } from "@/hooks/use-toast";
-import { useAuth } from "@/hooks/useAuth";
+import { useAuth } from "@/context/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
@@ -76,7 +76,7 @@ export default function DepositFlow({
   initialCommodity, 
   initialQuantity 
 }: DepositFlowProps) {
-  const { user, isAuthenticated } = useAuth();
+  const { user, isAuthenticated, apiClient } = useAuth();
   const { toast } = useToast();
   const [_, setLocation] = useLocation();
   const [currentStep, setCurrentStep] = useState<DepositStep>(DepositStep.CommodityDetails);
@@ -606,7 +606,7 @@ export default function DepositFlow({
                         <FormControl>
                           <CommoditySelector
                             value={field.value}
-                            onChange={field.onChange}
+                            onChange={(value) => field.onChange(value)}
                             onCategorySelect={(category) => {
                               // Auto-populate the commodity type based on selected category
                               form.setValue("type", category);

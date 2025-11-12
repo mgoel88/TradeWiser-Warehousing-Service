@@ -18,7 +18,63 @@ Created sample commodities for test user
 🔑 [AUTH.CLEAN] Generated tokens: [ 'accessToken', 'refreshToken', 'expiresIn' ]
 3:26:35 PM [express] POST /api/auth/login 200 in 255ms :: {"success":true,"message":"Login successfu…
 3:26:35 PM [express] GET /api/credit-line/details 401 in 2ms :: {"success":false,"message":"No authe…
-s
 🧹 Rate limiter cleanup: removed 0 expired entries
-3:26:35 PM [express] GET /api/portfolio 401 in 2ms :: {"success":false,"message":"No authentication …
-3:26:36 PM [express] GET /api/portfolio 401 in 1ms :: {"success":false,"message":"No authentication …
+🧹 Rate limiter cleanup: removed 0 expired entries
+🧹 Rate limiter cleanup: removed 0 expired entries
+🧹 Rate limiter cleanup: removed 0 expired entries
+🧹 Rate limiter cleanup: removed 0 expired entries
+🧹 Rate limiter cleanup: removed 0 expired entries
+🧹 Rate limiter cleanup: removed 0 expired entries
+🧹 Rate limiter cleanup: removed 0 expired entries
+🧹 Rate limiter cleanup: removed 0 expired entries
+🧹 Rate limiter cleanup: removed 0 expired entries
+🧹 Rate limiter cleanup: removed 0 expired entries
+🧹 Rate limiter cleanup: removed 0 expired entries
+🧹 Performed periodic cleanup of monitoring data
+🧹 Rate limiter cleanup: removed 0 expired entries
+🧹 Rate limiter cleanup: removed 0 expired entries
+🧹 Rate limiter cleanup: removed 0 expired entries
+🧹 Rate limiter cleanup: removed 0 expired entries
+🧹 Rate limiter cleanup: removed 0 expired entries
+🧹 Rate limiter cleanup: removed 0 expired entries
+3:05:39 AM [express] POST /api/auth/login 400 in 2ms :: {"success":false,"message":"Validation error…
+🧹 Rate limiter cleanup: removed 0 expired entries
+🧹 Rate limiter cleanup: removed 0 expired entries
+🧹 Rate limiter cleanup: removed 0 expired entries
+🧹 Rate limiter cleanup: removed 0 expired entries
+🧹 Rate limiter cleanup: removed 0 expired entries
+🧹 Rate limiter cleanup: removed 0 expired entries
+🧹 Rate limiter cleanup: removed 0 expired entries
+🧹 Rate limiter cleanup: removed 0 expired entries
+🧹 Rate limiter cleanup: removed 0 expired entries
+🧹 Rate limiter cleanup: removed 0 expired entries
+🧹 Rate limiter cleanup: removed 0 expired entries
+🧹 Rate limiter cleanup: removed 0 expired entries
+🧹 Rate limiter cleanup: removed 0 expired entries
+🧹 Rate limiter cleanup: removed 0 expired entries
+🧹 Rate limiter cleanup: removed 0 expired entries
+🧹 Rate limiter cleanup: removed 0 expired entries
+🧹 Rate limiter cleanup: removed 0 expired entries
+🧹 Rate limiter cleanup: removed 0 expired entries
+🧹 Performed periodic cleanup of monitoring data
+🧹 Rate limiter cleanup: removed 0 expired entries
+🧹 Rate limiter cleanup: removed 0 expired entries
+🧹 Rate limiter cleanup: removed 0 expired entries
+🧹 Rate limiter cleanup: removed 0 expired entries
+🧹 Rate limiter cleanup: removed 0 expired entries
+🧹 Rate limiter cleanup: removed 0 expired entries
+🧹 Rate limiter cleanup: removed 0 expired entries
+🧹 Rate limiter cleanup: removed 0 expired entries
+🧹 Rate limiter cleanup: removed 0 expired entries
+🧹 Rate limiter cleanup: removed 0 expired entries
+🧹 Rate limiter cleanup: removed 0 expired entries
+🧹 Rate limiter cleanup: removed 0 expired entries
+4:31:35 AM [express] GET /api/deposits/1/progress 401 in 1ms :: {"success":false,"message":"No authe…
+4:32:09 AM [express] GET /api/deposits/1/progress 401 in 1ms :: {"success":false,"message":"No authe…
+4:32:25 AM [express] GET /api/deposits/1/progress 401 in 1ms :: {"success":false,"message":"No authe…
+4:32:26 AM [express] GET /api/deposits/1/progress 401 in 1ms :: {"success":false,"message":"No authe…
+🧹 Rate limiter cleanup: removed 0 expired entries
+🧹 Rate limiter cleanup: removed 0 expired entries
+🧹 Rate limiter cleanup: removed 0 expired entries
+4:35:13 AM [express] GET /api/deposits/1/progress 401 i4:37:01 AM [express] GET /api/deposits/1/progress 401 in 1ms :: {"success":false,"message":"No authe…
+n 1ms :: {"success":false,"message":"No authe…
